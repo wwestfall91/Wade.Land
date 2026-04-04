@@ -1,14 +1,16 @@
-import "./App.css";
+import { useNavigate } from "react-router";
+import "./App.scss";
 
 function App() {
+  let navigate = useNavigate();
+
   return (
-    // A pointless change to test git deployment 4
-    <>
+    <div id="App">
       <div className="container">
-        <div className="welcome-text">You found me again!</div>
-        <button className="enter-button">ENTER</button>
+        <p className="welcome-text">Welcome to my humble little corner of the internet!</p>
+        <button className="enter-button" onClick={() => navigate("/Home") }>ENTER</button>
       </div>
-    </>
+    </div>
   );
 }
 
