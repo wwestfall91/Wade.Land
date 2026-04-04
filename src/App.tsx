@@ -5,7 +5,7 @@ function App() {
     // A pointless change to test git deployment 4
     <>
       <div className="container">
-        <div className="welcome-text">You found me!</div>
+        <div className="welcome-text">You found me again!</div>
         <button className="enter-button">ENTER</button>
       </div>
     </>
