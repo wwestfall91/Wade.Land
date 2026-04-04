@@ -2,6 +2,7 @@ import "./App.css";
 
 function App() {
   return (
+    // A pointless change to test git deployment
     <>
       <div className="container">
         <div className="welcome-text">You found me!</div>
