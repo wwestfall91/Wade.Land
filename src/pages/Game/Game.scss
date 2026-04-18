@@ -1,10 +1,23 @@
 #Game{
     display: flex;
+    width:100vw;
+    height:100vh;
+    flex-direction: column;
+    gap: 5rem;
+    justify-content: center;
+    align-items: center;
 
     .drag{
-        display: flex;
+        position: absolute;
         width: 2rem;
         height: 2rem;
         background-color: white;
+    }
+
+    .drop-zone{
+        display: flex;
+        width: 3rem;
+        height: 3rem;
+        background-color: rgb(255, 155, 155);
     }
 }
