@@ -6,12 +6,24 @@ type Position = {
 };
 
 type Props = {
+	id: number;
+	letter: string;
 	containerRef: React.RefObject<HTMLDivElement | null>;
-	dropZoneRef: React.RefObject<HTMLDivElement | null>;
+	dropZoneRefs: Array<React.RefObject<HTMLDivElement | null>>;
 	initialPosition: Position;
+	onSnapChange: (draggableId: number, zoneIndex: number | null) => void;
+	canSnapToZone: (draggableId: number, zoneIndex: number) => boolean;
 };
 
-function Draggable({ containerRef, dropZoneRef, initialPosition}: Props) {
+function Draggable({
+	id,
+	letter,
+	containerRef,
+	dropZoneRefs,
+	initialPosition,
+	onSnapChange,
+	canSnapToZone,
+}: Props) {
 	const [isDragging, setIsDragging] = useState(false);
 	const [mouseOffset, setMouseOffset] = useState({ x: 0, y: 0 });
 	const [position, setPosition] = useState<Position>(initialPosition);
@@ -32,18 +44,28 @@ function Draggable({ containerRef, dropZoneRef, initialPosition}: Props) {
 
 		const onUp = () => {
 			const containerRect = containerRef.current?.getBoundingClientRect();
-			const dropZoneRect = dropZoneRef.current?.getBoundingClientRect();
 			const dragRect = draggableRef.current?.getBoundingClientRect();
 
-			if (containerRect && dropZoneRect && dragRect) {
-				const intersects = !(
-					dragRect.right  < dropZoneRect.left     ||
-					dragRect.left   > dropZoneRect.right    ||
-					dragRect.bottom < dropZoneRect.top      ||
-					dragRect.top    > dropZoneRect.bottom
-				);
+			if (containerRect && dragRect) {
+				const snapZoneIndex = dropZoneRefs.findIndex((zoneRef, zoneIndex) => {
+					const dropZoneRect = zoneRef.current?.getBoundingClientRect();
+					if (!dropZoneRect) {
+						return false;
+					}
 
-				if (intersects) {
+					const intersects = !(
+						dragRect.right < dropZoneRect.left ||
+						dragRect.left > dropZoneRect.right ||
+						dragRect.bottom < dropZoneRect.top ||
+						dragRect.top > dropZoneRect.bottom
+					);
+
+					return intersects && canSnapToZone(id, zoneIndex);
+				});
+
+				if (snapZoneIndex !== -1) {
+					const dropZoneRect = dropZoneRefs[snapZoneIndex].current?.getBoundingClientRect();
+					if (dropZoneRect) {
 					setPosition({
 						x:
 							dropZoneRect.left -
@@ -54,6 +76,10 @@ function Draggable({ containerRef, dropZoneRef, initialPosition}: Props) {
 							containerRect.top +
 							(dropZoneRect.height - dragRect.height) / 2,
 					});
+						onSnapChange(id, snapZoneIndex);
+					}
+				} else {
+					onSnapChange(id, null);
 				}
 			}
 
@@ -67,7 +93,16 @@ function Draggable({ containerRef, dropZoneRef, initialPosition}: Props) {
 			window.removeEventListener("pointermove", onMove);
 			window.removeEventListener("pointerup", onUp);
 		};
-	}, [containerRef, dropZoneRef, isDragging, mouseOffset.x, mouseOffset.y]);
+	}, [
+		canSnapToZone,
+		containerRef,
+		dropZoneRefs,
+		id,
+		isDragging,
+		mouseOffset.x,
+		mouseOffset.y,
+		onSnapChange,
+	]);
 
 	const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
 		e.stopPropagation();
@@ -78,6 +113,7 @@ function Draggable({ containerRef, dropZoneRef, initialPosition}: Props) {
 			x: e.clientX - rect.left - position.x,
 			y: e.clientY - rect.top - position.y,
 		});
+		onSnapChange(id, null);
 		setIsDragging(true);
 	};
 
@@ -91,8 +127,12 @@ function Draggable({ containerRef, dropZoneRef, initialPosition}: Props) {
 				left: position.x,
 				cursor: isDragging ? "grabbing" : "grab",
 				userSelect: "none",
+				color: "black",
+				textAlign: "center"
 			}}
-		/>
+		>
+			{letter}
+		</div>
 	);
 }
 

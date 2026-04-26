@@ -1,11 +1,7 @@
 #Game{
-    display: flex;
     width:100vw;
     height:100vh;
-    flex-direction: column;
     gap: 5rem;
-    justify-content: center;
-    align-items: center;
 
     .drag{
         position: absolute;
@@ -15,10 +11,50 @@
         touch-action: none;
     }
 
+    .drop-zone-area{
+        display: flex;
+        gap:1rem;
+        justify-content: center;
+        align-items: center;
+    }
+
     .drop-zone{
         display: flex;
         width: 3rem;
         height: 3rem;
         background-color: rgb(255, 155, 155);
     }
+
+    .output{
+        display: flex;
+        width: 3rem;
+        height: 3rem;
+        background-color: rgb(239, 255, 95);
+    }
+
+    .combination-station{
+        display: flex;
+        flex-direction: column;
+        gap:1rem;
+    }
+
+    .combine-button:disabled{
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .combination-equation{
+        display: flex;
+        width: fit-content;
+        height: fit-content;
+        gap:1rem;
+    }
+
+    .combine-button{
+        display: flex;
+        justify-content: center;
+        width:60%;
+    }
+
+    
 }
