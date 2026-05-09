@@ -128,7 +128,8 @@ function Draggable({
 				cursor: isDragging ? "grabbing" : "grab",
 				userSelect: "none",
 				color: "black",
-				textAlign: "center"
+				textAlign: "center",
+				width: "fit-content"
 			}}
 		>
 			{letter}

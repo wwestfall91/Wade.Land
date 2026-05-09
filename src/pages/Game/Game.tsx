@@ -1,4 +1,5 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import * as XLSX from "xlsx";
 import Draggable from "./Draggable";
 import "./Game.scss";
 
@@ -13,6 +14,9 @@ type DraggableItem = {
     initialPosition: Position;
 };
 
+const SPREAD_X = 200;
+const SPREAD_Y = 150;
+
 function Game() {
     const gameRef = useRef<HTMLDivElement | null>(null);
     const dropZoneRefA = useRef<HTMLDivElement | null>(null);
@@ -20,13 +24,28 @@ function Game() {
     const outputRef = useRef<HTMLDivElement | null>(null);
     const dropZoneRefs = [dropZoneRefA, dropZoneRefB];
 
-    const [draggables, setDraggables] = useState<DraggableItem[]>([
-        { id: 1, letter: 'A', initialPosition: { x: -50, y: -50 } },
-        { id: 2, letter: 'B', initialPosition: { x: 100, y: 100 } },
-        { id: 3, letter: 'C', initialPosition: { x: 200, y: 150 } },
-    ]);
+    const [draggables, setDraggables] = useState<DraggableItem[]>([]);
     const [zoneOccupants, setZoneOccupants] = useState<Array<number | null>>([null, null]);
-    const nextId = useRef(4);
+    const nextId = useRef(1);
+
+    useEffect(() => {
+        fetch("/elements.xlsx")
+            .then((res) => res.arrayBuffer())
+            .then((buffer) => {
+                const wb = XLSX.read(buffer, { type: "array" });
+                const ws = wb.Sheets[wb.SheetNames[0]];
+                const rows = XLSX.utils.sheet_to_json<{ name: string }>(ws);
+                const items: DraggableItem[] = rows.map((row, index) => ({
+                    id: nextId.current++,
+                    letter: row.name,
+                    initialPosition: {
+                        x: (index % 3) * SPREAD_X,
+                        y: Math.floor(index / 3) * SPREAD_Y,
+                    },
+                }));
+                setDraggables(items);
+            });
+    }, []);
 
     const canCombine = zoneOccupants.every((occupantId) => occupantId !== null);
 
