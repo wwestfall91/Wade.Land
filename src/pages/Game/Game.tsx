@@ -14,6 +14,19 @@ type DraggableItem = {
     initialPosition: Position;
 };
 
+type CombinationRecipe = {
+    element1: string;
+    element2: string;
+    result: string;
+};
+
+type ElementRow = {
+    name?: string;
+    Name?: string;
+    ["Element 1"]?: string;
+    ["Element 2"]?: string;
+};
+
 const SPREAD_X = 200;
 const SPREAD_Y = 150;
 
@@ -25,6 +38,7 @@ function Game() {
     const dropZoneRefs = [dropZoneRefA, dropZoneRefB];
 
     const [draggables, setDraggables] = useState<DraggableItem[]>([]);
+    const [recipes, setRecipes] = useState<CombinationRecipe[]>([]);
     const [zoneOccupants, setZoneOccupants] = useState<Array<number | null>>([null, null]);
     const nextId = useRef(1);
 
@@ -34,8 +48,28 @@ function Game() {
             .then((buffer) => {
                 const wb = XLSX.read(buffer, { type: "array" });
                 const ws = wb.Sheets[wb.SheetNames[0]];
-                const rows = XLSX.utils.sheet_to_json<{ name: string }>(ws);
-                const items: DraggableItem[] = rows.map((row, index) => ({
+                const rows = XLSX.utils.sheet_to_json<ElementRow>(ws);
+
+                const parsedRows = rows
+                    .map((row) => ({
+                        name: (row.name ?? row.Name ?? "").trim(),
+                        element1: (row["Element 1"] ?? "").trim(),
+                        element2: (row["Element 2"] ?? "").trim(),
+                    }))
+                    .filter((row) => row.name.length > 0);
+
+                const baseElements = parsedRows.filter(
+                    (row) => row.element1.length === 0 && row.element2.length === 0,
+                );
+                const combinationRecipes = parsedRows
+                    .filter((row) => row.element1.length > 0 && row.element2.length > 0)
+                    .map((row) => ({
+                        element1: row.element1,
+                        element2: row.element2,
+                        result: row.name,
+                    }));
+
+                const items: DraggableItem[] = baseElements.map((row, index) => ({
                     id: nextId.current++,
                     letter: row.name,
                     initialPosition: {
@@ -43,7 +77,9 @@ function Game() {
                         y: Math.floor(index / 3) * SPREAD_Y,
                     },
                 }));
+
                 setDraggables(items);
+                setRecipes(combinationRecipes);
             });
     }, []);
 
@@ -74,9 +110,18 @@ function Game() {
         }
 
         const consumedIds = zoneOccupants.filter((occupantId): occupantId is number => occupantId !== null);
-        const combinedLetter = zoneOccupants
-            .map((occupantId) => draggables.find((draggable) => draggable.id === occupantId)?.letter ?? "")
-            .join("");
+        const occupantLetters = zoneOccupants.map(
+            (occupantId) => draggables.find((draggable) => draggable.id === occupantId)?.letter ?? "",
+        );
+        const [leftElement, rightElement] = occupantLetters;
+
+        const matchingRecipe = recipes.find(
+            (recipe) =>
+                (recipe.element1 === leftElement && recipe.element2 === rightElement) ||
+                (recipe.element1 === rightElement && recipe.element2 === leftElement),
+        );
+
+        const combinedLetter = matchingRecipe ? matchingRecipe.result : occupantLetters.join("");
 
         if (consumedIds.length !== dropZoneRefs.length || combinedLetter.length === 0) {
             return;
