@@ -62,6 +62,7 @@ function Game() {
     const navigate = useNavigate();
     const location = useLocation();
     const gameRef = useRef<HTMLDivElement | null>(null);
+    const elementStartRef = useRef<HTMLDivElement | null>(null);
     const dropZoneRefA = useRef<HTMLDivElement | null>(null);
     const dropZoneRefB = useRef<HTMLDivElement | null>(null);
     const outputRef = useRef<HTMLDivElement | null>(null);
@@ -69,18 +70,7 @@ function Game() {
 
     const restoredSpells = (location.state as GameLocationState | null)?.restoredSpells;
 
-    const [draggables, setDraggables] = useState<DraggableItem[]>(() => {
-        if (restoredSpells && restoredSpells.length > 0) {
-            return restoredSpells.map((spell, index) => ({
-                ...spell,
-                initialPosition: {
-                    x: (index % 3) * SPREAD_X,
-                    y: Math.floor(index / 3) * SPREAD_Y,
-                },
-            }));
-        }
-        return [];
-    });
+    const [draggables, setDraggables] = useState<DraggableItem[]>([]);
     const [recipes, setRecipes] = useState<CombinationRecipe[]>([]);
     const [enemies, setEnemies] = useState<Enemy[]>([]);
     const [zoneOccupants, setZoneOccupants] = useState<Array<number | null>>([null, null]);
@@ -89,6 +79,27 @@ function Game() {
             ? Math.max(...restoredSpells.map((s) => s.id)) + 1
             : 1
     );
+
+    const getSpawnPosition = (index: number): Position => {
+        const containerRect = gameRef.current?.getBoundingClientRect();
+        const startRect = elementStartRef.current?.getBoundingClientRect();
+
+        if (!containerRect || !startRect) {
+            return {
+                x: (index % 3) * SPREAD_X,
+                y: Math.floor(index / 3) * SPREAD_Y,
+            };
+        }
+
+        const step = 44;
+        const padding = 10;
+        const columns = Math.max(1, Math.floor((startRect.width - padding * 2) / step));
+
+        return {
+            x: startRect.left - containerRect.left + padding + (index % columns) * step,
+            y: startRect.top - containerRect.top + padding + Math.floor(index / columns) * step,
+        };
+    };
 
     useEffect(() => {
         const loadRecipesAndEnemies = (buffer: ArrayBuffer) => {
@@ -116,6 +127,15 @@ function Game() {
 
             setRecipes(combinationRecipes);
 
+            if (restoredSpells && restoredSpells.length > 0) {
+                const restoredItems: DraggableItem[] = restoredSpells.map((spell, index) => ({
+                    ...spell,
+                    initialPosition: getSpawnPosition(index),
+                }));
+                setDraggables(restoredItems);
+                return;
+            }
+
             if (!restoredSpells || restoredSpells.length === 0) {
                 const baseElements = parsedRows.filter(
                     (row) => row.element1.length === 0 && row.element2.length === 0,
@@ -124,10 +144,7 @@ function Game() {
                     id: nextId.current++,
                     letter: row.name,
                     damage: row.damage,
-                    initialPosition: {
-                        x: (index % 3) * SPREAD_X,
-                        y: Math.floor(index / 3) * SPREAD_Y,
-                    },
+                    initialPosition: getSpawnPosition(index),
                 }));
                 setDraggables(items);
             }
@@ -260,7 +277,7 @@ function Game() {
                 />
             ))}
 
-            <div className="element-start"></div>
+            <div className="element-start" ref={elementStartRef}></div>
             <div className="combination-station">
                 <div className="combination-equation">
                     <div className="drop-zone-area">
