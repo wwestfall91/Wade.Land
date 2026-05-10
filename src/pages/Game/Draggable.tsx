@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import "./Game.scss";
 
 type Position = {
 	x: number;
@@ -119,17 +120,22 @@ function Draggable({
 
 	return (
 		<div
+			id="Draggable"
 			ref={draggableRef}
 			className="drag"
 			onPointerDown={handlePointerDown}
 			style={{
+				display: "flex",
+				justifyContent: "center",
+				alignItems: "center",
 				top: position.y,
 				left: position.x,
 				cursor: isDragging ? "grabbing" : "grab",
 				userSelect: "none",
 				color: "black",
 				textAlign: "center",
-				width: "fit-content"
+				borderRadius: "1rem",
+				border:"3px solid black",
 			}}
 		>
 			{letter}
