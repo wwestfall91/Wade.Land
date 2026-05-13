@@ -39,6 +39,13 @@ export type PlayerProgress = {
     elements: PlayerElement[];
 };
 
+export type SelectedEnemy = {
+    name: string;
+    hp: number;
+    experience: number;
+    description: string;
+};
+
 type PlayerContextValue = {
     player: PlayerProgress;
     levelFillPercent: number;
@@ -47,6 +54,8 @@ type PlayerContextValue = {
     addExperience: (experience: number) => void;
     initializeElements: (elements: PlayerElement[]) => void;
     combineElements: (consumedIds: number[], newElement: PlayerElement) => void;
+    selectedEnemy: SelectedEnemy | null;
+    setSelectedEnemy: (enemy: SelectedEnemy | null) => void;
 };
 
 const DEFAULT_PLAYER_PROGRESS: PlayerProgress = {
@@ -118,6 +127,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
     const [experience, setExperience] = useState(0);
     const [levels, setLevels] = useState<LevelDefinition[]>([]);
     const [elements, setElements] = useState<PlayerElement[]>([]);
+    const [selectedEnemy, setSelectedEnemy] = useState<SelectedEnemy | null>(null);
 
     useEffect(() => {
         fetch("/levels.xlsx")
@@ -172,8 +182,10 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             addExperience,
             initializeElements,
             combineElements,
+            selectedEnemy,
+            setSelectedEnemy,
         }),
-        [addExperience, combineElements, initializeElements, levelFillPercent, levels, player],
+        [addExperience, combineElements, initializeElements, levelFillPercent, levels, player, selectedEnemy],
     );
 
     return <PlayerContext.Provider value={contextValue}>{children}</PlayerContext.Provider>;

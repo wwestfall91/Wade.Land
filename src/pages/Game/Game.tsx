@@ -83,6 +83,8 @@ function Game() {
         levelFillPercent,
         initializeElements,
         combineElements,
+        selectedEnemy: nextEnemy,
+        setSelectedEnemy: setNextEnemy,
     } = usePlayer();
     const gameRef = useRef<HTMLDivElement | null>(null);
     const elementStartRef = useRef<HTMLDivElement | null>(null);
@@ -95,7 +97,6 @@ function Game() {
     const [draggables, setDraggables] = useState<DraggableItem[]>([]);
     const [recipes, setRecipes] = useState<CombinationRecipe[]>([]);
     const [enemies, setEnemies] = useState<Enemy[]>([]);
-    const [nextEnemy, setNextEnemy] = useState<Enemy | null>(null);
     const [zoneOccupants, setZoneOccupants] = useState<Array<number | null>>([null, null]);
     const [isPreviewDragging, setIsPreviewDragging] = useState(false);
     const [isPreviewHovered, setIsPreviewHovered] = useState(false);
@@ -238,13 +239,9 @@ function Game() {
     }, [playerProgress.elements]);
 
     useEffect(() => {
-        if (enemies.length === 0) {
-            setNextEnemy(null);
-            return;
-        }
-
+        if (enemies.length === 0 || nextEnemy) return;
         setNextEnemy(enemies[Math.floor(Math.random() * enemies.length)]);
-    }, [enemies]);
+    }, [enemies, nextEnemy, setNextEnemy]);
 
     const canCombine = zoneOccupants.every((occupantId) => occupantId !== null);
 
@@ -529,12 +526,14 @@ function Game() {
     };
 
     const handleFight = () => {
-        const enemy = nextEnemy
-            ? nextEnemy
-            : { name: "Unknown", hp: 0, experience: 0 };
+        if (!nextEnemy) return;
+        // Pre-select the next enemy for after this fight (avoid picking the same one if possible)
+        const pool = enemies.filter((e) => e.name !== nextEnemy.name);
+        const nextPool = pool.length > 0 ? pool : enemies;
+        setNextEnemy(nextPool[Math.floor(Math.random() * nextPool.length)]);
         navigate("/fight", {
             state: {
-                enemy,
+                enemy: nextEnemy,
             },
         });
     };
