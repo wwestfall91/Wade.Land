@@ -4,6 +4,7 @@ import {
     useContext,
     useEffect,
     useMemo,
+    useRef,
     useState,
     type ReactNode,
 } from "react";
@@ -39,6 +40,8 @@ export type PlayerProgress = {
     elements: PlayerElement[];
 };
 
+export type RewardElement = Omit<PlayerElement, "id">;
+
 export type SelectedEnemy = {
     name: string;
     hp: number;
@@ -58,6 +61,7 @@ type PlayerContextValue = {
     combineElements: (consumedIds: number[], newElement: PlayerElement) => void;
     applyEnemyAttack: (power: number) => void;
     resetGame: () => void;
+    addElement: (element: RewardElement) => void;
     selectedEnemy: SelectedEnemy | null;
     setSelectedEnemy: (enemy: SelectedEnemy | null) => void;
 };
@@ -147,6 +151,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
     const [elements, setElements] = useState<PlayerElement[]>([]);
     const [currentHp, setCurrentHp] = useState<number | null>(null);
     const [selectedEnemy, setSelectedEnemy] = useState<SelectedEnemy | null>(null);
+    const previousLevelRef = useRef<number | null>(null);
 
     useEffect(() => {
         fetch("/levels.xlsx")
@@ -176,6 +181,16 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
         () => resolveLevelFillPercent(player, levels),
         [levels, player],
     );
+
+    useEffect(() => {
+        if (previousLevelRef.current !== null && player.level > previousLevelRef.current) {
+            const newLevelDef = levels.find((l) => l.level === player.level);
+            if (newLevelDef) {
+                setCurrentHp(newLevelDef.hp);
+            }
+        }
+        previousLevelRef.current = player.level;
+    }, [player.level, levels]);
 
     const addExperience = useCallback((amount: number) => {
         setExperience((previous) => previous + amount);
@@ -209,6 +224,13 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
         setSelectedEnemy(null);
     }, []);
 
+    const addElement = useCallback((element: RewardElement) => {
+        setElements((previous) => {
+            const maxId = previous.reduce((max, e) => Math.max(max, e.id), 0);
+            return [...previous, { ...element, id: maxId + 1 }];
+        });
+    }, []);
+
     const contextValue = useMemo(
         () => ({
             player,
@@ -220,6 +242,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             combineElements,
             applyEnemyAttack,
             resetGame,
+            addElement,
             selectedEnemy,
             setSelectedEnemy,
         }),
@@ -232,6 +255,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             levels,
             player,
             resetGame,
+            addElement,
             selectedEnemy,
         ],
     );

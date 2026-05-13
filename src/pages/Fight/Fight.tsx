@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import "./Fight.scss";
 import PlayerStats from "../../components/PlayerStats";
-import { usePlayer } from "../../context/PlayerContext";
+import { usePlayer, type RewardElement } from "../../context/PlayerContext";
+import RewardModal from "./RewardModal";
 
 type FightEnemy = {
     name: string;
@@ -13,18 +14,22 @@ type FightEnemy = {
 
 type FightLocationState = {
     enemy?: FightEnemy;
+    elementPool?: RewardElement[];
 };
 
 function Fight() {
     const location = useLocation();
     const navigate = useNavigate();
-    const { player, levelFillPercent, levels, addExperience, applyEnemyAttack, resetGame } = usePlayer();
+    const { player, levelFillPercent, levels, addExperience, addElement, applyEnemyAttack, resetGame } = usePlayer();
     const [flashingSlotId, setFlashingSlotId] = useState<number | null>(null);
     const [usedSpellIds, setUsedSpellIds] = useState<number[]>([]);
     const [turnMessage, setTurnMessage] = useState<string>("");
     const [isGameOver, setIsGameOver] = useState(false);
     const [isPlayerHit, setIsPlayerHit] = useState(false);
     const [isScreenFlashing, setIsScreenFlashing] = useState(false);
+    const [showRewardModal, setShowRewardModal] = useState(false);
+    const [rewardElements, setRewardElements] = useState<RewardElement[]>([]);
+    const preRewardXp = useRef(player.experience);
     const hasResolvedVictory = useRef(false);
     const playerHitTimeoutRef = useRef<number | null>(null);
     const screenFlashTimeoutRef = useRef<number | null>(null);
@@ -32,6 +37,11 @@ function Fight() {
     const enemy = useMemo(() => {
         const state = location.state as FightLocationState | null;
         return state?.enemy ?? { name: "Unknown", hp: 0, power: 0, experience: 0 };
+    }, [location.state]);
+
+    const elementPool = useMemo(() => {
+        const state = location.state as FightLocationState | null;
+        return state?.elementPool ?? [];
     }, [location.state]);
 
     const [enemyHealth, setEnemyHealth] = useState(() => enemy.hp);
@@ -64,12 +74,12 @@ function Fight() {
     useEffect(() => {
         if (enemyHealth <= 0 && !hasResolvedVictory.current) {
             hasResolvedVictory.current = true;
-            addExperience(enemy.experience);
-            navigate("/game", {
-                replace: true,
-            });
+            const shuffled = [...elementPool].sort(() => Math.random() - 0.5);
+            const chosen = shuffled.slice(0, Math.min(3, shuffled.length));
+            setRewardElements(chosen);
+            setShowRewardModal(true);
         }
-    }, [addExperience, enemy.experience, enemyHealth, navigate]);
+    }, [elementPool, enemyHealth]);
 
     useEffect(() => {
         if (levels.length === 0 || enemyHealth <= 0 || player.hp > 0) {
@@ -141,6 +151,14 @@ function Fight() {
         });
     };
 
+    const handleReturnHome = (selectedElement: RewardElement) => {
+        addExperience(enemy.experience);
+        addElement(selectedElement);
+        navigate("/game", {
+            replace: true,
+        });
+    };
+
     return (
         <div id="Fight" className={isScreenFlashing ? "is-screen-shaking" : undefined}>
             {isScreenFlashing ? <div className="screen-hit-flash" /> : null}
@@ -181,6 +199,15 @@ function Fight() {
                         <button type="button" onClick={handlePlayAgain}>Play again</button>
                     </div>
                 </div>
+            ) : null}
+            {showRewardModal ? (
+                <RewardModal
+                    xpGained={enemy.experience}
+                    currentXp={preRewardXp.current}
+                    levels={levels}
+                    rewardElements={rewardElements}
+                    onConfirm={handleReturnHome}
+                />
             ) : null}
         </div>
     );

@@ -103,6 +103,7 @@ function Game() {
     const [draggables, setDraggables] = useState<DraggableItem[]>([]);
     const [recipes, setRecipes] = useState<CombinationRecipe[]>([]);
     const [enemies, setEnemies] = useState<Enemy[]>([]);
+    const [baseElements, setBaseElements] = useState<Array<{ letter: string; damage: number; level: number; description: string }>>([]);
     const [zoneOccupants, setZoneOccupants] = useState<Array<number | null>>([null, null]);
     const [isPreviewDragging, setIsPreviewDragging] = useState(false);
     const [isPreviewHovered, setIsPreviewHovered] = useState(false);
@@ -168,11 +169,19 @@ function Game() {
                 }));
 
             setRecipes(combinationRecipes);
+            const baseElementRows = parsedRows.filter(
+                (row) => row.element1.length === 0 && row.element2.length === 0,
+            );
+            setBaseElements(
+                baseElementRows.map((row) => ({
+                    letter: row.name,
+                    damage: row.damage,
+                    level: row.level,
+                    description: row.description,
+                })),
+            );
             if (playerProgress.elements.length === 0) {
-                const baseElements = parsedRows.filter(
-                    (row) => row.element1.length === 0 && row.element2.length === 0,
-                );
-                const items = baseElements.map((row, index) => ({
+                const items = baseElementRows.map((row) => ({
                     id: nextId.current++,
                     letter: row.name,
                     damage: row.damage,
@@ -542,6 +551,7 @@ function Game() {
         navigate("/fight", {
             state: {
                 enemy: nextEnemy,
+                elementPool: baseElements,
             },
         });
     };

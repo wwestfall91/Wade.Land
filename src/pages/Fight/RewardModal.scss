@@ -1,0 +1,153 @@
+.reward-menu-overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(0, 0, 0, 0.75);
+    z-index: 100;
+}
+
+.reward-menu {
+    width: min(94vw, 34rem);
+    padding: 2rem 2rem 1.75rem;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background-color: #17181c;
+    color: #f5f5f5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.75rem;
+
+    .reward-title {
+        margin: 0;
+        font-size: 1.6rem;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+    }
+
+    .reward-xp-section {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 0.45rem;
+
+        .reward-level-label {
+            font-size: 0.88rem;
+            font-weight: 600;
+            opacity: 0.85;
+
+            .reward-levelup-flash {
+                color: #ffd700;
+                font-weight: 700;
+                margin-left: 0.4rem;
+                animation: rewardLevelUpPop 0.5s ease;
+            }
+        }
+
+        .reward-xp-bar-track {
+            width: 100%;
+            height: 0.75rem;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-radius: 999px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+
+        .reward-xp-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #ffd700, #ffaa00);
+            border-radius: 999px;
+
+            &.is-transitioning {
+                transition: width 900ms cubic-bezier(0.22, 1, 0.36, 1);
+            }
+        }
+
+        .reward-xp-gained {
+            font-size: 0.82rem;
+            opacity: 0.65;
+            text-align: right;
+        }
+    }
+
+    .reward-elements {
+        display: flex;
+        gap: 1.25rem;
+
+        .reward-element {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 6rem;
+            height: 6rem;
+            border-radius: 12px;
+            border: 2px solid rgba(255, 255, 255, 0.14);
+            background-color: rgba(255, 255, 255, 0.05);
+            color: #f5f5f5;
+            cursor: pointer;
+            gap: 0.4rem;
+            opacity: 0.4;
+            transition: border-color 140ms ease, background-color 140ms ease, opacity 140ms ease, transform 120ms ease;
+
+            &:hover {
+                opacity: 0.75;
+            }
+
+            &.is-selected {
+                border-color: #ffd700;
+                background-color: rgba(255, 215, 0, 0.1);
+                opacity: 1;
+                transform: scale(1.06);
+            }
+
+            .reward-element-letter {
+                font-size: 2rem;
+                line-height: 1;
+            }
+
+            .reward-element-damage {
+                font-size: 0.7rem;
+                font-weight: 600;
+                opacity: 0.8;
+            }
+        }
+    }
+
+    .reward-return-button {
+        min-width: 12rem;
+        height: 2.8rem;
+        border-radius: 8px;
+        border: 1px solid #e7e7e7;
+        background-color: #ffffff;
+        color: #17181c;
+        font-weight: 700;
+        cursor: pointer;
+        font-size: 1rem;
+        transition: background-color 120ms ease;
+
+        &:hover {
+            background-color: #f0f0f0;
+        }
+    }
+}
+
+@keyframes rewardLevelUpPop {
+    0% {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+
+    60% {
+        opacity: 1;
+        transform: scale(1.15);
+    }
+
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
