@@ -9,6 +9,7 @@ type Position = {
 type Props = {
 	id: number;
 	letter: string;
+	description: string;
 	containerRef: React.RefObject<HTMLDivElement | null>;
 	dropZoneRefs: Array<React.RefObject<HTMLDivElement | null>>;
 	initialPosition: Position;
@@ -19,6 +20,7 @@ type Props = {
 function Draggable({
 	id,
 	letter,
+	description,
 	containerRef,
 	dropZoneRefs,
 	initialPosition,
@@ -26,9 +28,53 @@ function Draggable({
 	canSnapToZone,
 }: Props) {
 	const [isDragging, setIsDragging] = useState(false);
+	const [isInvalidDrop, setIsInvalidDrop] = useState(false);
+	const [isHovered, setIsHovered] = useState(false);
+	const [popupOffsetX, setPopupOffsetX] = useState(0);
+	const [popupBelow, setPopupBelow] = useState(false);
 	const [mouseOffset, setMouseOffset] = useState({ x: 0, y: 0 });
 	const [position, setPosition] = useState<Position>(initialPosition);
 	const draggableRef = useRef<HTMLDivElement | null>(null);
+	const popupRef = useRef<HTMLDivElement | null>(null);
+
+	useEffect(() => {
+		if (!isHovered || isDragging || !description.length) {
+			setPopupOffsetX(0);
+			setPopupBelow(false);
+			return;
+		}
+
+		const updatePopupPosition = () => {
+			const dragRect = draggableRef.current?.getBoundingClientRect();
+			const popupRect = popupRef.current?.getBoundingClientRect();
+			if (!dragRect || !popupRect) {
+				return;
+			}
+
+			const screenPadding = 8;
+			const popupLeft = dragRect.left + dragRect.width / 2 - popupRect.width / 2;
+			const popupRight = popupLeft + popupRect.width;
+
+			if (popupLeft < screenPadding) {
+				setPopupOffsetX(screenPadding - popupLeft);
+			} else if (popupRight > window.innerWidth - screenPadding) {
+				setPopupOffsetX(window.innerWidth - screenPadding - popupRight);
+			} else {
+				setPopupOffsetX(0);
+			}
+
+			const topIfAbove = dragRect.top - 8 - popupRect.height;
+			setPopupBelow(topIfAbove < screenPadding);
+		};
+
+		const rafId = window.requestAnimationFrame(updatePopupPosition);
+		window.addEventListener("resize", updatePopupPosition);
+
+		return () => {
+			window.cancelAnimationFrame(rafId);
+			window.removeEventListener("resize", updatePopupPosition);
+		};
+	}, [description, isDragging, isHovered, position.x, position.y]);
 
 	useEffect(() => {
 		if (!isDragging) return;
@@ -48,7 +94,7 @@ function Draggable({
 			const dragRect = draggableRef.current?.getBoundingClientRect();
 
 			if (containerRect && dragRect) {
-				const snapZoneIndex = dropZoneRefs.findIndex((zoneRef, zoneIndex) => {
+				const intersectingZoneIndex = dropZoneRefs.findIndex((zoneRef) => {
 					const dropZoneRect = zoneRef.current?.getBoundingClientRect();
 					if (!dropZoneRect) {
 						return false;
@@ -61,12 +107,18 @@ function Draggable({
 						dragRect.top > dropZoneRect.bottom
 					);
 
-					return intersects && canSnapToZone(id, zoneIndex);
+					return intersects;
 				});
+
+				const snapZoneIndex =
+					intersectingZoneIndex !== -1 && canSnapToZone(id, intersectingZoneIndex)
+						? intersectingZoneIndex
+						: -1;
 
 				if (snapZoneIndex !== -1) {
 					const dropZoneRect = dropZoneRefs[snapZoneIndex].current?.getBoundingClientRect();
 					if (dropZoneRect) {
+						setIsInvalidDrop(false);
 					setPosition({
 						x:
 							dropZoneRect.left -
@@ -80,6 +132,9 @@ function Draggable({
 						onSnapChange(id, snapZoneIndex);
 					}
 				} else {
+					if (intersectingZoneIndex !== -1) {
+						setIsInvalidDrop(true);
+					}
 					onSnapChange(id, null);
 				}
 			}
@@ -110,10 +165,15 @@ function Draggable({
 		const rect = containerRef.current?.getBoundingClientRect();
 		if (!rect) return;
 
+		setIsInvalidDrop(false);
+
 		setMouseOffset({
 			x: e.clientX - rect.left - position.x,
 			y: e.clientY - rect.top - position.y,
 		});
+		setIsHovered(false);
+		setPopupOffsetX(0);
+		setPopupBelow(false);
 		onSnapChange(id, null);
 		setIsDragging(true);
 	};
@@ -122,8 +182,11 @@ function Draggable({
 		<div
 			id="Draggable"
 			ref={draggableRef}
-			className="drag"
+			className={`drag ${isInvalidDrop ? "is-invalid-drop" : ""}`}
 			onPointerDown={handlePointerDown}
+			onAnimationEnd={() => setIsInvalidDrop(false)}
+			onMouseEnter={() => setIsHovered(true)}
+			onMouseLeave={() => setIsHovered(false)}
 			style={{
 				display: "flex",
 				justifyContent: "center",
@@ -135,9 +198,20 @@ function Draggable({
 				color: "black",
 				textAlign: "center",
 				borderRadius: "1rem",
-				border:"3px solid black",
+				border: "3px solid black",
 			}}
 		>
+			{isHovered && !isDragging && description.length > 0 ? (
+				<div
+					ref={popupRef}
+					className={`drag-description-popup ${popupBelow ? "is-below" : ""}`}
+					style={{
+						["--popup-offset-x" as string]: `${popupOffsetX}px`,
+					}}
+				>
+					{description}
+				</div>
+			) : null}
 			{letter}
 		</div>
 	);

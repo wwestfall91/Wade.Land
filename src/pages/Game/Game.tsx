@@ -1,23 +1,14 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import Draggable from "./Draggable";
-import { useNavigate, useLocation } from "react-router";
+import { useNavigate } from "react-router";
+import PlayerStats from "../../components/PlayerStats";
+import { usePlayer } from "../../context/PlayerContext";
 import "./Game.scss";
 
 // TODO: Add enemy to Game Scene
 // TODO: Give player HP
 // TODO: Add enemy attacks
-
-type RestoredSpell = {
-    id: number;
-    letter: string;
-    damage: number;
-};
-
-type GameLocationState = {
-    restoredSpells?: RestoredSpell[];
-    playerExperience?: number;
-};
 
 type Position = {
     x: number;
@@ -28,6 +19,8 @@ type DraggableItem = {
     id: number;
     letter: string;
     damage: number;
+    level: number;
+    description: string;
     initialPosition: Position;
 };
 
@@ -36,6 +29,8 @@ type CombinationRecipe = {
     element2: string;
     result: string;
     damage: number;
+    level: number;
+    description: string;
 };
 
 type ElementRow = {
@@ -45,20 +40,15 @@ type ElementRow = {
     ["Element 2"]?: string;
     damage?: number | string;
     Damage?: number | string;
+    Level?: number | string;
+    level?: number | string;
+    Description?: string;
+    description?: string;
 };
 
 type EnemyRow = {
     Name?: string;
     name?: string;
-    HP?: number | string;
-    hp?: number | string;
-    Experience?: number | string;
-    experience?: number | string;
-};
-
-type LevelRow = {
-    Level?: number | string;
-    level?: number | string;
     HP?: number | string;
     hp?: number | string;
     Experience?: number | string;
@@ -71,52 +61,17 @@ type Enemy = {
     experience: number;
 };
 
-type LevelDefinition = {
-    level: number;
-    hp: number;
-    experience: number;
-};
-
-type PlayerProgress = {
-    level: number;
-    hp: number;
-    experience: number;
-};
-
 const SPREAD_X = 200;
 const SPREAD_Y = 150;
-const DEFAULT_PLAYER_PROGRESS: PlayerProgress = {
-    level: 1,
-    hp: 0,
-    experience: 0,
-};
-
-const resolvePlayerProgress = (
-    experience: number,
-    levels: LevelDefinition[],
-): PlayerProgress => {
-    if (levels.length === 0) {
-        return {
-            ...DEFAULT_PLAYER_PROGRESS,
-            experience,
-        };
-    }
-
-    const matchedLevel = levels.reduce(
-        (current, level) => (experience >= level.experience ? level : current),
-        levels[0],
-    );
-
-    return {
-        level: matchedLevel.level,
-        hp: matchedLevel.hp,
-        experience,
-    };
-};
 
 function Game() {
     const navigate = useNavigate();
-    const location = useLocation();
+    const {
+        player: playerProgress,
+        levelFillPercent,
+        initializeElements,
+        combineElements,
+    } = usePlayer();
     const gameRef = useRef<HTMLDivElement | null>(null);
     const elementStartRef = useRef<HTMLDivElement | null>(null);
     const dropZoneRefA = useRef<HTMLDivElement | null>(null);
@@ -124,53 +79,11 @@ function Game() {
     const outputRef = useRef<HTMLDivElement | null>(null);
     const dropZoneRefs = [dropZoneRefA, dropZoneRefB];
 
-    const routeState = location.state as GameLocationState | null;
-    const restoredSpells = routeState?.restoredSpells;
-
     const [draggables, setDraggables] = useState<DraggableItem[]>([]);
     const [recipes, setRecipes] = useState<CombinationRecipe[]>([]);
     const [enemies, setEnemies] = useState<Enemy[]>([]);
-    const [levels, setLevels] = useState<LevelDefinition[]>([]);
     const [zoneOccupants, setZoneOccupants] = useState<Array<number | null>>([null, null]);
-    const nextId = useRef(
-        restoredSpells && restoredSpells.length > 0
-            ? Math.max(...restoredSpells.map((s) => s.id)) + 1
-            : 1
-    );
-
-    const playerProgress = useMemo(
-        () => resolvePlayerProgress(routeState?.playerExperience ?? 0, levels),
-        [levels, routeState?.playerExperience],
-    );
-
-    const levelFillPercent = useMemo(() => {
-        if (levels.length === 0) {
-            return 0;
-        }
-
-        const currentLevel =
-            levels.find((level) => level.level === playerProgress.level) ?? levels[0];
-        const nextLevel = levels.find((level) => level.level > playerProgress.level);
-
-        if (!nextLevel) {
-            return 100;
-        }
-
-        const requiredExperience = nextLevel.experience - currentLevel.experience;
-        if (requiredExperience <= 0) {
-            return 100;
-        }
-
-        const gainedExperience = playerProgress.experience - currentLevel.experience;
-        const normalizedProgress = Math.max(0, Math.min(1, gainedExperience / requiredExperience));
-
-        return Math.round(normalizedProgress * 100);
-    }, [levels, playerProgress.experience, playerProgress.level]);
-
-    const playerStatsStyle = useMemo(
-        () => ({ "--xp-fill": `${levelFillPercent}%` }) as CSSProperties,
-        [levelFillPercent],
-    );
+    const nextId = useRef(1);
 
     const getSpawnPosition = (index: number): Position => {
         const containerRect = gameRef.current?.getBoundingClientRect();
@@ -205,6 +118,10 @@ function Game() {
                     element1: (row["Element 1"] ?? "").trim(),
                     element2: (row["Element 2"] ?? "").trim(),
                     damage: Number(row.damage ?? row.Damage ?? 0) || 0,
+                    level:
+                        Number(row.Level ?? row.level ?? 0) ||
+                        ((row["Element 1"] ?? "").trim().length === 0 ? 1 : 2),
+                    description: (row.Description ?? row.description ?? "").trim(),
                 }))
                 .filter((row) => row.name.length > 0);
 
@@ -215,30 +132,23 @@ function Game() {
                     element2: row.element2,
                     result: row.name,
                     damage: row.damage,
+                    level: row.level,
+                    description: row.description,
                 }));
 
             setRecipes(combinationRecipes);
-
-            if (restoredSpells && restoredSpells.length > 0) {
-                const restoredItems: DraggableItem[] = restoredSpells.map((spell, index) => ({
-                    ...spell,
-                    initialPosition: getSpawnPosition(index),
-                }));
-                setDraggables(restoredItems);
-                return;
-            }
-
-            if (!restoredSpells || restoredSpells.length === 0) {
+            if (playerProgress.elements.length === 0) {
                 const baseElements = parsedRows.filter(
                     (row) => row.element1.length === 0 && row.element2.length === 0,
                 );
-                const items: DraggableItem[] = baseElements.map((row, index) => ({
+                const items = baseElements.map((row, index) => ({
                     id: nextId.current++,
                     letter: row.name,
                     damage: row.damage,
-                    initialPosition: getSpawnPosition(index),
+                    level: row.level,
+                    description: row.description,
                 }));
-                setDraggables(items);
+                initializeElements(items);
             }
         };
 
@@ -262,23 +172,45 @@ function Game() {
                 setEnemies(parsed);
             });
 
-        fetch("/levels.xlsx")
-            .then((res) => res.arrayBuffer())
-            .then((buffer) => {
-                const wb = XLSX.read(buffer, { type: "array" });
-                const ws = wb.Sheets[wb.SheetNames[0]];
-                const rows = XLSX.utils.sheet_to_json<LevelRow>(ws);
-                const parsed: LevelDefinition[] = rows
-                    .map((row) => ({
-                        level: Number(row.Level ?? row.level ?? 0) || 0,
-                        hp: Number(row.HP ?? row.hp ?? 0) || 0,
-                        experience: Number(row.Experience ?? row.experience ?? 0) || 0,
-                    }))
-                    .filter((level) => level.level > 0)
-                    .sort((left, right) => left.level - right.level);
-                setLevels(parsed);
+    }, [initializeElements, playerProgress.elements.length]);
+
+    useEffect(() => {
+        setDraggables((previous) => {
+            const previousById = new Map(previous.map((item) => [item.id, item]));
+
+            return playerProgress.elements.map((element, index) => {
+                const existing = previousById.get(element.id);
+                if (existing) {
+                    return {
+                        ...existing,
+                        letter: element.letter,
+                        damage: element.damage,
+                        level: element.level,
+                        description: element.description,
+                    };
+                }
+
+                return {
+                    ...element,
+                    initialPosition: getSpawnPosition(index),
+                };
             });
-    }, []);
+        });
+
+        setZoneOccupants((previous) =>
+            previous.map((occupantId) =>
+                playerProgress.elements.some((element) => element.id === occupantId)
+                    ? occupantId
+                    : null,
+            ),
+        );
+
+        const maxId = playerProgress.elements.reduce(
+            (currentMax, element) => Math.max(currentMax, element.id),
+            0,
+        );
+        nextId.current = maxId + 1;
+    }, [playerProgress.elements]);
 
     const canCombine = zoneOccupants.every((occupantId) => occupantId !== null);
 
@@ -297,6 +229,11 @@ function Game() {
     };
 
     const canSnapToZone = (draggableId: number, zoneIndex: number) => {
+        const draggable = draggables.find((item) => item.id === draggableId);
+        if (!draggable || draggable.level >= 2) {
+            return false;
+        }
+
         const occupantId = zoneOccupants[zoneIndex];
         return occupantId === null || occupantId === draggableId;
     };
@@ -322,6 +259,10 @@ function Game() {
 
         const combinedLetter = matchingRecipe ? matchingRecipe.result : occupantLetters.join("");
         const combinedDamage = matchingRecipe ? matchingRecipe.damage : occupantDamage;
+        const combinedLevel = matchingRecipe ? matchingRecipe.level : 2;
+        const combinedDescription = matchingRecipe
+            ? matchingRecipe.description
+            : "Unstable fusion of two primal forces.";
 
         if (consumedIds.length !== dropZoneRefs.length || combinedLetter.length === 0) {
             return;
@@ -337,38 +278,41 @@ function Game() {
         const dragWidth = sampleDragRect?.width ?? 32;
         const dragHeight = sampleDragRect?.height ?? 32;
 
-        const newDraggable: DraggableItem = {
+        const newDraggable = {
             id: nextId.current,
             letter: combinedLetter,
             damage: combinedDamage,
-            initialPosition: {
-                x: outputRect.left - containerRect.left + (outputRect.width - dragWidth) / 2,
-                y: outputRect.top - containerRect.top + (outputRect.height - dragHeight) / 2,
-            },
+            level: combinedLevel,
+            description: combinedDescription,
         };
 
         nextId.current += 1;
 
-        setDraggables((previous) => [
-            ...previous.filter((draggable) => !consumedIds.includes(draggable.id)),
-            newDraggable,
-        ]);
+        combineElements(consumedIds, newDraggable);
+
+        setDraggables((previous) => {
+            const preserved = previous.filter((draggable) => !consumedIds.includes(draggable.id));
+            return [
+                ...preserved,
+                {
+                    ...newDraggable,
+                    initialPosition: {
+                        x: outputRect.left - containerRect.left + (outputRect.width - dragWidth) / 2,
+                        y: outputRect.top - containerRect.top + (outputRect.height - dragHeight) / 2,
+                    },
+                },
+            ];
+        });
         setZoneOccupants([null, null]);
     };
 
     const handleFight = () => {
         const enemy = enemies.length > 0
             ? enemies[Math.floor(Math.random() * enemies.length)]
-            : { name: "Unknown", hp: 0 };
+            : { name: "Unknown", hp: 0, experience: 0 };
         navigate("/fight", {
             state: {
                 enemy,
-                player: playerProgress,
-                spells: draggables.map((draggable) => ({
-                    id: draggable.id,
-                    letter: draggable.letter,
-                    damage: draggable.damage,
-                })),
             },
         });
     };
@@ -380,6 +324,7 @@ function Game() {
                     key={draggable.id}
                     id={draggable.id}
                     letter={draggable.letter}
+                    description={draggable.description}
                     containerRef={gameRef}
                     dropZoneRefs={dropZoneRefs}
                     initialPosition={draggable.initialPosition}
@@ -406,11 +351,12 @@ function Game() {
                 <button className="fight-button" onClick={handleFight}>
                     FIGHT!
                 </button>
-                <div className="player-stats" style={playerStatsStyle}>
-                    <div>Level {playerProgress.level}</div>
-                    <div>{playerProgress.hp} HP</div>
-                    <div>{playerProgress.experience} XP</div>
-                </div>
+                <PlayerStats
+                    level={playerProgress.level}
+                    hp={playerProgress.hp}
+                    experience={playerProgress.experience}
+                    fillPercent={levelFillPercent}
+                />
             </div>
         </div>
     );
