@@ -52,6 +52,8 @@ type EnemyRow = {
     name?: string;
     HP?: number | string;
     hp?: number | string;
+    Power?: number | string;
+    power?: number | string;
     Experience?: number | string;
     experience?: number | string;
     Description?: string;
@@ -61,6 +63,7 @@ type EnemyRow = {
 type Enemy = {
     name: string;
     hp: number;
+    power: number;
     experience: number;
     description: string;
 };
@@ -191,6 +194,7 @@ function Game() {
                     .map((row) => ({
                         name: ((row.Name ?? row.name ?? "") as string).trim(),
                         hp: Number(row.HP ?? row.hp ?? 0) || 0,
+                        power: Number(row.Power ?? row.power ?? 0) || 0,
                         experience: Number(row.Experience ?? row.experience ?? 0) || 0,
                         description: ((row.Description ?? row.description ?? "") as string).trim(),
                     }))

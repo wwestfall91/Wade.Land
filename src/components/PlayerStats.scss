@@ -38,4 +38,54 @@
         border-radius: 9px;
         padding: 0.1rem 0.55rem;
     }
+
+    &.is-hit {
+        border-color: rgba(255, 106, 106, 0.9);
+        box-shadow: 0 0 0.75rem rgba(255, 82, 82, 0.55);
+        animation: playerStatsHitShake 460ms ease-in-out, playerStatsHitFlash 460ms ease-in-out;
+
+        &::after {
+            background: rgba(120, 0, 0, 0.42);
+        }
+    }
+}
+
+@keyframes playerStatsHitShake {
+    0% {
+        transform: translateX(0);
+    }
+
+    18% {
+        transform: translateX(-4px);
+    }
+
+    36% {
+        transform: translateX(4px);
+    }
+
+    54% {
+        transform: translateX(-3px);
+    }
+
+    72% {
+        transform: translateX(3px);
+    }
+
+    100% {
+        transform: translateX(0);
+    }
+}
+
+@keyframes playerStatsHitFlash {
+    0% {
+        filter: saturate(1);
+    }
+
+    25% {
+        filter: saturate(1.3);
+    }
+
+    100% {
+        filter: saturate(1);
+    }
 }

@@ -44,6 +44,7 @@ export type SelectedEnemy = {
     hp: number;
     experience: number;
     description: string;
+    power: number;
 };
 
 type PlayerContextValue = {
@@ -54,6 +55,8 @@ type PlayerContextValue = {
     addExperience: (experience: number) => void;
     initializeElements: (elements: PlayerElement[]) => void;
     combineElements: (consumedIds: number[], newElement: PlayerElement) => void;
+    applyEnemyAttack: (power: number) => void;
+    resetGame: () => void;
     selectedEnemy: SelectedEnemy | null;
     setSelectedEnemy: (enemy: SelectedEnemy | null) => void;
 };
@@ -67,12 +70,29 @@ const DEFAULT_PLAYER_PROGRESS: PlayerProgress = {
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
 
+const resolveLevelForExperience = (
+    experience: number,
+    levels: LevelDefinition[],
+): LevelDefinition | null => {
+    if (levels.length === 0) {
+        return null;
+    }
+
+    return levels.reduce(
+        (current, level) => (experience >= level.experience ? level : current),
+        levels[0],
+    );
+};
+
 const resolvePlayerProgress = (
     experience: number,
     levels: LevelDefinition[],
     elements: PlayerElement[],
+    currentHp: number | null,
 ): PlayerProgress => {
-    if (levels.length === 0) {
+    const matchedLevel = resolveLevelForExperience(experience, levels);
+
+    if (!matchedLevel) {
         return {
             ...DEFAULT_PLAYER_PROGRESS,
             experience,
@@ -80,14 +100,11 @@ const resolvePlayerProgress = (
         };
     }
 
-    const matchedLevel = levels.reduce(
-        (current, level) => (experience >= level.experience ? level : current),
-        levels[0],
-    );
+    const resolvedHp = Math.max(0, Math.min(currentHp ?? matchedLevel.hp, matchedLevel.hp));
 
     return {
         level: matchedLevel.level,
-        hp: matchedLevel.hp,
+        hp: resolvedHp,
         experience,
         elements,
     };
@@ -127,6 +144,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
     const [experience, setExperience] = useState(0);
     const [levels, setLevels] = useState<LevelDefinition[]>([]);
     const [elements, setElements] = useState<PlayerElement[]>([]);
+    const [currentHp, setCurrentHp] = useState<number | null>(null);
     const [selectedEnemy, setSelectedEnemy] = useState<SelectedEnemy | null>(null);
 
     useEffect(() => {
@@ -149,8 +167,8 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
     }, []);
 
     const player = useMemo(
-        () => resolvePlayerProgress(experience, levels, elements),
-        [elements, experience, levels],
+        () => resolvePlayerProgress(experience, levels, elements, currentHp),
+        [currentHp, elements, experience, levels],
     );
 
     const levelFillPercent = useMemo(
@@ -173,6 +191,23 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
         ]);
     }, []);
 
+    const applyEnemyAttack = useCallback((power: number) => {
+        const normalizedPower = Math.max(0, power);
+        setCurrentHp((previousHp) => {
+            const matchedLevel = resolveLevelForExperience(experience, levels);
+            const maxHp = matchedLevel?.hp ?? 0;
+            const startingHp = previousHp ?? maxHp;
+            return Math.max(0, startingHp - normalizedPower);
+        });
+    }, [experience, levels]);
+
+    const resetGame = useCallback(() => {
+        setExperience(0);
+        setElements([]);
+        setCurrentHp(null);
+        setSelectedEnemy(null);
+    }, []);
+
     const contextValue = useMemo(
         () => ({
             player,
@@ -182,10 +217,22 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             addExperience,
             initializeElements,
             combineElements,
+            applyEnemyAttack,
+            resetGame,
             selectedEnemy,
             setSelectedEnemy,
         }),
-        [addExperience, combineElements, initializeElements, levelFillPercent, levels, player, selectedEnemy],
+        [
+            addExperience,
+            applyEnemyAttack,
+            combineElements,
+            initializeElements,
+            levelFillPercent,
+            levels,
+            player,
+            resetGame,
+            selectedEnemy,
+        ],
     );
 
     return <PlayerContext.Provider value={contextValue}>{children}</PlayerContext.Provider>;
