@@ -1,0 +1,83 @@
+#EnemyInfo{
+        display: flex;
+        flex-direction: column;
+        position: fixed;
+        bottom: 0;
+        right: 0;
+        margin: 1rem;
+        width: 20rem;
+        height:20rem;
+        border: 1px solid black;
+        max-height:25rem;
+        overflow: hidden;
+        background-color: #1e1f24;
+        background-image: repeating-linear-gradient(
+            -45deg,
+            rgba(255, 0, 0, 0.199) 0,
+            rgba(255, 0, 0, 0.199) 2px,
+            transparent 2px,
+            transparent 10px
+        );
+
+        > .enemy-info-header{
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+            justify-content: center;
+            align-items: center;
+            background-color: #ff5050;
+            font-weight: bold;
+            font-size:20px;
+            border-bottom: 1px solid black;
+
+            > .enemy-info-health{
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                width:100%;
+                border-top: black 1px solid;
+                font-size: 16px;
+            }
+        }
+
+        > .enemy-info-sprite{
+            display: flex;
+            flex-grow: 20;
+            justify-content: center;
+            align-items: center;
+            background-color: transparent;
+            position: relative;
+
+            > .enemy-sprite-image {
+                width: 85%;
+                max-height: 85%;
+                object-fit: contain;
+                image-rendering: crisp-edges;
+            }
+        }
+
+        &:hover .enemy-info-description {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+
+        > .enemy-info-description {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 0.75rem;
+            background-color: rgba(0, 0, 0, 0.72);
+            color: #fff;
+            font-size: 0.875rem;
+            font-weight: 500;
+            line-height: 1.4;
+            text-align: center;
+            opacity: 0;
+            transform: translateY(6px);
+            transition: opacity 0.18s ease, transform 0.18s ease;
+            pointer-events: none;
+        }
+    }

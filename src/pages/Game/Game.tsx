@@ -3,6 +3,7 @@ import * as XLSX from "xlsx";
 import Draggable from "./Draggable";
 import { useNavigate } from "react-router";
 import PlayerStats from "../../components/PlayerStats";
+import EnemyInfo from "../../components/EnemyInfo";
 import { usePlayer } from "../../context/PlayerContext";
 import "./Game.scss";
 
@@ -53,12 +54,15 @@ type EnemyRow = {
     hp?: number | string;
     Experience?: number | string;
     experience?: number | string;
+    Description?: string;
+    description?: string;
 };
 
 type Enemy = {
     name: string;
     hp: number;
     experience: number;
+    description: string;
 };
 
 type PreviewCombination = {
@@ -91,6 +95,7 @@ function Game() {
     const [draggables, setDraggables] = useState<DraggableItem[]>([]);
     const [recipes, setRecipes] = useState<CombinationRecipe[]>([]);
     const [enemies, setEnemies] = useState<Enemy[]>([]);
+    const [nextEnemy, setNextEnemy] = useState<Enemy | null>(null);
     const [zoneOccupants, setZoneOccupants] = useState<Array<number | null>>([null, null]);
     const [isPreviewDragging, setIsPreviewDragging] = useState(false);
     const [isPreviewHovered, setIsPreviewHovered] = useState(false);
@@ -186,6 +191,7 @@ function Game() {
                         name: ((row.Name ?? row.name ?? "") as string).trim(),
                         hp: Number(row.HP ?? row.hp ?? 0) || 0,
                         experience: Number(row.Experience ?? row.experience ?? 0) || 0,
+                        description: ((row.Description ?? row.description ?? "") as string).trim(),
                     }))
                     .filter((e) => e.name.length > 0);
                 setEnemies(parsed);
@@ -230,6 +236,15 @@ function Game() {
         );
         nextId.current = maxId + 1;
     }, [playerProgress.elements]);
+
+    useEffect(() => {
+        if (enemies.length === 0) {
+            setNextEnemy(null);
+            return;
+        }
+
+        setNextEnemy(enemies[Math.floor(Math.random() * enemies.length)]);
+    }, [enemies]);
 
     const canCombine = zoneOccupants.every((occupantId) => occupantId !== null);
 
@@ -514,8 +529,8 @@ function Game() {
     };
 
     const handleFight = () => {
-        const enemy = enemies.length > 0
-            ? enemies[Math.floor(Math.random() * enemies.length)]
+        const enemy = nextEnemy
+            ? nextEnemy
             : { name: "Unknown", hp: 0, experience: 0 };
         navigate("/fight", {
             state: {
@@ -601,6 +616,11 @@ function Game() {
                     fillPercent={levelFillPercent}
                 />
             </div>
+            <EnemyInfo 
+                enemyName={nextEnemy?.name ?? "Unknown Enemy"} 
+                enemyHealth={nextEnemy?.hp ?? 0}
+                enemyDescription={nextEnemy?.description ?? ""} 
+            />
         </div>
     );
 }
