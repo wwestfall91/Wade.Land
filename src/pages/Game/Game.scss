@@ -66,6 +66,13 @@
         animation: invalid-drop-shake 0.35s ease-in-out;
     }
 
+    .drag.drag-preview {
+        opacity: 0.5;
+        background-color: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(1px);
+        z-index: 3;
+    }
+
     @keyframes invalid-drop-shake {
         0% { transform: translateX(0); }
         20% { transform: translateX(-5px); }

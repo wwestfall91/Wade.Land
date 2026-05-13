@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import Draggable from "./Draggable";
 import { useNavigate } from "react-router";
@@ -61,6 +61,14 @@ type Enemy = {
     experience: number;
 };
 
+type PreviewCombination = {
+    consumedIds: number[];
+    letter: string;
+    damage: number;
+    level: number;
+    description: string;
+};
+
 const SPREAD_X = 200;
 const SPREAD_Y = 150;
 
@@ -77,12 +85,23 @@ function Game() {
     const dropZoneRefA = useRef<HTMLDivElement | null>(null);
     const dropZoneRefB = useRef<HTMLDivElement | null>(null);
     const outputRef = useRef<HTMLDivElement | null>(null);
+    const previewRef = useRef<HTMLDivElement | null>(null);
     const dropZoneRefs = [dropZoneRefA, dropZoneRefB];
 
     const [draggables, setDraggables] = useState<DraggableItem[]>([]);
     const [recipes, setRecipes] = useState<CombinationRecipe[]>([]);
     const [enemies, setEnemies] = useState<Enemy[]>([]);
     const [zoneOccupants, setZoneOccupants] = useState<Array<number | null>>([null, null]);
+    const [isPreviewDragging, setIsPreviewDragging] = useState(false);
+    const [isPreviewHovered, setIsPreviewHovered] = useState(false);
+    const [previewPopupOffsetX, setPreviewPopupOffsetX] = useState(0);
+    const [previewPopupBelow, setPreviewPopupBelow] = useState(false);
+    const [previewHomePosition, setPreviewHomePosition] = useState<Position | null>(null);
+    const [previewPosition, setPreviewPosition] = useState<Position | null>(null);
+    const [previewPointerOffset, setPreviewPointerOffset] = useState<Position>({ x: 0, y: 0 });
+    const previewPositionRef = useRef<Position | null>(null);
+    const previewPointerClientRef = useRef<Position>({ x: 0, y: 0 });
+    const previewPopupRef = useRef<HTMLDivElement | null>(null);
     const nextId = useRef(1);
 
     const getSpawnPosition = (index: number): Position => {
@@ -214,6 +233,254 @@ function Game() {
 
     const canCombine = zoneOccupants.every((occupantId) => occupantId !== null);
 
+    const previewCombination = useMemo<PreviewCombination | null>(() => {
+        if (!canCombine) {
+            return null;
+        }
+
+        const consumedIds = zoneOccupants.filter(
+            (occupantId): occupantId is number => occupantId !== null,
+        );
+        const occupantItems = zoneOccupants.map((occupantId) =>
+            draggables.find((draggable) => draggable.id === occupantId),
+        );
+
+        if (occupantItems.some((item) => !item)) {
+            return null;
+        }
+
+        const occupantLetters = occupantItems.map((item) => item?.letter ?? "");
+        const occupantDamage = occupantItems.reduce((total, item) => total + (item?.damage ?? 0), 0);
+        const [leftElement, rightElement] = occupantLetters;
+
+        const matchingRecipe = recipes.find(
+            (recipe) =>
+                (recipe.element1 === leftElement && recipe.element2 === rightElement) ||
+                (recipe.element1 === rightElement && recipe.element2 === leftElement),
+        );
+
+        const combinedLetter = matchingRecipe ? matchingRecipe.result : occupantLetters.join("");
+        if (consumedIds.length !== dropZoneRefs.length || combinedLetter.length === 0) {
+            return null;
+        }
+
+        return {
+            consumedIds,
+            letter: combinedLetter,
+            damage: matchingRecipe ? matchingRecipe.damage : occupantDamage,
+            level: matchingRecipe ? matchingRecipe.level : 2,
+            description: matchingRecipe
+                ? matchingRecipe.description
+                : "Unstable fusion of two primal forces.",
+        };
+    }, [canCombine, draggables, dropZoneRefs.length, recipes, zoneOccupants]);
+
+    const getOutputCenterPosition = useCallback((): Position | null => {
+        const containerRect = gameRef.current?.getBoundingClientRect();
+        const outputRect = outputRef.current?.getBoundingClientRect();
+        if (!containerRect || !outputRect) {
+            return null;
+        }
+
+        const previewRect = previewRef.current?.getBoundingClientRect();
+        const dragWidth = previewRect?.width ?? 32;
+        const dragHeight = previewRect?.height ?? 32;
+
+        return {
+            x: outputRect.left - containerRect.left + (outputRect.width - dragWidth) / 2,
+            y: outputRect.top - containerRect.top + (outputRect.height - dragHeight) / 2,
+        };
+    }, []);
+
+    const finalizeCombination = useCallback((spawnPosition?: Position) => {
+        if (!previewCombination) {
+            return;
+        }
+
+        const outputPosition = getOutputCenterPosition();
+        const targetPosition = spawnPosition ?? outputPosition;
+        if (!targetPosition) {
+            return;
+        }
+
+        const newDraggable = {
+            id: nextId.current,
+            letter: previewCombination.letter,
+            damage: previewCombination.damage,
+            level: previewCombination.level,
+            description: previewCombination.description,
+        };
+
+        nextId.current += 1;
+
+        combineElements(previewCombination.consumedIds, newDraggable);
+
+        setDraggables((previous) => {
+            const preserved = previous.filter(
+                (draggable) => !previewCombination.consumedIds.includes(draggable.id),
+            );
+
+            return [
+                ...preserved,
+                {
+                    ...newDraggable,
+                    initialPosition: targetPosition,
+                },
+            ];
+        });
+
+        setZoneOccupants([null, null]);
+        setIsPreviewDragging(false);
+        setPreviewPosition(null);
+        previewPositionRef.current = null;
+    }, [combineElements, getOutputCenterPosition, previewCombination]);
+
+    useEffect(() => {
+        if (previewCombination) {
+            return;
+        }
+
+        setIsPreviewDragging(false);
+        setIsPreviewHovered(false);
+        setPreviewPopupOffsetX(0);
+        setPreviewPopupBelow(false);
+        setPreviewHomePosition(null);
+        setPreviewPosition(null);
+        previewPositionRef.current = null;
+    }, [previewCombination]);
+
+    useLayoutEffect(() => {
+        if (!previewCombination || isPreviewDragging) {
+            return;
+        }
+
+        const centered = getOutputCenterPosition();
+        if (centered) {
+            setPreviewHomePosition(centered);
+        }
+    }, [getOutputCenterPosition, isPreviewDragging, previewCombination]);
+
+    useEffect(() => {
+        if (!previewCombination || !isPreviewHovered || isPreviewDragging) {
+            setPreviewPopupOffsetX(0);
+            setPreviewPopupBelow(false);
+            return;
+        }
+
+        const updatePopupPosition = () => {
+            const dragRect = previewRef.current?.getBoundingClientRect();
+            const popupRect = previewPopupRef.current?.getBoundingClientRect();
+            if (!dragRect || !popupRect) {
+                return;
+            }
+
+            const screenPadding = 8;
+            const popupLeft = dragRect.left + dragRect.width / 2 - popupRect.width / 2;
+            const popupRight = popupLeft + popupRect.width;
+
+            if (popupLeft < screenPadding) {
+                setPreviewPopupOffsetX(screenPadding - popupLeft);
+            } else if (popupRight > window.innerWidth - screenPadding) {
+                setPreviewPopupOffsetX(window.innerWidth - screenPadding - popupRight);
+            } else {
+                setPreviewPopupOffsetX(0);
+            }
+
+            const topIfAbove = dragRect.top - 8 - popupRect.height;
+            setPreviewPopupBelow(topIfAbove < screenPadding);
+        };
+
+        const rafId = window.requestAnimationFrame(updatePopupPosition);
+        window.addEventListener("resize", updatePopupPosition);
+
+        return () => {
+            window.cancelAnimationFrame(rafId);
+            window.removeEventListener("resize", updatePopupPosition);
+        };
+    }, [isPreviewDragging, isPreviewHovered, previewCombination, previewPosition?.x, previewPosition?.y]);
+
+    useEffect(() => {
+        if (!isPreviewDragging) {
+            return;
+        }
+
+        const handleMove = (event: PointerEvent) => {
+            const containerRect = gameRef.current?.getBoundingClientRect();
+            if (!containerRect) {
+                return;
+            }
+
+            const nextPosition = {
+                x: event.clientX - containerRect.left - previewPointerOffset.x,
+                y: event.clientY - containerRect.top - previewPointerOffset.y,
+            };
+
+            previewPointerClientRef.current = { x: event.clientX, y: event.clientY };
+            previewPositionRef.current = nextPosition;
+            setPreviewPosition(nextPosition);
+        };
+
+        const handleUp = () => {
+            const outputRect = outputRef.current?.getBoundingClientRect();
+            const pointer = previewPointerClientRef.current;
+
+            const isPointerInsideOutput =
+                !!outputRect &&
+                pointer.x >= outputRect.left &&
+                pointer.x <= outputRect.right &&
+                pointer.y >= outputRect.top &&
+                pointer.y <= outputRect.bottom;
+
+            setIsPreviewDragging(false);
+
+            if (!isPointerInsideOutput && previewPositionRef.current) {
+                finalizeCombination(previewPositionRef.current);
+            } else {
+                setIsPreviewHovered(false);
+                setPreviewPosition(null);
+                setPreviewHomePosition(getOutputCenterPosition());
+                previewPositionRef.current = null;
+            }
+        };
+
+        window.addEventListener("pointermove", handleMove);
+        window.addEventListener("pointerup", handleUp);
+
+        return () => {
+            window.removeEventListener("pointermove", handleMove);
+            window.removeEventListener("pointerup", handleUp);
+        };
+    }, [finalizeCombination, isPreviewDragging, previewPointerOffset.x, previewPointerOffset.y]);
+
+    const handlePreviewPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+        event.stopPropagation();
+
+        const previewRect = previewRef.current?.getBoundingClientRect();
+        const containerRect = gameRef.current?.getBoundingClientRect();
+        if (!previewRect || !containerRect) {
+            return;
+        }
+
+        const initial = {
+            x: previewRect.left - containerRect.left,
+            y: previewRect.top - containerRect.top,
+        };
+
+        const offset = {
+            x: event.clientX - previewRect.left,
+            y: event.clientY - previewRect.top,
+        };
+
+        previewPointerClientRef.current = { x: event.clientX, y: event.clientY };
+        setPreviewPointerOffset(offset);
+        setPreviewPosition(initial);
+        setIsPreviewHovered(false);
+        setPreviewPopupOffsetX(0);
+        setPreviewPopupBelow(false);
+        previewPositionRef.current = initial;
+        setIsPreviewDragging(true);
+    };
+
     const handleSnapChange = (draggableId: number, zoneIndex: number | null) => {
         setZoneOccupants((previous) => {
             const next = previous.map((occupantId) =>
@@ -239,71 +506,11 @@ function Game() {
     };
 
     const handleCombine = () => {
-        if (!canCombine) {
+        if (!previewCombination) {
             return;
         }
 
-        const consumedIds = zoneOccupants.filter((occupantId): occupantId is number => occupantId !== null);
-        const occupantItems = zoneOccupants.map((occupantId) =>
-            draggables.find((draggable) => draggable.id === occupantId),
-        );
-        const occupantLetters = occupantItems.map((item) => item?.letter ?? "");
-        const occupantDamage = occupantItems.reduce((total, item) => total + (item?.damage ?? 0), 0);
-        const [leftElement, rightElement] = occupantLetters;
-
-        const matchingRecipe = recipes.find(
-            (recipe) =>
-                (recipe.element1 === leftElement && recipe.element2 === rightElement) ||
-                (recipe.element1 === rightElement && recipe.element2 === leftElement),
-        );
-
-        const combinedLetter = matchingRecipe ? matchingRecipe.result : occupantLetters.join("");
-        const combinedDamage = matchingRecipe ? matchingRecipe.damage : occupantDamage;
-        const combinedLevel = matchingRecipe ? matchingRecipe.level : 2;
-        const combinedDescription = matchingRecipe
-            ? matchingRecipe.description
-            : "Unstable fusion of two primal forces.";
-
-        if (consumedIds.length !== dropZoneRefs.length || combinedLetter.length === 0) {
-            return;
-        }
-
-        const containerRect = gameRef.current?.getBoundingClientRect();
-        const outputRect = outputRef.current?.getBoundingClientRect();
-        if (!containerRect || !outputRect) {
-            return;
-        }
-
-        const sampleDragRect = gameRef.current?.querySelector(".draggable")?.getBoundingClientRect();
-        const dragWidth = sampleDragRect?.width ?? 32;
-        const dragHeight = sampleDragRect?.height ?? 32;
-
-        const newDraggable = {
-            id: nextId.current,
-            letter: combinedLetter,
-            damage: combinedDamage,
-            level: combinedLevel,
-            description: combinedDescription,
-        };
-
-        nextId.current += 1;
-
-        combineElements(consumedIds, newDraggable);
-
-        setDraggables((previous) => {
-            const preserved = previous.filter((draggable) => !consumedIds.includes(draggable.id));
-            return [
-                ...preserved,
-                {
-                    ...newDraggable,
-                    initialPosition: {
-                        x: outputRect.left - containerRect.left + (outputRect.width - dragWidth) / 2,
-                        y: outputRect.top - containerRect.top + (outputRect.height - dragHeight) / 2,
-                    },
-                },
-            ];
-        });
-        setZoneOccupants([null, null]);
+        finalizeCombination();
     };
 
     const handleFight = () => {
@@ -332,6 +539,42 @@ function Game() {
                     canSnapToZone={canSnapToZone}
                 />
             ))}
+
+            {previewCombination ? (
+                <div
+                    ref={previewRef}
+                    className="drag drag-preview"
+                    onPointerDown={handlePreviewPointerDown}
+                    onMouseEnter={() => setIsPreviewHovered(true)}
+                    onMouseLeave={() => setIsPreviewHovered(false)}
+                    style={{
+                        top: (isPreviewDragging ? previewPosition : previewHomePosition)?.y ?? 0,
+                        left: (isPreviewDragging ? previewPosition : previewHomePosition)?.x ?? 0,
+                        display: "flex",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        cursor: isPreviewDragging ? "grabbing" : "grab",
+                        userSelect: "none",
+                        color: "black",
+                        textAlign: "center",
+                        borderRadius: "1rem",
+                        border: "1px dashed black",
+                    }}
+                >
+                    {isPreviewHovered && !isPreviewDragging && previewCombination.description.length > 0 ? (
+                        <div
+                            ref={previewPopupRef}
+                            className={`drag-description-popup ${previewPopupBelow ? "is-below" : ""}`}
+                            style={{
+                                ["--popup-offset-x" as string]: `${previewPopupOffsetX}px`,
+                            }}
+                        >
+                            {previewCombination.description}
+                        </div>
+                    ) : null}
+                    {previewCombination.letter}
+                </div>
+            ) : null}
 
             <div className="element-start" ref={elementStartRef}></div>
             <div className="combination-station">
