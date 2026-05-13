@@ -7,6 +7,15 @@
     justify-content: center;
     align-items: center;
 
+    .player {
+        display: flex;
+        gap: 1rem;
+        padding: 0.75rem 1rem;
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        border-radius: 999px;
+        background-color: rgba(0, 0, 0, 0.35);
+    }
+
     .enemy {
         display: flex;
         flex-direction: column;
@@ -21,6 +30,11 @@
         .enemy-hp {
             font-size: 1.1rem;
             opacity: 0.75;
+        }
+
+        .enemy-experience {
+            font-size: 1rem;
+            opacity: 0.7;
         }
     }
 

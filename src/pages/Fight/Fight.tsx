@@ -11,11 +11,19 @@ type FightSpell = {
 type FightEnemy = {
     name: string;
     hp: number;
+    experience: number;
+};
+
+type FightPlayer = {
+    level: number;
+    hp: number;
+    experience: number;
 };
 
 type FightLocationState = {
     spells?: FightSpell[];
     enemy?: FightEnemy;
+    player?: FightPlayer;
 };
 
 function Fight() {
@@ -23,11 +31,12 @@ function Fight() {
     const navigate = useNavigate();
     const [flashingSlotId, setFlashingSlotId] = useState<number | null>(null);
 
-    const { spells, enemy } = useMemo(() => {
+    const { spells, enemy, player } = useMemo(() => {
         const state = location.state as FightLocationState | null;
         return {
             spells: state?.spells ?? [],
-            enemy: state?.enemy ?? { name: "Unknown", hp: 0 },
+            enemy: state?.enemy ?? { name: "Unknown", hp: 0, experience: 0 },
+            player: state?.player ?? { level: 1, hp: 0, experience: 0 },
         };
     }, [location.state]);
 
@@ -37,11 +46,12 @@ function Fight() {
         if (enemyHealth <= 0) {
             navigate("/game", {
                 state: {
+                    playerExperience: player.experience + enemy.experience,
                     restoredSpells: spells,
                 },
             });
         }
-    }, [enemyHealth, navigate, spells]);
+    }, [enemy.experience, enemyHealth, navigate, player.experience, spells]);
 
     const handleSlotClick = (spell: FightSpell) => {
         setFlashingSlotId(spell.id);
@@ -56,9 +66,16 @@ function Fight() {
 
     return (
         <div id="Fight">
+            <div className="player">
+                <span className="player-level">Level {player.level}</span>
+                <span className="player-hp">{player.hp} HP</span>
+                <span className="player-experience">{player.experience} XP</span>
+            </div>
+
             <div className="enemy">
                 <span className="enemy-name">{enemy.name}</span>
                 <span className="enemy-hp">{enemyHealth} HP</span>
+                <span className="enemy-experience">{enemy.experience} XP</span>
             </div>
             <div className="spells">
                 {spells.map((spell) => (
