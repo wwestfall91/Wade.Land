@@ -7,9 +7,7 @@ import EnemyInfo from "../../components/EnemyInfo";
 import { usePlayer } from "../../context/PlayerContext";
 import "./Game.scss";
 
-// TODO: Add enemy to Game Scene
-// TODO: Give player HP
-// TODO: Add enemy attacks
+
 
 type Position = {
     x: number;
