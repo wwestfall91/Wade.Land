@@ -45,6 +45,7 @@ export type SelectedEnemy = {
     experience: number;
     description: string;
     power: number;
+    sprite: string;
 };
 
 type PlayerContextValue = {

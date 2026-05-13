@@ -58,6 +58,8 @@ type EnemyRow = {
     experience?: number | string;
     Description?: string;
     description?: string;
+    Sprite?: string;
+    sprite?: string;
 };
 
 type Enemy = {
@@ -66,6 +68,7 @@ type Enemy = {
     power: number;
     experience: number;
     description: string;
+    sprite: string;
 };
 
 type PreviewCombination = {
@@ -197,6 +200,7 @@ function Game() {
                         power: Number(row.Power ?? row.power ?? 0) || 0,
                         experience: Number(row.Experience ?? row.experience ?? 0) || 0,
                         description: ((row.Description ?? row.description ?? "") as string).trim(),
+                        sprite: ((row.Sprite ?? row.sprite ?? "") as string).trim(),
                     }))
                     .filter((e) => e.name.length > 0);
                 setEnemies(parsed);
@@ -622,7 +626,8 @@ function Game() {
             <EnemyInfo 
                 enemyName={nextEnemy?.name ?? "Unknown Enemy"} 
                 enemyHealth={nextEnemy?.hp ?? 0}
-                enemyDescription={nextEnemy?.description ?? ""} 
+                enemyDescription={nextEnemy?.description ?? ""}
+                enemySpritePath={nextEnemy?.sprite ?? ""}
             />
         </div>
     );
