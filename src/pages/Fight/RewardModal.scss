@@ -91,15 +91,23 @@
             cursor: pointer;
             gap: 0.4rem;
             opacity: 1;
-            transition: border-color 140ms ease, background-color 140ms ease, opacity 140ms ease, transform 120ms ease;
+            transition: background-color 140ms ease, opacity 140ms ease, transform 120ms ease;
 
-            &:hover {
+            &:hover:not(.is-selected) {
                 border-color: rgba(255, 255, 255, 0.42);
                 background-color: rgba(255, 255, 255, 0.11);
             }
 
-            &.is-selected {
-                border-color: #ffd700;
+            &:focus,
+            &:focus-visible {
+                outline: none;
+            }
+
+            &.is-selected,
+            &.is-selected:hover,
+            &.is-selected:focus,
+            &.is-selected:focus-visible {
+                border-color: #ffd700 !important;
                 background-color: rgba(255, 215, 0, 0.1);
                 opacity: 1;
                 transform: scale(1.06);
