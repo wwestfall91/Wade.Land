@@ -1,25 +1,19 @@
 #Game{
-    display: flex;
     position: relative;
-    flex-direction: column;
-    gap:3.5rem;
-    width: 100vw;
-    height:100vh;
-    justify-content: center;
-    align-items: center;
-    color: #f5f4ff;
-    font-family: "VT323", "Lucida Console", monospace;
-    letter-spacing: 0.01em;
-    line-height: 1.15;
-    text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.65);
-    // background:
-    //     radial-gradient(circle at 14% 12%, rgba(122, 139, 255, 0.25), transparent 32%),
-    //     radial-gradient(circle at 80% 85%, rgba(84, 98, 218, 0.2), transparent 30%),
-    //     linear-gradient(180deg, #141f7a 0%, #10155b 52%, #0a0f44 100%);
+    isolation: isolate;
 
     &::before {
         content: "";
-        position: absolute;
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background: linear-gradient(180deg, #262931 0%, #1f242d 52%, #161a21 100%);
+        z-index: -2;
+    }
+
+    &::after {
+        content: "";
+        position: fixed;
         inset: 0;
         pointer-events: none;
         background: repeating-linear-gradient(
@@ -30,7 +24,7 @@
             transparent 4px
         );
         opacity: 0.35;
-        z-index: 0;
+        z-index: -1;
     }
 
     .element-start{

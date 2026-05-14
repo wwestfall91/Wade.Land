@@ -762,9 +762,14 @@ function Game() {
                         <div className="output" ref={outputRef} />
                     </div>
 
-                    <button className="combine-button" disabled={!canCombine} onClick={handleCombine}>
-                        COMBINE!
-                    </button>
+                    <div className={`combine-button-wrap ${!canCombine ? "is-disabled" : ""}`}>
+                        <button className="combine-button" disabled={!canCombine} onClick={handleCombine}>
+                            COMBINE!
+                        </button>
+                        <div className="combine-button-tooltip" role="tooltip">
+                            Please insert two base elements to start combining
+                        </div>
+                    </div>
                 </div>
 
                 <div className="battle-station">

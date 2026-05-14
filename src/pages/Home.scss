@@ -1,0 +1,55 @@
+#Home {
+    display: flex;
+    position: relative;
+    flex-direction: column;
+    gap:3.5rem;
+    width: 100vw;
+    height:100vh;
+    justify-content: center;
+    align-items: center;
+    color: #f5f4ff;
+    font-family: "VT323", "Lucida Console", monospace;
+    letter-spacing: 0.01em;
+    line-height: 1.15;
+    text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.65);
+    background: linear-gradient(180deg, #262931 0%, #1f242d 52%, #161a21 100%);
+
+    &::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: repeating-linear-gradient(
+            0deg,
+            rgba(255, 255, 255, 0.045) 0,
+            rgba(255, 255, 255, 0.045) 1px,
+            transparent 1px,
+            transparent 4px
+        );
+        opacity: 0.35;
+        z-index: 0;
+    }
+
+    > * {
+        position: relative;
+        z-index: 1;
+    }
+
+    .home-message {
+        color: #f5f4ff;
+        font-family: "VT323", "Lucida Console", monospace;
+        font-size: clamp(1.5rem, 4vw, 2.25rem);
+        letter-spacing: 0.02em;
+        text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.7);
+        padding: 0.85rem 1.1rem;
+        border: 2px solid #e7ecff;
+        border-radius: 4px;
+        background:
+            radial-gradient(circle at 14% 10%, rgba(122, 139, 255, 0.2), transparent 34%),
+            linear-gradient(180deg, #3245ce 0%, #1a2b8d 100%);
+        box-shadow:
+            inset 0 0 0 1px #7d90ff,
+            inset 0 0 0 2px #0f175a,
+            0 6px 0 rgba(0, 0, 0, 0.32);
+    }
+}

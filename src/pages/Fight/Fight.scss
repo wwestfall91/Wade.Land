@@ -14,10 +14,7 @@
     letter-spacing: 0.01em;
     line-height: 1.15;
     text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.65);
-    // background:
-    //     radial-gradient(circle at 14% 12%, rgba(122, 139, 255, 0.25), transparent 32%),
-    //     radial-gradient(circle at 80% 85%, rgba(84, 98, 218, 0.2), transparent 30%),
-    //     linear-gradient(180deg, #141f7a 0%, #10155b 52%, #0a0f44 100%);
+    background: linear-gradient(180deg, #262931 0%, #1f242d 52%, #161a21 100%);
 
     &::before {
         content: "";
