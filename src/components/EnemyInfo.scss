@@ -1,148 +1,202 @@
-#EnemyInfo{
+#EnemyInfo {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    bottom: 0;
+    right: 0;
+    margin: 1rem;
+    width: 18rem;
+    height: 18rem;
+    max-height: 25rem;
+    overflow: hidden;
+    border-radius: 4px;
+    border: 2px solid #e4e9ff;
+    background:
+        radial-gradient(circle at 18% 16%, rgba(122, 138, 255, 0.24), transparent 34%),
+        linear-gradient(180deg, #3144c9 0%, #17277f 100%);
+    box-shadow:
+        inset 0 0 0 1px #7f91ff,
+        inset 0 0 0 2px #0d1552,
+        0 8px 0 rgba(0, 0, 0, 0.34);
+    font-family: "VT323", "Lucida Console", monospace;
+    color: #f5f5ff;
+    text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.7);
+
+    &::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: repeating-linear-gradient(
+            0deg,
+            rgba(255, 255, 255, 0.04) 0,
+            rgba(255, 255, 255, 0.04) 1px,
+            transparent 1px,
+            transparent 4px
+        );
+        opacity: 0.36;
+        z-index: 0;
+    }
+
+    > * {
+        position: relative;
+        z-index: 1;
+    }
+
+    > .enemy-info-header {
         display: flex;
         flex-direction: column;
-        position: fixed;
-        bottom: 0;
-        right: 0;
-        margin: 1rem;
-        width: 18rem;
-        height:18rem;
-        border: 1px solid black;
-        max-height:25rem;
-        overflow: hidden;
-        background-color: #1e1f24;
-        background-image: repeating-linear-gradient(
-            -45deg,
-            rgba(255, 0, 0, 0.199) 0,
-            rgba(255, 0, 0, 0.199) 2px,
-            transparent 2px,
-            transparent 10px
-        );
+        flex-grow: 1;
+        justify-content: center;
+        align-items: center;
+        border-bottom: 2px solid rgba(228, 234, 255, 0.64);
+        background: linear-gradient(180deg, rgba(85, 103, 230, 0.95) 0%, rgba(36, 50, 164, 0.95) 100%);
+        box-shadow:
+            inset 0 0 0 1px #8ea0ff,
+            inset 0 0 0 2px #101964;
 
-        > .enemy-info-header{
+        > .enemy-info-name {
+            font-size: 1.55rem;
+            font-weight: 700;
+            letter-spacing: 0.03em;
+            color: #fff7ad;
+            text-transform: uppercase;
+        }
+
+        > .enemy-info-health {
             display: flex;
-            flex-direction: column;
-            flex-grow: 1;
             justify-content: center;
             align-items: center;
-            background-color: #ff5050;
-            font-weight: bold;
-            font-size:20px;
-            border-bottom: 1px solid black;
-
-            > .enemy-info-health{
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                width:100%;
-                border-top: black 1px solid;
-                font-size: 16px;
-            }
-        }
-
-        > .enemy-info-sprite{
-            display: flex;
-            flex-grow: 20;
-            justify-content: center;
-            align-items: center;
-            background-color: transparent;
-            position: relative;
-
-            > .enemy-sprite-image {
-                width: 85%;
-                max-height: 85%;
-                object-fit: contain;
-                image-rendering: crisp-edges;
-            }
-        }
-
-        &:hover .enemy-info-description {
-            opacity: 1;
-            transform: translateY(0);
-            pointer-events: auto;
-        }
-
-        > .enemy-info-description {
-            position: absolute;
-            inset: 0;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            padding: 0.75rem;
-            background-color: rgba(0, 0, 0, 0.72);
-            color: #fff;
-            font-size: 0.875rem;
-            font-weight: 500;
-            line-height: 1.4;
-            text-align: center;
-            opacity: 0;
-            transform: translateY(6px);
-            transition: opacity 0.18s ease, transform 0.18s ease;
-            pointer-events: none;
-            z-index: 2;
-
-            > .enemy-description-text {
-                margin-bottom: 0.45rem;
-            }
-
-            > .enemy-weakness-text {
-                border-top: 1px solid rgba(255, 255, 255, 0.28);
-                padding-top: 0.35rem;
-                font-weight: 700;
-                color: #ffd588;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                gap: 0.28rem;
-
-                > .enemy-weakness-label {
-                    font-size: 0.72rem;
-                    letter-spacing: 0.05em;
-                    text-transform: uppercase;
-                }
-
-                > .enemy-weakness-list {
-                    display: flex;
-                    flex-wrap: wrap;
-                    justify-content: center;
-                    gap: 0.3rem;
-                }
-
-                .type-chip {
-                    display: inline-flex;
-                    align-items: center;
-                    border-radius: 999px;
-                    border: 1px solid rgba(255, 255, 255, 0.35);
-                    padding: 0.06rem 0.45rem;
-                    font-size: 0.72rem;
-                    line-height: 1.2;
-                    color: #111;
-                    background-color: #ececec;
-                }
-
-                .type-fire { background-color: #ffb17d; }
-                .type-water { background-color: #9ad6ff; }
-                .type-earth { background-color: #cdb48a; }
-                .type-air { background-color: #d5eef9; }
-                .type-lightning { background-color: #ffe56d; }
-                .type-ice { background-color: #b8f0ff; }
-                .type-light { background-color: #fff4b5; }
-                .type-dark { background-color: #8f86aa; color: #f4f4f4; }
-                .type-arcane { background-color: #ffbfe1; }
-                .type-none { background-color: #d4d4d4; color: #505050; }
-            }
-        }
-
-        > .next-enemy-text{
-            position: absolute;
-            z-index: 1;
-            bottom:2%;
-            font-size:22px;
-            font-weight: bold;
-            background-color: rgba(0, 0, 0, 0.904);
-            border-radius: 5px;
-            padding:3px 7px;
-            left:2%;
+            width: 100%;
+            margin-top: 0.15rem;
+            padding-top: 0.2rem;
+            border-top: 1px solid rgba(228, 234, 255, 0.58);
+            color: #ffffff;
+            font-size: 1rem;
+            font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+            font-variant-numeric: tabular-nums;
+            text-shadow: 0 1px 1px rgba(0, 0, 0, 0.82);
         }
     }
+
+    > .enemy-info-sprite {
+        display: flex;
+        flex-grow: 20;
+        justify-content: center;
+        align-items: center;
+        position: relative;
+        background: radial-gradient(circle at 38% 30%, rgba(156, 180, 255, 0.25), rgba(20, 30, 104, 0.94));
+
+        > .enemy-sprite-image {
+            width: 85%;
+            max-height: 85%;
+            object-fit: contain;
+            image-rendering: pixelated;
+            filter: drop-shadow(0 3px 0 rgba(0, 0, 0, 0.35));
+        }
+    }
+
+    &:hover .enemy-info-description {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+    }
+
+    > .enemy-info-description {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.8rem;
+        border: 2px solid rgba(228, 234, 255, 0.74);
+        background: linear-gradient(180deg, rgba(45, 63, 177, 0.96) 0%, rgba(22, 34, 116, 0.97) 100%);
+        box-shadow:
+            inset 0 0 0 1px #8094ff,
+            inset 0 0 0 2px #0d1557;
+        color: #fff;
+        font-size: 0.86rem;
+        font-weight: 500;
+        line-height: 1.32;
+        text-align: center;
+        opacity: 0;
+        transform: translateY(6px);
+        transition: opacity 0.16s ease, transform 0.16s ease;
+        pointer-events: none;
+        z-index: 101;
+
+        > .enemy-description-text {
+            margin-bottom: 0.2rem;
+        }
+
+        > .enemy-weakness-text {
+            width: 100%;
+            border-top: 1px solid rgba(255, 255, 255, 0.3);
+            padding-top: 0.36rem;
+            font-weight: 700;
+            color: #ffd588;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.28rem;
+
+            > .enemy-weakness-label {
+                font-size: .85rem;
+                letter-spacing: 0.05em;
+                text-transform: uppercase;
+            }
+
+            > .enemy-weakness-list {
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 0.3rem;
+            }
+
+            .type-chip {
+                display: inline-flex;
+                align-items: center;
+                border-radius: 999px;
+                border: 1px solid rgba(0, 0, 0, 0.25);
+                padding: 0.06rem 0.45rem;
+                font-size: .85rem;
+                line-height: 1.2;
+                color: #111;
+                background-color: #ececec;
+                text-shadow: none;
+            }
+
+            .type-fire { background-color: #ffb17d; }
+            .type-water { background-color: #9ad6ff; }
+            .type-earth { background-color: #cdb48a; }
+            .type-air { background-color: #d5eef9; }
+            .type-lightning { background-color: #ffe56d; }
+            .type-ice { background-color: #b8f0ff; }
+            .type-light { background-color: #fff4b5; }
+            .type-dark { background-color: #8f86aa; color: #f4f4f4; }
+            .type-arcane { background-color: #ffbfe1; }
+            .type-none { background-color: #d4d4d4; color: #505050; }
+        }
+    }
+
+    > .next-enemy-text {
+        position: absolute;
+        z-index: 100;
+        bottom: 2%;
+        left: 2%;
+        padding: 0.14rem 0.45rem;
+        border-radius: 3px;
+        border: 2px solid #d8e0ff;
+        background: linear-gradient(180deg, #2c3fc7 0%, #16257b 100%);
+        box-shadow:
+            inset 0 0 0 1px #7d90ff,
+            inset 0 0 0 2px #0e1757;
+        font-size: 1.08rem;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        color: #fff7ab;
+    }
+}

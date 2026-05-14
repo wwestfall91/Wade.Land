@@ -69,6 +69,8 @@ type RewardModalProps = {
 function RewardModal({ xpGained, currentXp, levels, rewardElements, onConfirm }: RewardModalProps) {
     const [selectedElement, setSelectedElement] = useState<RewardElement | null>(null);
     const [hoveredLetter, setHoveredLetter] = useState<string | null>(null);
+    const [popupPos, setPopupPos] = useState<{ x: number; y: number } | null>(null);
+    const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
     const [isClosing, setIsClosing] = useState(false);
     const closeTimeoutRef = useRef<number | null>(null);
 
@@ -237,91 +239,120 @@ function RewardModal({ xpGained, currentXp, levels, rewardElements, onConfirm }:
     };
 
     const modal = (
-        <div
-            className={`reward-menu-overlay${isClosing ? " is-closing" : ""}`}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Reward selection"
-        >
-            <div className={`reward-menu${isClosing ? " is-closing" : ""}`}>
-                <div className="reward-xp-section">
-                    <div className="reward-level-label">
-                        Level {displayLevel}
-                        {showLevelUp ? <span className="reward-levelup-flash"> LEVEL UP!</span> : null}
+        <>
+            <div
+                className={`reward-menu-overlay${isClosing ? " is-closing" : ""}`}
+                role="dialog"
+                aria-modal="true"
+                aria-label="Reward selection"
+            >
+                <div className={`reward-menu${isClosing ? " is-closing" : ""}`}>
+                    <div className="reward-xp-section">
+                        <div className="reward-level-label">
+                            Level {displayLevel}
+                            {showLevelUp ? <span className="reward-levelup-flash"> LEVEL UP!</span> : null}
+                        </div>
+                        <div className="reward-xp-bar-track">
+                            <div
+                                className={`reward-xp-bar-fill${isTransitioning ? " is-transitioning" : ""}`}
+                                style={{ width: `${fillPercent}%` }}
+                            />
+                        </div>
+                        <div className="reward-xp-gained">+{xpGained} XP</div>
                     </div>
-                    <div className="reward-xp-bar-track">
-                        <div
-                            className={`reward-xp-bar-fill${isTransitioning ? " is-transitioning" : ""}`}
-                            style={{ width: `${fillPercent}%` }}
-                        />
+                    <h2 className="reward-title">Pick 1 Element!</h2>
+                    <div className="reward-elements">
+                        {rewardElements.map((element) => (
+                            <button
+                                key={element.letter}
+                                ref={el => (buttonRefs.current[element.letter] = el)}
+                                type="button"
+                                className={`reward-element${selectedElement?.letter === element.letter ? " is-selected" : ""}`}
+                                onClick={() => setSelectedElement(element)}
+                                onMouseEnter={e => {
+                                    setHoveredLetter(element.letter);
+                                    const rect = e.currentTarget.getBoundingClientRect();
+                                    setPopupPos({
+                                        x: rect.left + rect.width / 2,
+                                        y: rect.top
+                                    });
+                                }}
+                                onMouseLeave={() => {
+                                    setHoveredLetter(current => (current === element.letter ? null : current));
+                                    setPopupPos(null);
+                                }}
+                            >
+                                <span className="reward-element-letter">{element.letter}</span>
+                                <span className="reward-element-damage">{element.damage} DMG</span>
+                            </button>
+                        ))}
                     </div>
-                    <div className="reward-xp-gained">+{xpGained} XP</div>
+
+                    <button
+                        type="button"
+                        className="reward-return-button"
+                        disabled={!selectedElement || isClosing}
+                        onClick={handleConfirm}
+                    >
+                        CONTINUE
+                    </button>
                 </div>
-                <h2 className="reward-title">Pick 1 Element!</h2>
-                <div className="reward-elements">
-                    {rewardElements.map((element) => (
-                        <button
-                            key={element.letter}
-                            type="button"
-                            className={`reward-element${selectedElement?.letter === element.letter ? " is-selected" : ""}`}
-                            onClick={() => setSelectedElement(element)}
-                            onMouseEnter={() => setHoveredLetter(element.letter)}
-                            onMouseLeave={() => setHoveredLetter((current) => (current === element.letter ? null : current))}
-                        >
-                            {hoveredLetter === element.letter ? (
-                                <span className="reward-element-info">
-                                    {element.description.length > 0 ? (
-                                        <span className="element-info-description">{element.description}</span>
-                                    ) : null}
-                                    <span className="element-info-damage">Damage: {element.damage}</span>
-                                    <span className="element-info-types">
-                                        <span className="element-info-label">Types:</span>
-                                        <span className="element-info-list">
-                                            {[element.type1, element.type2].filter(
-                                                (value): value is string => Boolean(value && value.trim().length > 0),
-                                            ).length > 0 ? (
-                                                [element.type1, element.type2]
-                                                    .filter((value): value is string => Boolean(value && value.trim().length > 0))
-                                                    .map((type) => (
-                                                        <span key={type} className={`type-chip ${toTypeClass(type)}`}>
-                                                            {type}
-                                                        </span>
-                                                    ))
-                                            ) : (
-                                                <span className="type-chip type-none">None</span>
-                                            )}
-                                        </span>
-                                    </span>
-                                    {getEffectSummaryLines(element.effects).length > 0 ? (
-                                        <span className="element-info-effects">
-                                            <span className="element-info-label">Effects:</span>
-                                            <span className="element-info-list">
-                                                {getEffectSummaryLines(element.effects).map((line, index) => (
-                                                    <span key={`${line}-${index}`} className={`effect-chip ${getEffectChipClass(line)}`}>
-                                                        {line}
-                                                    </span>
-                                                ))}
+            </div>
+            {hoveredLetter && popupPos && (() => {
+                const element = rewardElements.find(e => e.letter === hoveredLetter);
+                if (!element) return null;
+
+                const elementTypes = [element.type1, element.type2].filter(
+                    (value): value is string => Boolean(value && value.trim().length > 0),
+                );
+                const effectLines = getEffectSummaryLines(element.effects);
+
+                return createPortal(
+                    <div
+                        className="reward-element-tooltip-shell"
+                        style={{
+                            left: popupPos.x,
+                            top: popupPos.y - 12,
+                        }}
+                    >
+                        <div className="reward-element-info">
+                            {element.description.length > 0 ? (
+                                <span className="element-info-description">{element.description}</span>
+                            ) : null}
+                            <span className="element-info-damage">Damage: {element.damage}</span>
+                            <span className="element-info-types">
+                                <span className="element-info-label">Types:</span>
+                                <span className="element-info-list">
+                                    {elementTypes.length > 0 ? (
+                                        elementTypes.map((type) => (
+                                            <span key={type} className={`type-chip ${toTypeClass(type)}`}>
+                                                {type}
                                             </span>
-                                        </span>
-                                    ) : null}
+                                        ))
+                                    ) : (
+                                        <span className="type-chip type-none">None</span>
+                                    )}
+                                </span>
+                            </span>
+                            {effectLines.length > 0 ? (
+                                <span className="element-info-effects">
+                                    <span className="element-info-label">Effects:</span>
+                                    <span className="element-info-list">
+                                        {effectLines.map((line, index) => (
+                                            <span key={`${line}-${index}`} className={`effect-chip ${getEffectChipClass(line)}`}>
+                                                {line}
+                                            </span>
+                                        ))}
+                                    </span>
                                 </span>
                             ) : null}
-                            <span className="reward-element-letter">{element.letter}</span>
-                            <span className="reward-element-damage">{element.damage} DMG</span>
-                        </button>
-                    ))}
-                </div>
-
-                <button
-                    type="button"
-                    className="reward-return-button"
-                    disabled={!selectedElement || isClosing}
-                    onClick={handleConfirm}
-                >
-                    CONTINUE
-                </button>
-            </div>
-        </div>
+                        </div>
+                        <span className="reward-element-tooltip-arrow" aria-hidden="true" />
+                    </div>,
+                    document.body
+                );
+            })()}
+        </>
     );
 
     return createPortal(modal, document.body);

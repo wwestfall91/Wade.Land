@@ -24,15 +24,11 @@
         gap:1rem;
     }
 
-    .combine-button:disabled{
-        opacity: 0.5;
-        cursor: not-allowed;
-    }
-
     .combination-equation{
         display: flex;
         gap:1rem;
         justify-content: center;
+        align-items: center;
 
         > .drop-zone-area
         {
@@ -40,13 +36,33 @@
             gap:1rem;
             align-items: center;
 
+            > div:not(.drop-zone) {
+                min-width: 1.5rem;
+                text-align: center;
+                font-family: "VT323", "Lucida Console", monospace;
+                font-size: 2rem;
+                line-height: 1;
+                color: #fff7ab;
+                text-shadow:
+                    1px 1px 0 rgba(0, 0, 0, 0.75),
+                    0 0 10px rgba(116, 140, 255, 0.3);
+                user-select: none;
+                pointer-events: none;
+            }
+
             > .drop-zone
             {
                 display: flex;
                 width: 3rem;
                 height: 3rem;
-                background-color: rgb(255, 155, 155);
-                border-radius: 2rem;
+                border-radius: 4px;
+                border: 2px solid #e6ecff;
+                background:
+                    radial-gradient(circle at 35% 30%, rgba(156, 180, 255, 0.26), rgba(20, 30, 104, 0.95));
+                box-shadow:
+                    inset 0 0 0 1px #7f91ff,
+                    inset 0 0 0 2px #0f175a,
+                    0 5px 0 rgba(0, 0, 0, 0.3);
             }
         }
 
@@ -56,26 +72,98 @@
             width:3rem;
             max-width: 3rem;
             height: 3rem;
-            background-color: rgb(117, 255, 112);
-            border-radius: 1rem;
+            border-radius: 4px;
+            border: 2px solid #d8fff1;
+            background:
+                radial-gradient(circle at 35% 30%, rgba(170, 255, 226, 0.4), rgba(25, 103, 88, 0.95));
+            box-shadow:
+                inset 0 0 0 1px rgba(178, 245, 232, 0.75),
+                inset 0 0 0 2px rgba(11, 69, 58, 0.92),
+                0 5px 0 rgba(0, 0, 0, 0.3);
         }
     }
 
     .combine-button{
         display: flex;
         justify-content: center;
+        align-items: center;
+        min-height: 2.9rem;
+        min-width: 12rem;
+        padding: 0 1.15rem;
+        border-radius: 4px;
+        border: 2px solid #e8edff;
+        background: linear-gradient(180deg, #5a71e3 0%, #2b3ea9 100%);
+        color: #fff6a9;
+        font-family: "VT323", "Lucida Console", monospace;
+        font-size: 1.1rem;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        cursor: pointer;
+        transition: transform 110ms ease, box-shadow 110ms ease, border-color 110ms ease, opacity 120ms ease;
+        box-shadow:
+            inset 0 0 0 1px #94a4ff,
+            inset 0 0 0 2px #121c66,
+            0 5px 0 rgba(0, 0, 0, 0.3);
+
+        &:hover:enabled {
+            transform: translateY(-1px);
+            border-color: #f6f8ff;
+            box-shadow:
+                inset 0 0 0 1px #a4b3ff,
+                inset 0 0 0 2px #121c66,
+                0 8px 0 rgba(0, 0, 0, 0.36);
+        }
+
+        &:active:enabled {
+            transform: translateY(0);
+        }
+
+        &:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            filter: saturate(0.55) brightness(0.92);
+            box-shadow:
+                inset 0 0 0 1px #8391de,
+                inset 0 0 0 2px #121c66,
+                0 3px 0 rgba(0, 0, 0, 0.25);
+        }
     }
 
     .fight-button{
         display: flex;
         justify-content: center;
-        background-color: rgb(255, 80, 80);
-        color:white;
-        border: 1px solid black;
-        transition: border 0.25s;
-    }
+        align-items: center;
+        min-height: 2.9rem;
+        min-width: 12rem;
+        padding: 0 1.15rem;
+        border-radius: 4px;
+        border: 2px solid #ffd0cb;
+        background: linear-gradient(180deg, #de604f 0%, #a92d20 100%);
+        color: #fff7da;
+        font-family: "VT323", "Lucida Console", monospace;
+        font-size: 1.1rem;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        cursor: pointer;
+        transition: transform 110ms ease, box-shadow 110ms ease, border-color 110ms ease;
+        box-shadow:
+            inset 0 0 0 1px #f4988d,
+            inset 0 0 0 2px #751812,
+            0 5px 0 rgba(0, 0, 0, 0.32);
 
-    .fight-button:hover{
-        border: 1px solid white;
+        &:hover {
+            transform: translateY(-1px);
+            border-color: #ffe4e0;
+            box-shadow:
+                inset 0 0 0 1px #ffb0a7,
+                inset 0 0 0 2px #751812,
+                0 8px 0 rgba(0, 0, 0, 0.36);
+        }
+
+        &:active {
+            transform: translateY(0);
+        }
     }
 }
