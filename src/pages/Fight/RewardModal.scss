@@ -9,6 +9,11 @@
     backdrop-filter: blur(2px);
     z-index: 5000;
     isolation: isolate;
+    animation: rewardOverlayIn 180ms ease-out;
+
+    &.is-closing {
+        animation: rewardOverlayOut 180ms ease-in forwards;
+    }
 }
 
 .reward-menu {
@@ -34,6 +39,11 @@
         0 10px 0 rgba(0, 0, 0, 0.36);
     font-family: "VT323", "Lucida Console", monospace;
     text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.72);
+    animation: rewardMenuIn 200ms cubic-bezier(0.16, 1, 0.3, 1);
+
+    &.is-closing {
+        animation: rewardMenuOut 180ms ease-in forwards;
+    }
 
     .reward-title {
         margin: 0;
@@ -139,7 +149,7 @@
             cursor: pointer;
             gap: 0.22rem;
             opacity: 1;
-            transition: background-color 140ms ease, opacity 140ms ease, transform 120ms ease, border-color 120ms ease;
+            transition: background-color 140ms ease, opacity 140ms ease, transform 130ms ease, border-color 120ms ease, box-shadow 130ms ease;
             box-shadow:
                 inset 0 0 0 1px #8ea1ff,
                 inset 0 0 0 2px #131d69,
@@ -148,6 +158,11 @@
             &:hover:not(.is-selected) {
                 border-color: rgba(248, 251, 255, 0.9);
                 background: linear-gradient(180deg, rgba(95, 118, 246, 0.96) 0%, rgba(41, 59, 180, 0.96) 100%);
+                transform: translateY(-2px) scale(1.02);
+                box-shadow:
+                    inset 0 0 0 1px #9fb1ff,
+                    inset 0 0 0 2px #131d69,
+                    0 7px 0 rgba(0, 0, 0, 0.3);
             }
 
             &:focus,
@@ -162,7 +177,7 @@
                 border-color: #ffd700 !important;
                 background: linear-gradient(180deg, rgba(131, 110, 35, 0.88) 0%, rgba(92, 73, 21, 0.92) 100%);
                 opacity: 1;
-                transform: scale(1.06);
+                transform: translateY(-1px) scale(1.04);
             }
 
             .reward-element-letter {
@@ -344,5 +359,49 @@
     100% {
         opacity: 1;
         transform: scale(1);
+    }
+}
+
+@keyframes rewardOverlayIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes rewardOverlayOut {
+    from {
+        opacity: 1;
+    }
+
+    to {
+        opacity: 0;
+    }
+}
+
+@keyframes rewardMenuIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px) scale(0.97);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes rewardMenuOut {
+    from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+
+    to {
+        opacity: 0;
+        transform: translateY(8px) scale(0.98);
     }
 }

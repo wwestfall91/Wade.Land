@@ -69,6 +69,8 @@ type RewardModalProps = {
 function RewardModal({ xpGained, currentXp, levels, rewardElements, onConfirm }: RewardModalProps) {
     const [selectedElement, setSelectedElement] = useState<RewardElement | null>(null);
     const [hoveredLetter, setHoveredLetter] = useState<string | null>(null);
+    const [isClosing, setIsClosing] = useState(false);
+    const closeTimeoutRef = useRef<number | null>(null);
 
     const toTypeClass = (value: string) =>
         `type-${value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
@@ -216,13 +218,32 @@ function RewardModal({ xpGained, currentXp, levels, rewardElements, onConfirm }:
         document.body.style.overflow = "hidden";
 
         return () => {
+            if (closeTimeoutRef.current !== null) {
+                window.clearTimeout(closeTimeoutRef.current);
+            }
             document.body.style.overflow = previousOverflow;
         };
     }, []);
 
+    const handleConfirm = () => {
+        if (!selectedElement || isClosing) {
+            return;
+        }
+
+        setIsClosing(true);
+        closeTimeoutRef.current = window.setTimeout(() => {
+            onConfirm(selectedElement);
+        }, 180);
+    };
+
     const modal = (
-        <div className="reward-menu-overlay" role="dialog" aria-modal="true" aria-label="Reward selection">
-            <div className="reward-menu">
+        <div
+            className={`reward-menu-overlay${isClosing ? " is-closing" : ""}`}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Reward selection"
+        >
+            <div className={`reward-menu${isClosing ? " is-closing" : ""}`}>
                 <div className="reward-xp-section">
                     <div className="reward-level-label">
                         Level {displayLevel}
@@ -294,14 +315,8 @@ function RewardModal({ xpGained, currentXp, levels, rewardElements, onConfirm }:
                 <button
                     type="button"
                     className="reward-return-button"
-                    disabled={!selectedElement}
-                    onClick={() => {
-                        if (!selectedElement) {
-                            return;
-                        }
-
-                        onConfirm(selectedElement);
-                    }}
+                    disabled={!selectedElement || isClosing}
+                    onClick={handleConfirm}
                 >
                     CONTINUE
                 </button>
