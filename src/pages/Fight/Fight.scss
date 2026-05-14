@@ -115,7 +115,7 @@
             .enemy-burn-indicator:hover ~ .enemy-meta-tooltip,
             .enemy-soak-indicator:hover ~ .enemy-meta-tooltip,
             .enemy-freeze-indicator:hover ~ .enemy-meta-tooltip {
-                cursor:pointer;
+                cursor:default;
                 opacity: 0;
             }
 
@@ -178,6 +178,7 @@
 
             .enemy-burn-indicator {
                 position: absolute;
+                cursor: default;
                 right: -0.32rem;
                 top: -0.34rem;
                 display: inline-flex;
