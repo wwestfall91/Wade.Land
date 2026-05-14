@@ -1,4 +1,4 @@
-export type SpellEffectKind = "heal" | "multi_hit" | "burn" | "shield" | "lifesteal";
+export type SpellEffectKind = "heal" | "multi_hit" | "burn" | "shield" | "lifesteal" | "soak";
 
 export type SpellEffectTarget = "self" | "enemy";
 
@@ -14,6 +14,11 @@ export type ActiveBurnStatus = {
     kind: "burn";
     stacks: number;
     remainingTurns: number;
+};
+
+export type ActiveSoakStatus = {
+    kind: "soak";
+    stacks: number;
 };
 
 const EFFECT_COLUMN_CANDIDATES = (index: number, suffix: string) => [
@@ -44,6 +49,8 @@ const normalizeEffectKind = (value: string): SpellEffectKind | null => {
             return "shield";
         case "lifesteal":
             return "lifesteal";
+        case "soak":
+            return "soak";
         default:
             return null;
     }

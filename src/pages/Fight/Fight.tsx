@@ -5,10 +5,35 @@ import {
     getPerHitSpellEffects,
     getSpellHitCount,
     type ActiveBurnStatus,
+    type ActiveSoakStatus,
     type SpellEffectConfig,
 } from "../../combat/spellEffects";
+import EnemyInfoSprite from "../../components/EnemyInfoSprite";
 import { usePlayer, type RewardElement } from "../../context/PlayerContext";
 import RewardModal from "./RewardModal";
+
+type EnemyDamagePopup = {
+    id: number;
+    text: string;
+    color: string;
+};
+
+type ActiveFreezeStatus = {
+    kind: "freeze";
+    stacks: number;
+};
+
+const HIT_FLASH_MS = 190;
+const HIT_STEP_DELAY_MS = 120;
+const EFFECT_STEP_DELAY_MS = 95;
+const BURN_DAMAGE_PER_STACK = 5;
+const SOAK_LIGHTNING_BONUS_PER_STACK = 3;
+const SOAK_FIRE_PENALTY_PER_STACK = 3;
+const FREEZE_FIRE_BONUS_PER_STACK = 10;
+
+const wait = (ms: number) => new Promise<void>((resolve) => {
+    window.setTimeout(resolve, ms);
+});
 
 type SpellColor = {
     bg: string;
@@ -34,6 +59,7 @@ type FightEnemy = {
     power: number;
     experience: number;
     weaknesses?: string[];
+    sprite?: string;
 };
 
 type FightLocationState = {
@@ -59,12 +85,27 @@ function Fight() {
     const [showRewardModal, setShowRewardModal] = useState(false);
     const [rewardElements, setRewardElements] = useState<RewardElement[]>([]);
     const [enemyBurnStatus, setEnemyBurnStatus] = useState<ActiveBurnStatus | null>(null);
+    const [enemySoakStatus, setEnemySoakStatus] = useState<ActiveSoakStatus | null>(null);
+    const [enemyFreezeStatus, setEnemyFreezeStatus] = useState<ActiveFreezeStatus | null>(null);
     const [playerShield, setPlayerShield] = useState(0);
+    const [isResolvingTurn, setIsResolvingTurn] = useState(false);
+    const [isEnemySpriteFlashing, setIsEnemySpriteFlashing] = useState(false);
+    const [isEnemySteamVisible, setIsEnemySteamVisible] = useState(false);
+    const [enemySpriteFlashColor, setEnemySpriteFlashColor] = useState("rgba(255, 255, 255, 0.6)");
+    const [enemyDamagePopups, setEnemyDamagePopups] = useState<EnemyDamagePopup[]>([]);
+    const [isPlayerHealingFlash, setIsPlayerHealingFlash] = useState(false);
+    const [isPlayerShieldFlash, setIsPlayerShieldFlash] = useState(false);
     const preRewardXp = useRef(player.experience);
     const hasResolvedVictory = useRef(false);
+    const previousPlayerHpRef = useRef(player.hp);
+    const previousPlayerShieldRef = useRef(playerShield);
+    const enemyDamagePopupIdRef = useRef(1);
+    const healFlashTimeoutRef = useRef<number | null>(null);
+    const shieldFlashTimeoutRef = useRef<number | null>(null);
     const playerHitTimeoutRef = useRef<number | null>(null);
     const screenFlashTimeoutRef = useRef<number | null>(null);
     const spellCastFlashTimeoutRef = useRef<number | null>(null);
+    const enemySteamTimeoutRef = useRef<number | null>(null);
 
     const enemy = useMemo(() => {
         const state = location.state as FightLocationState | null;
@@ -80,7 +121,12 @@ function Fight() {
     const enemyMaxHp = Math.max(1, enemy.hp);
     const enemyHpFillPercent = Math.max(0, Math.min(100, (enemyHealth / enemyMaxHp) * 100));
     const playerMaxHp = levels.find((levelDef) => levelDef.level === player.level)?.hp ?? Math.max(player.hp, 1);
+    const displayedPlayerHp = player.hp + Math.max(0, playerShield);
     const playerHpFillPercent = Math.max(0, Math.min(100, (player.hp / playerMaxHp) * 100));
+    const playerShieldFillPercent = Math.max(0, Math.min(100, (Math.max(0, playerShield) / playerMaxHp) * 100));
+    const playerTotalFillPercent = Math.min(100, playerHpFillPercent + playerShieldFillPercent);
+    const playerShieldTailFillPercent = Math.min(playerShieldFillPercent, playerTotalFillPercent);
+    const playerHealthFillPercent = Math.max(0, playerTotalFillPercent - playerShieldTailFillPercent);
 
     const normalizeType = (value?: string) => value?.trim().toLowerCase() ?? "";
 
@@ -135,6 +181,35 @@ function Fight() {
         return hexToRgba(primary, 0.18);
     };
 
+    const getSpellHitFlashColor = (type1?: string, type2?: string) => {
+        const normalized = [type1, type2].map(normalizeType).filter(Boolean);
+        const primary = normalized[0] ? SPELL_TYPE_COLORS[normalized[0]] : undefined;
+        return primary?.bg ?? "#f0f0f0";
+    };
+
+    const triggerEnemyHitFeedback = (damage: number, flashColor: string) => {
+        const popupId = enemyDamagePopupIdRef.current++;
+        setEnemySpriteFlashColor(flashColor);
+        setIsEnemySpriteFlashing(false);
+        window.requestAnimationFrame(() => {
+            setIsEnemySpriteFlashing(true);
+            window.setTimeout(() => setIsEnemySpriteFlashing(false), HIT_FLASH_MS);
+        });
+
+        setEnemyDamagePopups((previous) => [
+            ...previous,
+            {
+                id: popupId,
+                text: `-${damage}`,
+                color: flashColor,
+            },
+        ]);
+
+        window.setTimeout(() => {
+            setEnemyDamagePopups((previous) => previous.filter((popup) => popup.id !== popupId));
+        }, 480);
+    };
+
     const getSpellTooltipLines = (spell: { damage: number; effects?: SpellEffectConfig[] }) => {
         const lines = [`Damage: ${spell.damage}`];
         const effects = spell.effects ?? [];
@@ -176,6 +251,11 @@ function Fight() {
                     }
                     break;
                 }
+                case "soak": {
+                    const amount = Math.max(1, effect.amount ?? 1);
+                    lines.push(`Soak: +${amount}`);
+                    break;
+                }
                 default:
                     break;
             }
@@ -196,6 +276,9 @@ function Fight() {
         }
         if (line.startsWith("Lifesteal:")) {
             return "effect-lifesteal";
+        }
+        if (line.startsWith("Soak:")) {
+            return "effect-soak";
         }
         if (line.startsWith("Hits:")) {
             return "effect-multi-hit";
@@ -220,6 +303,12 @@ function Fight() {
 
     useEffect(() => {
         return () => {
+            if (healFlashTimeoutRef.current !== null) {
+                window.clearTimeout(healFlashTimeoutRef.current);
+            }
+            if (shieldFlashTimeoutRef.current !== null) {
+                window.clearTimeout(shieldFlashTimeoutRef.current);
+            }
             if (playerHitTimeoutRef.current !== null) {
                 window.clearTimeout(playerHitTimeoutRef.current);
             }
@@ -229,8 +318,55 @@ function Fight() {
             if (spellCastFlashTimeoutRef.current !== null) {
                 window.clearTimeout(spellCastFlashTimeoutRef.current);
             }
+            if (enemySteamTimeoutRef.current !== null) {
+                window.clearTimeout(enemySteamTimeoutRef.current);
+            }
         };
     }, []);
+
+    const triggerEnemySteamEffect = () => {
+        setIsEnemySteamVisible(false);
+        window.requestAnimationFrame(() => {
+            setIsEnemySteamVisible(true);
+            if (enemySteamTimeoutRef.current !== null) {
+                window.clearTimeout(enemySteamTimeoutRef.current);
+            }
+
+            enemySteamTimeoutRef.current = window.setTimeout(() => {
+                setIsEnemySteamVisible(false);
+            }, 520);
+        });
+    };
+
+    useEffect(() => {
+        if (player.hp > previousPlayerHpRef.current) {
+            setIsPlayerHealingFlash(true);
+            if (healFlashTimeoutRef.current !== null) {
+                window.clearTimeout(healFlashTimeoutRef.current);
+            }
+
+            healFlashTimeoutRef.current = window.setTimeout(() => {
+                setIsPlayerHealingFlash(false);
+            }, 420);
+        }
+
+        previousPlayerHpRef.current = player.hp;
+    }, [player.hp]);
+
+    useEffect(() => {
+        if (playerShield > previousPlayerShieldRef.current) {
+            setIsPlayerShieldFlash(true);
+            if (shieldFlashTimeoutRef.current !== null) {
+                window.clearTimeout(shieldFlashTimeoutRef.current);
+            }
+
+            shieldFlashTimeoutRef.current = window.setTimeout(() => {
+                setIsPlayerShieldFlash(false);
+            }, 360);
+        }
+
+        previousPlayerShieldRef.current = playerShield;
+    }, [playerShield]);
 
     useEffect(() => {
         if (enemyHealth <= 0 && !hasResolvedVictory.current) {
@@ -250,7 +386,7 @@ function Fight() {
         setIsGameOver(true);
     }, [enemyHealth, levels.length, player.hp]);
 
-    const triggerEnemyAttack = () => {
+    const triggerEnemyAttack = async () => {
         if (enemyHealth <= 0 || isGameOver) {
             return;
         }
@@ -259,11 +395,13 @@ function Fight() {
         let nextEnemyHealth = enemyHealth;
 
         if (enemyBurnStatus) {
-            const burnDamage = Math.max(0, enemyBurnStatus.stacks);
+            const burnDamage = Math.max(0, enemyBurnStatus.stacks * BURN_DAMAGE_PER_STACK);
             if (burnDamage > 0) {
                 nextEnemyHealth = Math.max(0, nextEnemyHealth - burnDamage);
                 setEnemyHealth(nextEnemyHealth);
+                triggerEnemyHitFeedback(burnDamage, "#ff9b57");
                 turnMessages.push(`Burn deals ${burnDamage} damage`);
+                await wait(EFFECT_STEP_DELAY_MS);
             }
 
             const nextDuration = enemyBurnStatus.remainingTurns - 1;
@@ -283,6 +421,7 @@ function Fight() {
         if (absorbedDamage > 0) {
             setPlayerShield((previous) => Math.max(0, previous - absorbedDamage));
             turnMessages.push(`Shield blocks ${absorbedDamage}`);
+            await wait(EFFECT_STEP_DELAY_MS);
         }
 
         applyEnemyAttack(remainingDamage);
@@ -310,19 +449,23 @@ function Fight() {
         });
     };
 
-    const handleEndTurn = () => {
-        if (enemyHealth <= 0 || isGameOver) {
+    const handleEndTurn = async () => {
+        if (enemyHealth <= 0 || isGameOver || isResolvingTurn) {
             return;
         }
 
-        triggerEnemyAttack();
+        setIsResolvingTurn(true);
+        await triggerEnemyAttack();
         setUsedSpellIds([]);
+        setIsResolvingTurn(false);
     };
 
-    const handleSlotClick = (spell: { id: number; damage: number; type1?: string; type2?: string; effects?: SpellEffectConfig[] }) => {
-        if (usedSpellIds.includes(spell.id) || enemyHealth <= 0 || isGameOver) {
+    const handleSlotClick = async (spell: { id: number; damage: number; type1?: string; type2?: string; effects?: SpellEffectConfig[] }) => {
+        if (usedSpellIds.includes(spell.id) || enemyHealth <= 0 || isGameOver || isResolvingTurn) {
             return;
         }
+
+        setIsResolvingTurn(true);
 
         setSpellCastFlashBackground(getSpellCastFlashBackground(spell.type1, spell.type2));
         setIsSpellCastFlashing(false);
@@ -339,8 +482,15 @@ function Fight() {
         setFlashingSlotId(spell.id);
         const spellTypes = [spell.type1, spell.type2].map(normalizeType).filter(Boolean);
         const enemyWeaknesses = (enemy.weaknesses ?? []).map(normalizeType).filter(Boolean);
+        const isWaterSpell = spellTypes.includes("water");
+        const isLightningSpell = spellTypes.includes("lightning");
+        const isFireSpell = spellTypes.includes("fire");
+        const isIceSpell = spellTypes.includes("ice");
+        const hitFlashColor = getSpellHitFlashColor(spell.type1, spell.type2);
         const hitCount = getSpellHitCount(spell.effects);
         const perHitEffects = getPerHitSpellEffects(spell.effects);
+        let remainingSoakStacks = enemySoakStatus?.stacks ?? 0;
+        let remainingFreezeStacks = enemyFreezeStatus?.stacks ?? 0;
 
         let totalDamage = 0;
         let totalHealing = 0;
@@ -348,12 +498,66 @@ function Fight() {
         let totalShieldGranted = 0;
         let burnDuration = 0;
         let hadCriticalHit = false;
+        let nextEnemyHealth = enemyHealth;
+        let burnedWasExtinguished = false;
+        let totalSoakApplied = 0;
+        let soakWasConsumed = false;
+        let soakWasFrozen = false;
+        let convertedFreezeStacks = 0;
+        let freezeWasConsumed = false;
+        let consumedFreezeStacks = 0;
 
         for (let hitIndex = 0; hitIndex < hitCount; hitIndex += 1) {
+            if (nextEnemyHealth <= 0) {
+                break;
+            }
+
             const isCritical = spellTypes.some((type) => enemyWeaknesses.includes(type));
             hadCriticalHit ||= isCritical;
-            const hitDamage = isCritical ? spell.damage * 2 : spell.damage;
+            const soakBonus = isLightningSpell ? remainingSoakStacks * SOAK_LIGHTNING_BONUS_PER_STACK : 0;
+            const soakPenalty = isFireSpell ? remainingSoakStacks * SOAK_FIRE_PENALTY_PER_STACK : 0;
+            const freezeBonus = isFireSpell ? remainingFreezeStacks * FREEZE_FIRE_BONUS_PER_STACK : 0;
+            const baseHitDamage = Math.max(0, spell.damage + soakBonus - soakPenalty + freezeBonus);
+            const hitDamage = isCritical ? baseHitDamage * 2 : baseHitDamage;
             totalDamage += hitDamage;
+            nextEnemyHealth = Math.max(0, nextEnemyHealth - hitDamage);
+            setEnemyHealth(nextEnemyHealth);
+            triggerEnemyHitFeedback(hitDamage, hitFlashColor);
+
+            if (isWaterSpell && !burnedWasExtinguished && enemyBurnStatus) {
+                setEnemyBurnStatus(null);
+                burnedWasExtinguished = true;
+                triggerEnemySteamEffect();
+                await wait(EFFECT_STEP_DELAY_MS);
+            }
+
+            if (isIceSpell && !soakWasFrozen && remainingSoakStacks > 0) {
+                convertedFreezeStacks = remainingSoakStacks;
+                soakWasFrozen = true;
+                await wait(EFFECT_STEP_DELAY_MS);
+            } else if ((isFireSpell || isLightningSpell) && !soakWasConsumed && remainingSoakStacks > 0) {
+                soakWasConsumed = true;
+                await wait(EFFECT_STEP_DELAY_MS);
+            }
+
+            if (isFireSpell && !freezeWasConsumed && remainingFreezeStacks > 0) {
+                consumedFreezeStacks = remainingFreezeStacks;
+                freezeWasConsumed = true;
+                await wait(EFFECT_STEP_DELAY_MS);
+            }
+
+            if (isCritical && !isCritTextVisible) {
+                setIsCritFlashing(false);
+                setIsCritTextVisible(false);
+                window.requestAnimationFrame(() => {
+                    setIsCritFlashing(true);
+                    setIsCritTextVisible(true);
+                    setTimeout(() => setIsCritFlashing(false), 320);
+                    setTimeout(() => setIsCritTextVisible(false), 520);
+                });
+            }
+
+            await wait(HIT_STEP_DELAY_MS);
 
             perHitEffects.forEach((effect) => {
                 switch (effect.kind) {
@@ -403,14 +607,27 @@ function Fight() {
                         }
                         break;
                     }
+                    case "soak": {
+                        if (effect.target === "self") {
+                            return;
+                        }
+
+                        totalSoakApplied += Math.max(1, effect.amount ?? 1);
+                        break;
+                    }
                     default:
                         break;
                 }
             });
-        }
 
-        const nextEnemyHealth = Math.max(0, enemyHealth - totalDamage);
-        setEnemyHealth(nextEnemyHealth);
+            if (perHitEffects.length > 0) {
+                await wait(EFFECT_STEP_DELAY_MS);
+            }
+
+            if (hitIndex < hitCount - 1) {
+                await wait(HIT_STEP_DELAY_MS);
+            }
+        }
 
         if (nextEnemyHealth > 0 && totalBurnApplied > 0) {
             setEnemyBurnStatus((previous) => {
@@ -428,21 +645,52 @@ function Fight() {
                     remainingTurns: Math.max(previous.remainingTurns, burnDuration),
                 };
             });
+            await wait(EFFECT_STEP_DELAY_MS);
+        }
+
+        if (soakWasFrozen) {
+            setEnemySoakStatus(null);
+            setEnemyFreezeStatus((previous) => {
+                if (!previous) {
+                    return { kind: "freeze", stacks: convertedFreezeStacks };
+                }
+
+                return {
+                    kind: "freeze",
+                    stacks: previous.stacks + convertedFreezeStacks,
+                };
+            });
+            await wait(EFFECT_STEP_DELAY_MS);
+        } else if (soakWasConsumed) {
+            setEnemySoakStatus(null);
+            await wait(EFFECT_STEP_DELAY_MS);
+        }
+
+        if (freezeWasConsumed) {
+            setEnemyFreezeStatus(null);
+            await wait(EFFECT_STEP_DELAY_MS);
+        }
+
+        if (nextEnemyHealth > 0 && totalSoakApplied > 0) {
+            setEnemySoakStatus((previous) => {
+                if (!previous) {
+                    return {
+                        kind: "soak",
+                        stacks: totalSoakApplied,
+                    };
+                }
+
+                return {
+                    kind: "soak",
+                    stacks: previous.stacks + totalSoakApplied,
+                };
+            });
+            await wait(EFFECT_STEP_DELAY_MS);
         }
 
         if (totalShieldGranted > 0) {
             setPlayerShield((previous) => previous + totalShieldGranted);
-        }
-
-        if (hadCriticalHit) {
-            setIsCritFlashing(false);
-            setIsCritTextVisible(false);
-            window.requestAnimationFrame(() => {
-                setIsCritFlashing(true);
-                setIsCritTextVisible(true);
-                setTimeout(() => setIsCritFlashing(false), 320);
-                setTimeout(() => setIsCritTextVisible(false), 520);
-            });
+            await wait(EFFECT_STEP_DELAY_MS);
         }
 
         const effectMessages: string[] = [];
@@ -458,28 +706,46 @@ function Fight() {
         if (totalBurnApplied > 0 && nextEnemyHealth > 0) {
             effectMessages.push(`Burn +${totalBurnApplied}`);
         }
+        if (totalSoakApplied > 0 && nextEnemyHealth > 0) {
+            effectMessages.push(`Soak +${totalSoakApplied}`);
+        }
+        if (soakWasConsumed) {
+            effectMessages.push("Soak reset");
+        }
+        if (soakWasFrozen) {
+            effectMessages.push(`Freeze +${convertedFreezeStacks}`);
+        }
+        if (freezeWasConsumed) {
+            effectMessages.push(`Freeze consumed`);
+        }
+        if (burnedWasExtinguished) {
+            effectMessages.push("Burn extinguished");
+        }
+        if (hadCriticalHit) {
+            effectMessages.push("Critical hit");
+        }
 
+        let isTurnOver = false;
         setUsedSpellIds((previous) => {
             if (previous.includes(spell.id)) {
                 return previous;
             }
 
             const next = [...previous, spell.id];
-            const isTurnOver = next.length >= player.elements.length;
-
-            if (isTurnOver) {
-                if (nextEnemyHealth > 0) {
-                    setTurnMessage("All spell slots used");
-                }
-                return next;
-            }
-
-            if (effectMessages.length > 0) {
-                setTurnMessage(effectMessages.join(". "));
-            }
+            isTurnOver = next.length >= player.elements.length;
 
             return next;
         });
+
+        if (isTurnOver) {
+            if (nextEnemyHealth > 0) {
+                setTurnMessage("All spell slots used");
+            }
+        } else if (effectMessages.length > 0) {
+            setTurnMessage(effectMessages.join(". "));
+        }
+
+        setIsResolvingTurn(false);
     };
 
     const handleFlashEnd = (slotId: number) => {
@@ -526,11 +792,57 @@ function Fight() {
                     <div className="enemy-hp-fill" style={{ width: `${enemyHpFillPercent}%` }} />
                     <span className="enemy-hp-label">{enemyHealth} / {enemyMaxHp} HP</span>
                 </div>
-                {enemyBurnStatus ? (
-                    <span className="enemy-status">Burn {enemyBurnStatus.stacks} for {enemyBurnStatus.remainingTurns} turns</span>
-                ) : null}
-                <span className="enemy-power">{enemy.power} POW</span>
-                <span className="enemy-experience">{enemy.experience} XP</span>
+                <div
+                    className={`enemy-sprite-card ${isEnemySpriteFlashing ? "is-hit-flash" : ""}`}
+                    style={{ ["--enemy-hit-flash" as string]: enemySpriteFlashColor }}
+                >
+                    <EnemyInfoSprite enemyName={enemy.name} spritePath={enemy.sprite ?? ""} />
+                    {isEnemySteamVisible ? (
+                        <span className="enemy-steam-pop" aria-hidden="true">
+                            <span className="steam-cloud steam-cloud-one" />
+                            <span className="steam-cloud steam-cloud-two" />
+                            <span className="steam-cloud steam-cloud-three" />
+                        </span>
+                    ) : null}
+                    {enemyDamagePopups.map((popup) => (
+                        <span
+                            key={popup.id}
+                            className="enemy-damage-popup"
+                            style={{ ["--popup-color" as string]: popup.color }}
+                        >
+                            {popup.text}
+                        </span>
+                    ))}
+                    {enemyBurnStatus ? (
+                        <span className="enemy-burn-indicator" aria-label={`Burn ${enemyBurnStatus.stacks}`}>
+                            <span className="burn-icon" role="img" aria-hidden="true">🔥</span>
+                            <span className="burn-stacks">{enemyBurnStatus.stacks}</span>
+                            <span className="burn-tooltip">Burn expires in {enemyBurnStatus.remainingTurns} turns</span>
+                        </span>
+                    ) : null}
+                    {enemySoakStatus ? (
+                        <span className="enemy-soak-indicator" aria-label={`Soak ${enemySoakStatus.stacks}`}>
+                            <span className="soak-icon" role="img" aria-hidden="true">💧</span>
+                            <span className="soak-stacks">{enemySoakStatus.stacks}</span>
+                            <span className="soak-tooltip">
+                                Lightning +{enemySoakStatus.stacks * SOAK_LIGHTNING_BONUS_PER_STACK}. Fire -{enemySoakStatus.stacks * SOAK_FIRE_PENALTY_PER_STACK}
+                            </span>
+                        </span>
+                    ) : null}
+                    {enemyFreezeStatus ? (
+                        <span className="enemy-freeze-indicator" aria-label={`Freeze ${enemyFreezeStatus.stacks}`}>
+                            <span className="freeze-icon" role="img" aria-hidden="true">❄</span>
+                            <span className="freeze-stacks">{enemyFreezeStatus.stacks}</span>
+                            <span className="freeze-tooltip">
+                                Fire gains +{enemyFreezeStatus.stacks * FREEZE_FIRE_BONUS_PER_STACK} damage
+                            </span>
+                        </span>
+                    ) : null}
+                    <div className="enemy-meta-tooltip" aria-hidden="true">
+                        <span>{enemy.power} POW</span>
+                        <span>{enemy.experience} XP</span>
+                    </div>
+                </div>
             </div>
             <div className="spells">
                 {player.elements.map((spell) => (
@@ -538,7 +850,7 @@ function Fight() {
                         key={spell.id}
                         type="button"
                         className={`spell-slot ${flashingSlotId === spell.id ? "is-flashing" : ""}`}
-                        disabled={usedSpellIds.includes(spell.id) || isGameOver}
+                        disabled={usedSpellIds.includes(spell.id) || isGameOver || isResolvingTurn}
                         style={getSpellSlotStyle(spell.type1, spell.type2)}
                         onMouseEnter={() => setHoveredSpellId(spell.id)}
                         onMouseLeave={() => setHoveredSpellId((current) => (current === spell.id ? null : current))}
@@ -568,16 +880,41 @@ function Fight() {
                     type="button"
                     className="end-turn-button"
                     onClick={handleEndTurn}
-                    disabled={isGameOver || enemyHealth <= 0}
+                    disabled={isGameOver || enemyHealth <= 0 || isResolvingTurn}
                 >
                     End Turn
                 </button>
             </div>
-            <div className="player-hp-bar" role="progressbar" aria-valuemin={0} aria-valuemax={playerMaxHp} aria-valuenow={player.hp}>
-                <div className="player-hp-fill" style={{ width: `${playerHpFillPercent}%` }} />
-                <span className="player-hp-label">{player.hp} / {playerMaxHp} HP</span>
+            <div className="player-hp-wrap">
+                {playerShield > 0 ? (
+                    <span className="player-shield-badge">
+                        {playerShield}
+                        <span className="player-shield-tooltip">You have {playerShield} shield</span>
+                    </span>
+                ) : null}
+                <div
+                    className={`player-hp-bar ${playerShield > 0 ? "has-shield" : ""} ${isPlayerHealingFlash ? "is-healing" : ""} ${isPlayerShieldFlash ? "is-shield-gain" : ""}`}
+                    role="progressbar"
+                    aria-valuemin={0}
+                    aria-valuemax={playerMaxHp}
+                    aria-valuenow={displayedPlayerHp}
+                >
+                    <div
+                        className="player-hp-fill player-hp-fill--health"
+                        style={{ width: `${playerHealthFillPercent}%` }}
+                    />
+                    <div
+                        className="player-hp-fill player-hp-fill--shield"
+                        style={{
+                            left: `${playerHealthFillPercent}%`,
+                            width: `${playerShieldTailFillPercent}%`,
+                        }}
+                    />
+                    <span className={`player-hp-label ${playerShield > 0 ? "has-shield" : ""}`}>
+                        {displayedPlayerHp} / {playerMaxHp} HP
+                    </span>
+                </div>
             </div>
-            {playerShield > 0 ? <span className="player-status">Shield {playerShield}</span> : null}
 
             {isGameOver ? (
                 <div className="game-over-overlay" role="dialog" aria-modal="true" aria-labelledby="game-over-title">

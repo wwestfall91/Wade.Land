@@ -151,6 +151,11 @@ const getEffectSummaryLines = (effects?: SpellEffectConfig[]): string[] => {
                 }
                 break;
             }
+            case "soak": {
+                const amount = Math.max(1, effect.amount ?? 1);
+                lines.push(`Soak: +${amount}`);
+                break;
+            }
             default:
                 break;
         }
@@ -171,6 +176,9 @@ const getEffectChipClass = (line: string): string => {
     }
     if (line.startsWith("Lifesteal:")) {
         return "effect-lifesteal";
+    }
+    if (line.startsWith("Soak:")) {
+        return "effect-soak";
     }
     if (line.startsWith("Hits:")) {
         return "effect-multi-hit";
