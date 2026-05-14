@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { getEffectChipClass, getEffectSummaryLines } from "../../combat/effectSummary";
-import type { LevelDefinition, RewardElement } from "../../context/PlayerContext";
+import { usePlayer, type LevelDefinition, type RewardElement } from "../../context/PlayerContext";
 import FloatingTooltip from "../Game/FloatingTooltip";
 import "./RewardModal.scss";
 
@@ -69,9 +69,12 @@ type RewardModalProps = {
 };
 
 function RewardModal({ xpGained, currentXp, levels, rewardElements, onConfirm }: RewardModalProps) {
+    const { player } = usePlayer();
     const [selectedElement, setSelectedElement] = useState<RewardElement | null>(null);
     const [hoveredLetter, setHoveredLetter] = useState<string | null>(null);
+    const [hoveredCurrentElementId, setHoveredCurrentElementId] = useState<number | null>(null);
     const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+    const currentElementRefs = useRef<Record<number, HTMLDivElement | null>>({});
     const [isClosing, setIsClosing] = useState(false);
     const closeTimeoutRef = useRef<number | null>(null);
 
@@ -205,6 +208,33 @@ function RewardModal({ xpGained, currentXp, levels, rewardElements, onConfirm }:
                             </button>
                         ))}
                     </div>
+                    <section className="reward-current-elements" aria-label="Current spells">
+                        <h3 className="reward-current-elements-title">Your Elements</h3>
+                        <div className="reward-current-elements-list">
+                            {player.elements.length > 0 ? (
+                                player.elements.map((element) => (
+                                    <div
+                                        key={element.id}
+                                        ref={(el) => {
+                                            currentElementRefs.current[element.id] = el;
+                                        }}
+                                        className="reward-current-element"
+                                        onMouseEnter={() => setHoveredCurrentElementId(element.id)}
+                                        onMouseLeave={() => {
+                                            setHoveredCurrentElementId((current) => (
+                                                current === element.id ? null : current
+                                            ));
+                                        }}
+                                    >
+                                        <span className="reward-current-element-letter">{element.letter}</span>
+                                    </div>
+                                ))
+                            ) : (
+                                <p className="reward-current-empty">Nothing.</p>
+                            )}
+                        </div>
+                    </section>
+                    
 
                     <button
                         type="button"
@@ -229,6 +259,56 @@ function RewardModal({ xpGained, currentXp, levels, rewardElements, onConfirm }:
                     <FloatingTooltip
                         anchorElement={buttonRefs.current[hoveredLetter]}
                         open={Boolean(hoveredLetter)}
+                        className="reward-element-tooltip-shell"
+                    >
+                        <div className="reward-element-info">
+                            {element.description.length > 0 ? (
+                                <span className="element-info-description">{element.description}</span>
+                            ) : null}
+                            <span className="element-info-damage">Damage: {element.damage}</span>
+                            <span className="element-info-types">
+                                <span className="element-info-label">Types:</span>
+                                <span className="element-info-list">
+                                    {elementTypes.length > 0 ? (
+                                        elementTypes.map((type) => (
+                                            <span key={type} className={`type-chip ${toTypeClass(type)}`}>
+                                                {type}
+                                            </span>
+                                        ))
+                                    ) : (
+                                        <span className="type-chip type-none">None</span>
+                                    )}
+                                </span>
+                            </span>
+                            {effectLines.length > 0 ? (
+                                <span className="element-info-effects">
+                                    <span className="element-info-label">Effects:</span>
+                                    <span className="element-info-list">
+                                        {effectLines.map((line, index) => (
+                                            <span key={`${line}-${index}`} className={`effect-chip ${getEffectChipClass(line)}`}>
+                                                {line}
+                                            </span>
+                                        ))}
+                                    </span>
+                                </span>
+                            ) : null}
+                        </div>
+                    </FloatingTooltip>
+                );
+            })() : null}
+            {hoveredCurrentElementId !== null ? (() => {
+                const element = player.elements.find((entry) => entry.id === hoveredCurrentElementId);
+                if (!element) return null;
+
+                const elementTypes = [element.type1, element.type2].filter(
+                    (value): value is string => Boolean(value && value.trim().length > 0),
+                );
+                const effectLines = getEffectSummaryLines(element.effects);
+
+                return (
+                    <FloatingTooltip
+                        anchorElement={currentElementRefs.current[hoveredCurrentElementId]}
+                        open
                         className="reward-element-tooltip-shell"
                     >
                         <div className="reward-element-info">

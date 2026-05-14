@@ -2,7 +2,7 @@
     position: absolute;
     left: 50%;
     top: 0;
-    width: fit-content;
+    min-width: min(20rem, 88vw);
     max-width: min(20rem, 88vw);
     color: #181818;
     z-index: 2147483647;
@@ -14,7 +14,8 @@
     flex-direction: column;
     align-items: stretch;
     gap: 0.3rem;
-    width: fit-content;
+    min-width: 30%;
+    max-width: 70%;
     box-sizing: border-box;
     padding: 0.58rem 0.62rem;
     border: 2px solid #102060;
@@ -54,13 +55,16 @@
 .floating-tooltip.spell-hover-tooltip-shell {
     width: fit-content;
     max-width: min(20rem, 88vw);
-    min-width: 9rem;
+    min-width: 0;
     font-size: 0.76rem;
     font-weight: 700;
     letter-spacing: 0.02em;
 }
 
 .floating-tooltip.spell-hover-tooltip-shell .floating-tooltip__panel {
+    width: fit-content;
+    min-width: 0;
+    max-width: none;
     gap: 0.1rem;
     padding: 0.26rem 0.52rem;
     border: 2px solid #d8e0ff;
