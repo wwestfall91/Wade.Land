@@ -23,6 +23,13 @@ type ActiveFreezeStatus = {
     stacks: number;
 };
 
+type EventLogEntry = {
+    id: number;
+    text: string;
+    kind: "enemy" | "player" | "status";
+    isDetail?: boolean;
+};
+
 const HIT_FLASH_MS = 190;
 const HIT_STEP_DELAY_MS = 120;
 const EFFECT_STEP_DELAY_MS = 95;
@@ -30,6 +37,7 @@ const BURN_DAMAGE_PER_STACK = 5;
 const SOAK_LIGHTNING_BONUS_PER_STACK = 3;
 const SOAK_FIRE_PENALTY_PER_STACK = 3;
 const FREEZE_FIRE_BONUS_PER_STACK = 10;
+const EVENT_LOG_MAX_ENTRIES = 60;
 
 const wait = (ms: number) => new Promise<void>((resolve) => {
     window.setTimeout(resolve, ms);
@@ -67,6 +75,15 @@ type FightLocationState = {
     elementPool?: RewardElement[];
 };
 
+type CastableSpell = {
+    id: number;
+    letter: string;
+    damage: number;
+    type1?: string;
+    type2?: string;
+    effects?: SpellEffectConfig[];
+};
+
 function Fight() {
     const location = useLocation();
     const navigate = useNavigate();
@@ -74,7 +91,7 @@ function Fight() {
     const [flashingSlotId, setFlashingSlotId] = useState<number | null>(null);
     const [hoveredSpellId, setHoveredSpellId] = useState<number | null>(null);
     const [usedSpellIds, setUsedSpellIds] = useState<number[]>([]);
-    const [turnMessage, setTurnMessage] = useState<string>("");
+    const [eventLogEntries, setEventLogEntries] = useState<EventLogEntry[]>([]);
     const [isGameOver, setIsGameOver] = useState(false);
     const [isPlayerHit, setIsPlayerHit] = useState(false);
     const [isScreenFlashing, setIsScreenFlashing] = useState(false);
@@ -100,6 +117,8 @@ function Fight() {
     const previousPlayerHpRef = useRef(player.hp);
     const previousPlayerShieldRef = useRef(playerShield);
     const enemyDamagePopupIdRef = useRef(1);
+    const eventLogIdRef = useRef(1);
+    const eventLogContainerRef = useRef<HTMLDivElement | null>(null);
     const healFlashTimeoutRef = useRef<number | null>(null);
     const shieldFlashTimeoutRef = useRef<number | null>(null);
     const playerHitTimeoutRef = useRef<number | null>(null);
@@ -187,6 +206,13 @@ function Fight() {
         return primary?.bg ?? "#f0f0f0";
     };
 
+    const getAbilityLogName = (spell: CastableSpell) => {
+        const types = [spell.type1, spell.type2].map(normalizeType).filter(Boolean);
+        const prettyTypes = types.map((type) => `${type.charAt(0).toUpperCase()}${type.slice(1)}`);
+        const typeLabel = prettyTypes.length > 0 ? ` (${prettyTypes.join("/")})` : "";
+        return `${spell.letter}${typeLabel}`;
+    };
+
     const triggerEnemyHitFeedback = (damage: number, flashColor: string) => {
         const popupId = enemyDamagePopupIdRef.current++;
         setEnemySpriteFlashColor(flashColor);
@@ -230,9 +256,8 @@ function Fight() {
                 }
                 case "burn": {
                     const amount = Math.max(0, effect.amount ?? 0);
-                    const duration = Math.max(1, effect.duration ?? 1);
                     if (amount > 0) {
-                        lines.push(`Burn: +${amount} for ${duration} turns`);
+                        lines.push(`Burn: +${amount}`);
                     }
                     break;
                 }
@@ -287,19 +312,50 @@ function Fight() {
         return "effect-default";
     };
 
-    useEffect(() => {
-        if (turnMessage.length === 0) {
+    const inferEventKind = (message: string): EventLogEntry["kind"] => {
+        if (message.startsWith("Enemy attacks")) {
+            return "enemy";
+        }
+        if (message.startsWith("Heals") || message.startsWith("Shield ") || message.startsWith("Hits") || message.startsWith("Critical hit")) {
+            return "player";
+        }
+
+        return "status";
+    };
+
+    const pushEventLog = (
+        message: string,
+        kind: EventLogEntry["kind"] = inferEventKind(message),
+        options?: { isDetail?: boolean },
+    ) => {
+        const trimmed = message.trim();
+        if (trimmed.length === 0) {
             return;
         }
 
-        const timeout = window.setTimeout(() => {
-            setTurnMessage("");
-        }, 3000);
+        setEventLogEntries((previous) => {
+            const next = [...previous, {
+                id: eventLogIdRef.current++,
+                text: trimmed,
+                kind,
+                isDetail: options?.isDetail ?? false,
+            }];
+            if (next.length <= EVENT_LOG_MAX_ENTRIES) {
+                return next;
+            }
 
-        return () => {
-            window.clearTimeout(timeout);
-        };
-    }, [turnMessage]);
+            return next.slice(next.length - EVENT_LOG_MAX_ENTRIES);
+        });
+    };
+
+    useEffect(() => {
+        const container = eventLogContainerRef.current;
+        if (!container) {
+            return;
+        }
+
+        container.scrollTop = container.scrollHeight;
+    }, [eventLogEntries]);
 
     useEffect(() => {
         return () => {
@@ -391,7 +447,6 @@ function Fight() {
             return;
         }
 
-        const turnMessages: string[] = [];
         let nextEnemyHealth = enemyHealth;
 
         if (enemyBurnStatus) {
@@ -400,7 +455,7 @@ function Fight() {
                 nextEnemyHealth = Math.max(0, nextEnemyHealth - burnDamage);
                 setEnemyHealth(nextEnemyHealth);
                 triggerEnemyHitFeedback(burnDamage, "#ff9b57");
-                turnMessages.push(`Burn deals ${burnDamage} damage`);
+                pushEventLog(`Burn deals ${burnDamage} damage (${enemyBurnStatus.stacks} stack)`, "status");
                 await wait(EFFECT_STEP_DELAY_MS);
             }
 
@@ -410,7 +465,6 @@ function Fight() {
                 : null);
 
             if (nextEnemyHealth <= 0) {
-                setTurnMessage(turnMessages.join(". "));
                 return;
             }
         }
@@ -420,13 +474,12 @@ function Fight() {
 
         if (absorbedDamage > 0) {
             setPlayerShield((previous) => Math.max(0, previous - absorbedDamage));
-            turnMessages.push(`Shield blocks ${absorbedDamage}`);
+            pushEventLog(`Shield blocks ${absorbedDamage}`, "player");
             await wait(EFFECT_STEP_DELAY_MS);
         }
 
         applyEnemyAttack(remainingDamage);
-        turnMessages.push(`Enemy attacks for ${remainingDamage} damage`);
-        setTurnMessage(turnMessages.join(". "));
+        pushEventLog(`Enemy attacks for ${remainingDamage} damage`, "enemy");
         if (playerHitTimeoutRef.current !== null) {
             window.clearTimeout(playerHitTimeoutRef.current);
         }
@@ -460,7 +513,7 @@ function Fight() {
         setIsResolvingTurn(false);
     };
 
-    const handleSlotClick = async (spell: { id: number; damage: number; type1?: string; type2?: string; effects?: SpellEffectConfig[] }) => {
+    const handleSlotClick = async (spell: CastableSpell) => {
         if (usedSpellIds.includes(spell.id) || enemyHealth <= 0 || isGameOver || isResolvingTurn) {
             return;
         }
@@ -486,6 +539,7 @@ function Fight() {
         const isLightningSpell = spellTypes.includes("lightning");
         const isFireSpell = spellTypes.includes("fire");
         const isIceSpell = spellTypes.includes("ice");
+        const abilityName = getAbilityLogName(spell);
         const hitFlashColor = getSpellHitFlashColor(spell.type1, spell.type2);
         const hitCount = getSpellHitCount(spell.effects);
         const perHitEffects = getPerHitSpellEffects(spell.effects);
@@ -499,6 +553,7 @@ function Fight() {
         let burnDuration = 0;
         let hadCriticalHit = false;
         let nextEnemyHealth = enemyHealth;
+        const hitDamageBreakdown: number[] = [];
         let burnedWasExtinguished = false;
         let totalSoakApplied = 0;
         let soakWasConsumed = false;
@@ -519,6 +574,7 @@ function Fight() {
             const freezeBonus = isFireSpell ? remainingFreezeStacks * FREEZE_FIRE_BONUS_PER_STACK : 0;
             const baseHitDamage = Math.max(0, spell.damage + soakBonus - soakPenalty + freezeBonus);
             const hitDamage = isCritical ? baseHitDamage * 2 : baseHitDamage;
+            hitDamageBreakdown.push(hitDamage);
             totalDamage += hitDamage;
             nextEnemyHealth = Math.max(0, nextEnemyHealth - hitDamage);
             setEnemyHealth(nextEnemyHealth);
@@ -693,9 +749,11 @@ function Fight() {
             await wait(EFFECT_STEP_DELAY_MS);
         }
 
+        pushEventLog(`${abilityName} deals ${totalDamage} damage`, "player");
+
         const effectMessages: string[] = [];
         if (hitCount > 1) {
-            effectMessages.push(`Hits ${hitCount}x`);
+            effectMessages.push(`Hits ${hitCount}x | ${hitDamageBreakdown.join(" + ")}`);
         }
         if (totalHealing > 0) {
             effectMessages.push(`Heals ${totalHealing}`);
@@ -710,7 +768,7 @@ function Fight() {
             effectMessages.push(`Soak +${totalSoakApplied}`);
         }
         if (soakWasConsumed) {
-            effectMessages.push("Soak reset");
+            effectMessages.push("Soak evaporates");
         }
         if (soakWasFrozen) {
             effectMessages.push(`Freeze +${convertedFreezeStacks}`);
@@ -739,10 +797,12 @@ function Fight() {
 
         if (isTurnOver) {
             if (nextEnemyHealth > 0) {
-                setTurnMessage("All spell slots used");
+                pushEventLog("All spell slots used", "status");
             }
         } else if (effectMessages.length > 0) {
-            setTurnMessage(effectMessages.join(". "));
+            effectMessages.forEach((message) => {
+                pushEventLog(message, inferEventKind(message), { isDetail: true });
+            });
         }
 
         setIsResolvingTurn(false);
@@ -781,12 +841,6 @@ function Fight() {
             {isCritFlashing ? <div className="screen-crit-flash" /> : null}
             {isCritTextVisible ? <div className="crit-text">CRITICAL!</div> : null}
             <div className="enemy">
-                <div
-                    className={`turn-message ${turnMessage.length > 0 ? "is-visible" : ""}`}
-                    aria-live="polite"
-                >
-                    {turnMessage.length > 0 ? turnMessage : " "}
-                </div>
                 <span className="enemy-name">{enemy.name}</span>
                 <div className="enemy-hp-bar" role="progressbar" aria-valuemin={0} aria-valuemax={enemyMaxHp} aria-valuenow={enemyHealth}>
                     <div className="enemy-hp-fill" style={{ width: `${enemyHpFillPercent}%` }} />
@@ -817,7 +871,13 @@ function Fight() {
                         <span className="enemy-burn-indicator" aria-label={`Burn ${enemyBurnStatus.stacks}`}>
                             <span className="burn-icon" role="img" aria-hidden="true">🔥</span>
                             <span className="burn-stacks">{enemyBurnStatus.stacks}</span>
-                            <span className="burn-tooltip">Burn expires in {enemyBurnStatus.remainingTurns} turns</span>
+                            <span className="burn-tooltip">
+                                <span>Burn Stacks: {enemyBurnStatus.stacks}</span>
+                                <span>Expires in: {enemyBurnStatus.remainingTurns} turns</span>
+                                <span>Damage: {enemyBurnStatus.stacks * BURN_DAMAGE_PER_STACK}</span>
+                                <span>Triggers at the end of each turn</span>
+                                
+                            </span>
                         </span>
                     ) : null}
                     {enemySoakStatus ? (
@@ -856,6 +916,7 @@ function Fight() {
                         onMouseLeave={() => setHoveredSpellId((current) => (current === spell.id ? null : current))}
                         onClick={() => handleSlotClick({
                             id: spell.id,
+                            letter: spell.letter,
                             damage: spell.damage,
                             type1: spell.type1,
                             type2: spell.type2,
@@ -915,6 +976,27 @@ function Fight() {
                     </span>
                 </div>
             </div>
+
+            <aside className="event-log-panel" aria-live="polite" aria-label="Fight event log">
+                <h3 className="event-log-title">Battle Log</h3>
+                <div className="event-log-list" ref={eventLogContainerRef}>
+                    {eventLogEntries.length === 0 ? (
+                        <p className="event-log-empty">Actions will appear here.</p>
+                    ) : (
+                        eventLogEntries.map((entry) => (
+                            <p
+                                key={entry.id}
+                                className={`event-log-entry event-log-entry--${entry.kind}${entry.isDetail ? " event-log-entry--detail" : ""}`}
+                            >
+                                <span className={`event-log-tag event-log-tag--${entry.kind}`}>
+                                    {entry.kind}
+                                </span>
+                                <span className="event-log-text">{entry.text}</span>
+                            </p>
+                        ))
+                    )}
+                </div>
+            </aside>
 
             {isGameOver ? (
                 <div className="game-over-overlay" role="dialog" aria-modal="true" aria-labelledby="game-over-title">
