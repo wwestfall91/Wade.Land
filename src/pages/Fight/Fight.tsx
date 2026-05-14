@@ -47,6 +47,8 @@ function Fight() {
     const [isGameOver, setIsGameOver] = useState(false);
     const [isPlayerHit, setIsPlayerHit] = useState(false);
     const [isScreenFlashing, setIsScreenFlashing] = useState(false);
+    const [isSpellCastFlashing, setIsSpellCastFlashing] = useState(false);
+    const [spellCastFlashBackground, setSpellCastFlashBackground] = useState<string>("rgba(255, 255, 255, 0.16)");
     const [isCritFlashing, setIsCritFlashing] = useState(false);
     const [isCritTextVisible, setIsCritTextVisible] = useState(false);
     const [showRewardModal, setShowRewardModal] = useState(false);
@@ -55,6 +57,7 @@ function Fight() {
     const hasResolvedVictory = useRef(false);
     const playerHitTimeoutRef = useRef<number | null>(null);
     const screenFlashTimeoutRef = useRef<number | null>(null);
+    const spellCastFlashTimeoutRef = useRef<number | null>(null);
 
     const enemy = useMemo(() => {
         const state = location.state as FightLocationState | null;
@@ -93,6 +96,34 @@ function Fight() {
         } as React.CSSProperties;
     };
 
+    const hexToRgba = (hexColor: string, alpha: number) => {
+        const hex = hexColor.replace("#", "");
+        if (hex.length !== 6) {
+            return `rgba(255, 255, 255, ${alpha})`;
+        }
+
+        const red = Number.parseInt(hex.slice(0, 2), 16);
+        const green = Number.parseInt(hex.slice(2, 4), 16);
+        const blue = Number.parseInt(hex.slice(4, 6), 16);
+        return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+    };
+
+    const getSpellCastFlashBackground = (type1?: string, type2?: string) => {
+        const normalized = [type1, type2].map(normalizeType).filter(Boolean);
+        if (normalized.length === 0) {
+            return "rgba(255, 255, 255, 0.16)";
+        }
+
+        const primary = SPELL_TYPE_COLORS[normalized[0]]?.bg ?? "#ffffff";
+        const secondary = SPELL_TYPE_COLORS[normalized[1]]?.bg ?? primary;
+
+        if (normalized.length >= 2) {
+            return `linear-gradient(120deg, ${hexToRgba(primary, 0.16)} 0%, ${hexToRgba(secondary, 0.16)} 100%)`;
+        }
+
+        return hexToRgba(primary, 0.18);
+    };
+
     useEffect(() => {
         if (turnMessage.length === 0) {
             return;
@@ -114,6 +145,9 @@ function Fight() {
             }
             if (screenFlashTimeoutRef.current !== null) {
                 window.clearTimeout(screenFlashTimeoutRef.current);
+            }
+            if (spellCastFlashTimeoutRef.current !== null) {
+                window.clearTimeout(spellCastFlashTimeoutRef.current);
             }
         };
     }, []);
@@ -179,6 +213,18 @@ function Fight() {
             return;
         }
 
+        setSpellCastFlashBackground(getSpellCastFlashBackground(spell.type1, spell.type2));
+        setIsSpellCastFlashing(false);
+        window.requestAnimationFrame(() => {
+            setIsSpellCastFlashing(true);
+            if (spellCastFlashTimeoutRef.current !== null) {
+                window.clearTimeout(spellCastFlashTimeoutRef.current);
+            }
+            spellCastFlashTimeoutRef.current = window.setTimeout(() => {
+                setIsSpellCastFlashing(false);
+            }, 190);
+        });
+
         setFlashingSlotId(spell.id);
         // Determine if this is a critical hit
         const spellTypes = [spell.type1, spell.type2].map(normalizeType).filter(Boolean);
@@ -241,6 +287,12 @@ function Fight() {
 
     return (
         <div id="Fight" className={isScreenFlashing ? "is-screen-shaking" : undefined}>
+            {isSpellCastFlashing ? (
+                <div
+                    className="screen-spell-flash"
+                    style={{ ["--spell-cast-flash-bg" as string]: spellCastFlashBackground }}
+                />
+            ) : null}
             {isScreenFlashing ? <div className="screen-hit-flash" /> : null}
             {isCritFlashing ? <div className="screen-crit-flash" /> : null}
             {isCritTextVisible ? <div className="crit-text">CRITICAL!</div> : null}

@@ -54,7 +54,7 @@
 
     .turn-message {
         position: absolute;
-        top: 33%;
+        top: 45%;
         left: 50%;
         transform: translate(-50%, -50%);
         min-height: 2.25rem;
@@ -70,7 +70,7 @@
         letter-spacing: 0.02em;
         pointer-events: none;
         z-index: 8;
-        animation: fadeTurnMessage 3s ease forwards;
+        animation: fadeTurnMessage 2s ease forwards;
     }
 
     .screen-hit-flash {
@@ -80,6 +80,15 @@
         background-color: rgba(255, 0, 0, 0.3);
         z-index: 50;
         animation: enemyHitScreenFlash 420ms ease-out forwards;
+    }
+
+    .screen-spell-flash {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background: var(--spell-cast-flash-bg, rgba(255, 255, 255, 0.16));
+        z-index: 45;
+        animation: spellCastScreenFlash 190ms ease-out forwards;
     }
 
     .screen-crit-flash {
@@ -292,6 +301,20 @@
     }
 
     25% {
+        opacity: 1;
+    }
+
+    100% {
+        opacity: 0;
+    }
+}
+
+@keyframes spellCastScreenFlash {
+    0% {
+        opacity: 0;
+    }
+
+    35% {
         opacity: 1;
     }
 
