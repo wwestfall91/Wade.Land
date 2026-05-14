@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { LevelDefinition, RewardElement } from "../../context/PlayerContext";
 import "./RewardModal.scss";
 
@@ -210,8 +211,17 @@ function RewardModal({ xpGained, currentXp, levels, rewardElements, onConfirm }:
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [segmentIndex]);
 
-    return (
-        <div className="reward-menu-overlay">
+    useEffect(() => {
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+
+        return () => {
+            document.body.style.overflow = previousOverflow;
+        };
+    }, []);
+
+    const modal = (
+        <div className="reward-menu-overlay" role="dialog" aria-modal="true" aria-label="Reward selection">
             <div className="reward-menu">
                 <div className="reward-xp-section">
                     <div className="reward-level-label">
@@ -298,6 +308,8 @@ function RewardModal({ xpGained, currentXp, levels, rewardElements, onConfirm }:
             </div>
         </div>
     );
+
+    return createPortal(modal, document.body);
 }
 
 export default RewardModal;
