@@ -99,7 +99,7 @@ function RewardModal({ xpGained, currentXp, levels, rewardElements, onConfirm }:
                     const amount = Math.max(0, effect.amount ?? 0);
                     const duration = Math.max(1, effect.duration ?? 1);
                     if (amount > 0) {
-                        lines.push(`Burn: +${amount} for ${duration} turns`);
+                        lines.push(`Burn: +${amount}`);
                     }
                     break;
                 }

@@ -103,6 +103,7 @@ type PreviewCombination = {
 
 const SPREAD_X = 200;
 const SPREAD_Y = 150;
+const DRAG_TUTORIAL_SEEN_KEY = "game.dragTutorialSeen";
 
 const normalizeType = (value?: string): string => value?.trim().toLowerCase() ?? "";
 
@@ -133,7 +134,7 @@ const getEffectSummaryLines = (effects?: SpellEffectConfig[]): string[] => {
                 const amount = Math.max(0, effect.amount ?? 0);
                 const duration = Math.max(1, effect.duration ?? 1);
                 if (amount > 0) {
-                    lines.push(`Burn: +${amount} for ${duration} turns`);
+                    lines.push(`Burn: +${amount}`);
                 }
                 break;
             }
@@ -212,6 +213,13 @@ function Game() {
     const [baseElements, setBaseElements] = useState<RewardElement[]>([]);
     const [starterChoices, setStarterChoices] = useState<RewardElement[]>([]);
     const [selectedStarter, setSelectedStarter] = useState<RewardElement | null>(null);
+    const [hasSeenDragTutorial, setHasSeenDragTutorial] = useState(() => {
+        if (typeof window === "undefined") {
+            return false;
+        }
+
+        return window.localStorage.getItem(DRAG_TUTORIAL_SEEN_KEY) === "1";
+    });
     const [zoneOccupants, setZoneOccupants] = useState<Array<number | null>>([null, null]);
     const [isPreviewDragging, setIsPreviewDragging] = useState(false);
     const [isPreviewHovered, setIsPreviewHovered] = useState(false);
@@ -627,6 +635,17 @@ function Game() {
         finalizeCombination();
     };
 
+    const handleDismissDragTutorial = useCallback(() => {
+        if (hasSeenDragTutorial) {
+            return;
+        }
+
+        setHasSeenDragTutorial(true);
+        if (typeof window !== "undefined") {
+            window.localStorage.setItem(DRAG_TUTORIAL_SEEN_KEY, "1");
+        }
+    }, [hasSeenDragTutorial]);
+
     const handleFight = () => {
         if (!nextEnemy) return;
 
@@ -671,6 +690,8 @@ function Game() {
                     letter={draggable.letter}
                     damage={draggable.damage}
                     description={draggable.description}
+                    showTutorialCue={draggable.id === 1 && !hasSeenDragTutorial}
+                    onDismissTutorialCue={handleDismissDragTutorial}
                     type1={draggable.type1}
                     type2={draggable.type2}
                     effects={draggable.effects}
@@ -754,9 +775,9 @@ function Game() {
                 <div className="combination-station">
                     <div className="combination-equation">
                         <div className="drop-zone-area">
-                            <div className="drop-zone" ref={dropZoneRefA} />
+                            <div className="drop-zone" ref={dropZoneRefA}>1</div>
                             <div>+</div>
-                            <div className="drop-zone" ref={dropZoneRefB} />
+                            <div className="drop-zone" ref={dropZoneRefB}>2</div>
                             <div>=</div>
                         </div>
                         <div className="output" ref={outputRef} />

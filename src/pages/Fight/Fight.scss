@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap");
 
 #Fight{
     display: flex;
@@ -10,7 +10,7 @@
     justify-content: center;
     align-items: center;
     color: #f5f4ff;
-    font-family: "VT323", "Lucida Console", monospace;
+    font-family: "Trebuchet MS", "Segoe UI", sans-serif;
     letter-spacing: 0.01em;
     line-height: 1.15;
     text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.65);
@@ -51,7 +51,7 @@
         .enemy-name {
             font-size: 1.55rem;
             font-weight: 700;
-            font-family: "VT323", "Lucida Console", monospace;
+            font-family: "Trebuchet MS", "Segoe UI", sans-serif;
             letter-spacing: 0.03em;
             color: #fff95a;
             text-transform: uppercase;
@@ -444,7 +444,7 @@
         padding: 0.56rem 0.72rem;
         border-bottom: 2px solid rgba(229, 235, 255, 0.64);
         font-size: 0.94rem;
-        font-family: "VT323", "Lucida Console", monospace;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
         letter-spacing: 0.04em;
         text-transform: uppercase;
         color: #fff7ab;
@@ -755,7 +755,7 @@
         background: linear-gradient(180deg, #566cdf 0%, #2a3da8 100%);
         color: #fff6aa;
         font-size: 1rem;
-        font-family: "VT323", "Lucida Console", monospace;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
         font-weight: 700;
         letter-spacing: 0.03em;
         cursor: pointer;
@@ -941,7 +941,7 @@
         > h2 {
             margin: 0;
             font-size: 1.9rem;
-            font-family: "VT323", "Lucida Console", monospace;
+            font-family: "Trebuchet MS", "Segoe UI", sans-serif;
             color: #fff69c;
         }
 
@@ -958,7 +958,7 @@
             border: 2px solid #ecf0ff;
             background: linear-gradient(180deg, #5a71e3 0%, #2b3ea9 100%);
             color: #fff7aa;
-            font-family: "VT323", "Lucida Console", monospace;
+            font-family: "Trebuchet MS", "Segoe UI", sans-serif;
             font-size: 1rem;
             font-weight: 700;
             cursor: pointer;

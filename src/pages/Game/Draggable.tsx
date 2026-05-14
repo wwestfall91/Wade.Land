@@ -13,6 +13,8 @@ type Props = {
 	letter: string;
 	damage: number;
 	description: string;
+	showTutorialCue?: boolean;
+	onDismissTutorialCue?: () => void;
 	type1?: string;
 	type2?: string;
 	effects?: SpellEffectConfig[];
@@ -28,6 +30,8 @@ function Draggable({
 	letter,
 	damage,
 	description,
+	showTutorialCue = false,
+	onDismissTutorialCue,
 	type1,
 	type2,
 	effects,
@@ -145,6 +149,9 @@ function Draggable({
 			y: e.clientY - rect.top - position.y,
 		});
 		setIsHovered(false);
+		if (showTutorialCue && !hasBeenDragged) {
+			onDismissTutorialCue?.();
+		}
 		onSnapChange(id, null);
 		setHasBeenDragged(true);
 		setIsDragging(true);
@@ -178,7 +185,7 @@ function Draggable({
 					const amount = Math.max(0, effect.amount ?? 0);
 					const duration = Math.max(1, effect.duration ?? 1);
 					if (amount > 0) {
-						lines.push(`Burn: +${amount} for ${duration} turns`);
+						lines.push(`Burn: +${amount}`);
 					}
 					break;
 				}
@@ -239,7 +246,7 @@ function Draggable({
 		<div
 			id="Draggable"
 			ref={draggableRef}
-			className={`drag ${isInvalidDrop ? "is-invalid-drop" : ""} ${isDragging ? "is-dragging" : ""} ${!hasBeenDragged ? "is-discoverable" : ""}`}
+			className={`drag ${isInvalidDrop ? "is-invalid-drop" : ""} ${isDragging ? "is-dragging" : ""} ${showTutorialCue && !hasBeenDragged ? "is-discoverable" : ""}`}
 			onPointerDown={handlePointerDown}
 			onAnimationEnd={() => setIsInvalidDrop(false)}
 			onMouseEnter={() => setIsHovered(true)}

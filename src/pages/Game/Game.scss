@@ -109,7 +109,7 @@
             > div:not(.drop-zone) {
                 min-width: 1.5rem;
                 text-align: center;
-                font-family: "VT323", "Lucida Console", monospace;
+                font-family: "Trebuchet MS", "Segoe UI", sans-serif;
                 font-size: 2rem;
                 line-height: 1;
                 color: #fff7ab;
@@ -123,15 +123,25 @@
             > .drop-zone
             {
                 display: flex;
+                justify-content: center;
+                align-items: center;
                 width: 3rem;
                 height: 3rem;
-                border-radius: 4px;
+                border-radius: 22px;
                 border: 2px solid #e6ecff;
+                font-size: 20px;
+                color: rgba(255, 255, 255, 0.425);
+                font-weight: 600;
+                font-style:italic;
                 background:
-                    radial-gradient(circle at 35% 30%, rgba(156, 180, 255, 0.26), rgba(20, 30, 104, 0.95));
+                    radial-gradient(circle at 34% 30%, rgba(154, 176, 255, 0.22), rgba(44, 61, 156, 0.24) 38%, rgba(20, 31, 104, 0.88) 78%),
+                    radial-gradient(circle at 50% 62%, rgba(14, 23, 76, 0.66), rgba(10, 16, 56, 0.78));
                 box-shadow:
-                    inset 0 0 0 1px #7f91ff,
-                    inset 0 0 0 2px #0f175a,
+                    inset 0 1px 0 rgba(201, 213, 255, 0.28),
+                    inset 0 0 0 1px #6f84ff,
+                    inset 0 0 0 2px #101a64,
+                    inset 0 4px 6px rgba(8, 14, 56, 0.34),
+                    inset 0 -3px 4px rgba(0, 0, 0, 0.22),
                     0 5px 0 rgba(0, 0, 0, 0.3);
             }
         }
@@ -164,7 +174,7 @@
         border: 2px solid #e8edff;
         background: linear-gradient(180deg, #5a71e3 0%, #2b3ea9 100%);
         color: #fff6a9;
-        font-family: "VT323", "Lucida Console", monospace;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
         font-size: 1.1rem;
         font-weight: 700;
         letter-spacing: 0.03em;
@@ -263,7 +273,7 @@
         border: 2px solid #ffd0cb;
         background: linear-gradient(180deg, #de604f 0%, #a92d20 100%);
         color: #fff7da;
-        font-family: "VT323", "Lucida Console", monospace;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
         font-size: 1.1rem;
         font-weight: 700;
         letter-spacing: 0.03em;
