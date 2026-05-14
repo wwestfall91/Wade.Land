@@ -8,7 +8,9 @@ import EnemyInfo from "../../components/EnemyInfo";
 import { type RewardElement, usePlayer } from "../../context/PlayerContext";
 import "./Game.scss";
 
-
+// TODO: Add special effects (Healing, burn, multi-hit)
+// TODO: Balance the current state to be fun
+// TODO: Add combos to battles
 
 type Position = {
     x: number;
