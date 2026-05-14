@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import Draggable from "./Draggable";
+import StartMenuModal from "./StartMenuModal.tsx";
 import { useNavigate } from "react-router";
 import PlayerStats from "../../components/PlayerStats";
 import EnemyInfo from "../../components/EnemyInfo";
-import { usePlayer } from "../../context/PlayerContext";
+import { type RewardElement, usePlayer } from "../../context/PlayerContext";
 import "./Game.scss";
 
 
@@ -20,6 +21,8 @@ type DraggableItem = {
     damage: number;
     level: number;
     description: string;
+    type1?: string;
+    type2?: string;
     initialPosition: Position;
 };
 
@@ -30,6 +33,8 @@ type CombinationRecipe = {
     damage: number;
     level: number;
     description: string;
+    type1?: string;
+    type2?: string;
 };
 
 type ElementRow = {
@@ -43,6 +48,10 @@ type ElementRow = {
     level?: number | string;
     Description?: string;
     description?: string;
+    ["Type 1"]?: string;
+    ["Type 2"]?: string;
+    Type1?: string;
+    Type2?: string;
 };
 
 type EnemyRow = {
@@ -58,6 +67,10 @@ type EnemyRow = {
     description?: string;
     Sprite?: string;
     sprite?: string;
+    Weak1?: string;
+    Weak2?: string;
+    ["Weak 1"]?: string;
+    ["Weak 2"]?: string;
 };
 
 type Enemy = {
@@ -67,6 +80,7 @@ type Enemy = {
     experience: number;
     description: string;
     sprite: string;
+    weaknesses: string[];
 };
 
 type PreviewCombination = {
@@ -75,10 +89,19 @@ type PreviewCombination = {
     damage: number;
     level: number;
     description: string;
+    type1?: string;
+    type2?: string;
 };
 
 const SPREAD_X = 200;
 const SPREAD_Y = 150;
+
+const normalizeType = (value?: string): string => value?.trim().toLowerCase() ?? "";
+
+const getRandomUniqueElements = (elements: RewardElement[], count: number): RewardElement[] => {
+    const shuffled = [...elements].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, Math.min(count, shuffled.length));
+};
 
 function Game() {
     const navigate = useNavigate();
@@ -101,7 +124,9 @@ function Game() {
     const [draggables, setDraggables] = useState<DraggableItem[]>([]);
     const [recipes, setRecipes] = useState<CombinationRecipe[]>([]);
     const [enemies, setEnemies] = useState<Enemy[]>([]);
-    const [baseElements, setBaseElements] = useState<Array<{ letter: string; damage: number; level: number; description: string }>>([]);
+    const [baseElements, setBaseElements] = useState<RewardElement[]>([]);
+    const [starterChoices, setStarterChoices] = useState<RewardElement[]>([]);
+    const [selectedStarter, setSelectedStarter] = useState<RewardElement | null>(null);
     const [zoneOccupants, setZoneOccupants] = useState<Array<number | null>>([null, null]);
     const [isPreviewDragging, setIsPreviewDragging] = useState(false);
     const [isPreviewHovered, setIsPreviewHovered] = useState(false);
@@ -152,6 +177,8 @@ function Game() {
                         Number(row.Level ?? row.level ?? 0) ||
                         ((row["Element 1"] ?? "").trim().length === 0 ? 1 : 2),
                     description: (row.Description ?? row.description ?? "").trim(),
+                    type1: normalizeType((row["Type 1"] ?? row.Type1 ?? "") as string),
+                    type2: normalizeType((row["Type 2"] ?? row.Type2 ?? "") as string),
                 }))
                 .filter((row) => row.name.length > 0);
 
@@ -164,6 +191,8 @@ function Game() {
                     damage: row.damage,
                     level: row.level,
                     description: row.description,
+                    type1: row.type1,
+                    type2: row.type2,
                 }));
 
             setRecipes(combinationRecipes);
@@ -176,18 +205,10 @@ function Game() {
                     damage: row.damage,
                     level: row.level,
                     description: row.description,
+                    type1: row.type1,
+                    type2: row.type2,
                 })),
             );
-            if (playerProgress.elements.length === 0) {
-                const items = baseElementRows.map((row) => ({
-                    id: nextId.current++,
-                    letter: row.name,
-                    damage: row.damage,
-                    level: row.level,
-                    description: row.description,
-                }));
-                initializeElements(items);
-            }
         };
 
         fetch("/elements.xlsx")
@@ -208,12 +229,26 @@ function Game() {
                         experience: Number(row.Experience ?? row.experience ?? 0) || 0,
                         description: ((row.Description ?? row.description ?? "") as string).trim(),
                         sprite: ((row.Sprite ?? row.sprite ?? "") as string).trim(),
+                        weaknesses: [row.Weak1, row["Weak 1"], row.Weak2, row["Weak 2"]]
+                            .flatMap((value) => String(value ?? "").split(/[;,/]/g))
+                            .map((value) => normalizeType(value))
+                            .filter(Boolean),
                     }))
                     .filter((e) => e.name.length > 0);
                 setEnemies(parsed);
             });
 
-    }, [initializeElements, playerProgress.elements.length]);
+    }, []);
+
+    useEffect(() => {
+        if (playerProgress.elements.length > 0 || baseElements.length === 0 || starterChoices.length > 0) {
+            return;
+        }
+
+        const choices = getRandomUniqueElements(baseElements, 3);
+        setStarterChoices(choices);
+        setSelectedStarter(choices[0] ?? null);
+    }, [baseElements, playerProgress.elements.length, starterChoices.length]);
 
     useEffect(() => {
         setDraggables((previous) => {
@@ -228,6 +263,8 @@ function Game() {
                         damage: element.damage,
                         level: element.level,
                         description: element.description,
+                        type1: element.type1,
+                        type2: element.type2,
                     };
                 }
 
@@ -255,7 +292,8 @@ function Game() {
 
     useEffect(() => {
         if (enemies.length === 0 || nextEnemy) return;
-        setNextEnemy(enemies[Math.floor(Math.random() * enemies.length)]);
+        // Start with the first enemy row from the sheet.
+        setNextEnemy(enemies[0]);
     }, [enemies, nextEnemy, setNextEnemy]);
 
     const canCombine = zoneOccupants.every((occupantId) => occupantId !== null);
@@ -299,6 +337,8 @@ function Game() {
             description: matchingRecipe
                 ? matchingRecipe.description
                 : "Unstable fusion of two primal forces.",
+            type1: matchingRecipe?.type1,
+            type2: matchingRecipe?.type2,
         };
     }, [canCombine, draggables, dropZoneRefs.length, recipes, zoneOccupants]);
 
@@ -336,6 +376,8 @@ function Game() {
             damage: previewCombination.damage,
             level: previewCombination.level,
             description: previewCombination.description,
+            type1: previewCombination.type1,
+            type2: previewCombination.type2,
         };
 
         nextId.current += 1;
@@ -542,17 +584,38 @@ function Game() {
 
     const handleFight = () => {
         if (!nextEnemy) return;
-        // Pre-select the next enemy for after this fight (avoid picking the same one if possible)
-        const pool = enemies.filter((e) => e.name !== nextEnemy.name);
-        const nextPool = pool.length > 0 ? pool : enemies;
-        setNextEnemy(nextPool[Math.floor(Math.random() * nextPool.length)]);
+
+        // Fight the currently selected enemy and preselect the next row in order.
+        const currentIndex = enemies.findIndex((enemy) => enemy.name === nextEnemy.name);
+        const safeCurrentIndex = currentIndex >= 0 ? currentIndex : 0;
+        const fullEnemy = enemies[safeCurrentIndex] ?? nextEnemy;
+        const nextIndex = (safeCurrentIndex + 1) % enemies.length;
+        setNextEnemy(enemies[nextIndex]);
+
         navigate("/fight", {
             state: {
-                enemy: nextEnemy,
+                enemy: fullEnemy,
                 elementPool: baseElements,
             },
         });
     };
+
+    const handleConfirmStarter = () => {
+        if (!selectedStarter) {
+            return;
+        }
+
+        initializeElements([
+            {
+                id: nextId.current++,
+                ...selectedStarter,
+            },
+        ]);
+        setStarterChoices([]);
+        setSelectedStarter(null);
+    };
+
+    const isStartMenuOpen = playerProgress.elements.length === 0 && starterChoices.length > 0;
 
     return (
         <div id="Game" ref={gameRef} style={{ position: "relative", width: "100%", height: "100%" }} >
@@ -561,7 +624,10 @@ function Game() {
                     key={draggable.id}
                     id={draggable.id}
                     letter={draggable.letter}
+                    damage={draggable.damage}
                     description={draggable.description}
+                    type1={draggable.type1}
+                    type2={draggable.type2}
                     containerRef={gameRef}
                     dropZoneRefs={dropZoneRefs}
                     initialPosition={draggable.initialPosition}
@@ -591,7 +657,7 @@ function Game() {
                         border: "1px dashed black",
                     }}
                 >
-                    {isPreviewHovered && !isPreviewDragging && previewCombination.description.length > 0 ? (
+                    {isPreviewHovered && !isPreviewDragging ? (
                         <div
                             ref={previewPopupRef}
                             className={`drag-description-popup ${previewPopupBelow ? "is-below" : ""}`}
@@ -599,7 +665,34 @@ function Game() {
                                 ["--popup-offset-x" as string]: `${previewPopupOffsetX}px`,
                             }}
                         >
-                            {previewCombination.description}
+                            {previewCombination.description.length > 0 ? (
+                                <div className="drag-description-text">{previewCombination.description}</div>
+                            ) : null}
+                            <div className="drag-damage-text">Damage: {previewCombination.damage}</div>
+                            <div className="drag-type-text">
+                                <span className="drag-type-label">Types:</span>
+                                <span className="drag-type-list">
+                                    {[previewCombination.type1, previewCombination.type2].filter(
+                                        (value): value is string => Boolean(value && value.trim().length > 0),
+                                    ).length > 0 ? (
+                                        [previewCombination.type1, previewCombination.type2]
+                                            .filter((value): value is string => Boolean(value && value.trim().length > 0))
+                                            .map((type) => (
+                                                <span
+                                                    key={type}
+                                                    className={`type-chip type-${type
+                                                        .trim()
+                                                        .toLowerCase()
+                                                        .replace(/[^a-z0-9]+/g, "-")}`}
+                                                >
+                                                    {type}
+                                                </span>
+                                            ))
+                                    ) : (
+                                        <span className="type-chip type-none">None</span>
+                                    )}
+                                </span>
+                            </div>
                         </div>
                     ) : null}
                     {previewCombination.letter}
@@ -635,8 +728,17 @@ function Game() {
                 enemyName={nextEnemy?.name ?? "Unknown Enemy"} 
                 enemyHealth={nextEnemy?.hp ?? 0}
                 enemyDescription={nextEnemy?.description ?? ""}
+                enemyWeaknesses={nextEnemy?.weaknesses ?? []}
                 enemySpritePath={nextEnemy?.sprite ?? ""}
             />
+            {isStartMenuOpen ? (
+                <StartMenuModal
+                    choices={starterChoices}
+                    selected={selectedStarter}
+                    onSelect={setSelectedStarter}
+                    onConfirm={handleConfirmStarter}
+                />
+            ) : null}
         </div>
     );
 }

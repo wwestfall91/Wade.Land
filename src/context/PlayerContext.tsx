@@ -25,12 +25,15 @@ export type LevelDefinition = {
     experience: number;
 };
 
+
 export type PlayerElement = {
     id: number;
     letter: string;
     damage: number;
     level: number;
     description: string;
+    type1?: string;
+    type2?: string;
 };
 
 export type PlayerProgress = {
@@ -49,6 +52,7 @@ export type SelectedEnemy = {
     description: string;
     power: number;
     sprite: string;
+    weaknesses: string[];
 };
 
 type PlayerContextValue = {

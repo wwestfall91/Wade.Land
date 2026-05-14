@@ -66,6 +66,7 @@
             position: absolute;
             inset: 0;
             display: flex;
+            flex-direction: column;
             justify-content: center;
             align-items: center;
             padding: 0.75rem;
@@ -79,5 +80,69 @@
             transform: translateY(6px);
             transition: opacity 0.18s ease, transform 0.18s ease;
             pointer-events: none;
+            z-index: 2;
+
+            > .enemy-description-text {
+                margin-bottom: 0.45rem;
+            }
+
+            > .enemy-weakness-text {
+                border-top: 1px solid rgba(255, 255, 255, 0.28);
+                padding-top: 0.35rem;
+                font-weight: 700;
+                color: #ffd588;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 0.28rem;
+
+                > .enemy-weakness-label {
+                    font-size: 0.72rem;
+                    letter-spacing: 0.05em;
+                    text-transform: uppercase;
+                }
+
+                > .enemy-weakness-list {
+                    display: flex;
+                    flex-wrap: wrap;
+                    justify-content: center;
+                    gap: 0.3rem;
+                }
+
+                .type-chip {
+                    display: inline-flex;
+                    align-items: center;
+                    border-radius: 999px;
+                    border: 1px solid rgba(255, 255, 255, 0.35);
+                    padding: 0.06rem 0.45rem;
+                    font-size: 0.72rem;
+                    line-height: 1.2;
+                    color: #111;
+                    background-color: #ececec;
+                }
+
+                .type-fire { background-color: #ffb17d; }
+                .type-water { background-color: #9ad6ff; }
+                .type-earth { background-color: #cdb48a; }
+                .type-air { background-color: #d5eef9; }
+                .type-lightning { background-color: #ffe56d; }
+                .type-ice { background-color: #b8f0ff; }
+                .type-light { background-color: #fff4b5; }
+                .type-dark { background-color: #8f86aa; color: #f4f4f4; }
+                .type-arcane { background-color: #ffbfe1; }
+                .type-none { background-color: #d4d4d4; color: #505050; }
+            }
+        }
+
+        > .next-enemy-text{
+            position: absolute;
+            z-index: 1;
+            bottom:2%;
+            font-size:22px;
+            font-weight: bold;
+            background-color: rgba(0, 0, 0, 0.904);
+            border-radius: 5px;
+            padding:3px 7px;
+            left:2%;
         }
     }

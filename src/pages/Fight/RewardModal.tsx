@@ -167,7 +167,7 @@ function RewardModal({ xpGained, currentXp, levels, rewardElements, onConfirm }:
                     className="reward-return-button"
                     onClick={() => onConfirm(selectedElement)}
                 >
-                    Return Home
+                    CONTINUE
                 </button>
             </div>
         </div>

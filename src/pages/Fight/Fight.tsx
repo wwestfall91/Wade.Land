@@ -5,11 +5,30 @@ import PlayerStats from "../../components/PlayerStats";
 import { usePlayer, type RewardElement } from "../../context/PlayerContext";
 import RewardModal from "./RewardModal";
 
+type SpellColor = {
+    bg: string;
+    border: string;
+    text: string;
+};
+
+const SPELL_TYPE_COLORS: Record<string, SpellColor> = {
+    fire: { bg: "#ffb680", border: "#d0652c", text: "#2a140a" },
+    water: { bg: "#9ad6ff", border: "#3c84c4", text: "#081f33" },
+    earth: { bg: "#ccb086", border: "#7d5c37", text: "#26190b" },
+    air: { bg: "#dff6ff", border: "#75a4b8", text: "#0f2832" },
+    lightning: { bg: "#ffe56d", border: "#b59308", text: "#332700" },
+    ice: { bg: "#baf1ff", border: "#5aa8bd", text: "#0f2c34" },
+    light: { bg: "#fff3bd", border: "#b59a36", text: "#312700" },
+    dark: { bg: "#8d84aa", border: "#514569", text: "#faf9ff" },
+    arcane: { bg: "#ffc1e4", border: "#af5f8d", text: "#2f1023" },
+};
+
 type FightEnemy = {
     name: string;
     hp: number;
     power: number;
     experience: number;
+    weaknesses?: string[];
 };
 
 type FightLocationState = {
@@ -22,11 +41,14 @@ function Fight() {
     const navigate = useNavigate();
     const { player, levelFillPercent, levels, addExperience, addElement, applyEnemyAttack, resetGame } = usePlayer();
     const [flashingSlotId, setFlashingSlotId] = useState<number | null>(null);
+    const [hoveredSpellId, setHoveredSpellId] = useState<number | null>(null);
     const [usedSpellIds, setUsedSpellIds] = useState<number[]>([]);
     const [turnMessage, setTurnMessage] = useState<string>("");
     const [isGameOver, setIsGameOver] = useState(false);
     const [isPlayerHit, setIsPlayerHit] = useState(false);
     const [isScreenFlashing, setIsScreenFlashing] = useState(false);
+    const [isCritFlashing, setIsCritFlashing] = useState(false);
+    const [isCritTextVisible, setIsCritTextVisible] = useState(false);
     const [showRewardModal, setShowRewardModal] = useState(false);
     const [rewardElements, setRewardElements] = useState<RewardElement[]>([]);
     const preRewardXp = useRef(player.experience);
@@ -45,6 +67,31 @@ function Fight() {
     }, [location.state]);
 
     const [enemyHealth, setEnemyHealth] = useState(() => enemy.hp);
+
+    const normalizeType = (value?: string) => value?.trim().toLowerCase() ?? "";
+
+    const getSpellSlotStyle = (type1?: string, type2?: string) => {
+        const normalized = [type1, type2].map(normalizeType).filter(Boolean);
+        if (normalized.length === 0) {
+            return undefined;
+        }
+
+        const first = SPELL_TYPE_COLORS[normalized[0]];
+        const second = normalized[1] ? SPELL_TYPE_COLORS[normalized[1]] : undefined;
+
+        const fallback: SpellColor = { bg: "#e9e9e9", border: "#a9a9a9", text: "#202020" };
+        const primary = first ?? fallback;
+        const secondary = second ?? primary;
+        const background = normalized.length >= 2
+            ? `linear-gradient(120deg, ${primary.bg} 0%, ${secondary.bg} 100%)`
+            : primary.bg;
+
+        return {
+            ["--spell-slot-bg" as string]: background,
+            ["--spell-slot-border" as string]: primary.border,
+            ["--spell-slot-text" as string]: primary.text,
+        } as React.CSSProperties;
+    };
 
     useEffect(() => {
         if (turnMessage.length === 0) {
@@ -89,14 +136,68 @@ function Fight() {
         setIsGameOver(true);
     }, [enemyHealth, levels.length, player.hp]);
 
-    const handleSlotClick = (spell: { id: number; damage: number }) => {
+    const triggerEnemyAttack = () => {
+        if (enemyHealth <= 0 || isGameOver) {
+            return;
+        }
+
+        applyEnemyAttack(enemy.power);
+        setTurnMessage(`attacks for ${enemy.power} damage`);
+        if (playerHitTimeoutRef.current !== null) {
+            window.clearTimeout(playerHitTimeoutRef.current);
+        }
+        setIsPlayerHit(false);
+        window.requestAnimationFrame(() => {
+            setIsPlayerHit(true);
+            playerHitTimeoutRef.current = window.setTimeout(() => {
+                setIsPlayerHit(false);
+            }, 480);
+        });
+        if (screenFlashTimeoutRef.current !== null) {
+            window.clearTimeout(screenFlashTimeoutRef.current);
+        }
+        setIsScreenFlashing(false);
+        window.requestAnimationFrame(() => {
+            setIsScreenFlashing(true);
+            screenFlashTimeoutRef.current = window.setTimeout(() => {
+                setIsScreenFlashing(false);
+            }, 420);
+        });
+    };
+
+    const handleEndTurn = () => {
+        if (enemyHealth <= 0 || isGameOver) {
+            return;
+        }
+
+        triggerEnemyAttack();
+        setUsedSpellIds([]);
+    };
+
+    const handleSlotClick = (spell: { id: number; damage: number; type1?: string; type2?: string }) => {
         if (usedSpellIds.includes(spell.id) || enemyHealth <= 0 || isGameOver) {
             return;
         }
 
         setFlashingSlotId(spell.id);
-        const nextEnemyHealth = Math.max(0, enemyHealth - spell.damage);
+        // Determine if this is a critical hit
+        const spellTypes = [spell.type1, spell.type2].map(normalizeType).filter(Boolean);
+        const enemyWeaknesses = (enemy.weaknesses ?? []).map(normalizeType).filter(Boolean);
+        const isCritical = spellTypes.some((type) => enemyWeaknesses.includes(type));
+        const critDamage = isCritical ? spell.damage * 2 : spell.damage;
+        const nextEnemyHealth = Math.max(0, enemyHealth - critDamage);
         setEnemyHealth(nextEnemyHealth);
+
+        if (isCritical) {
+            setIsCritFlashing(false);
+            setIsCritTextVisible(false);
+            window.requestAnimationFrame(() => {
+                setIsCritFlashing(true);
+                setIsCritTextVisible(true);
+                setTimeout(() => setIsCritFlashing(false), 320);
+                setTimeout(() => setIsCritTextVisible(false), 520);
+            });
+        }
 
         setUsedSpellIds((previous) => {
             if (previous.includes(spell.id)) {
@@ -108,30 +209,9 @@ function Fight() {
 
             if (isTurnOver) {
                 if (nextEnemyHealth > 0) {
-                    applyEnemyAttack(enemy.power);
-                    setTurnMessage(`attacks for ${enemy.power} damage`);
-                    if (playerHitTimeoutRef.current !== null) {
-                        window.clearTimeout(playerHitTimeoutRef.current);
-                    }
-                    setIsPlayerHit(false);
-                    window.requestAnimationFrame(() => {
-                        setIsPlayerHit(true);
-                        playerHitTimeoutRef.current = window.setTimeout(() => {
-                            setIsPlayerHit(false);
-                        }, 480);
-                    });
-                    if (screenFlashTimeoutRef.current !== null) {
-                        window.clearTimeout(screenFlashTimeoutRef.current);
-                    }
-                    setIsScreenFlashing(false);
-                    window.requestAnimationFrame(() => {
-                        setIsScreenFlashing(true);
-                        screenFlashTimeoutRef.current = window.setTimeout(() => {
-                            setIsScreenFlashing(false);
-                        }, 420);
-                    });
+                    setTurnMessage("All spell slots used. End your turn.");
                 }
-                return [];
+                return next;
             }
 
             return next;
@@ -162,6 +242,8 @@ function Fight() {
     return (
         <div id="Fight" className={isScreenFlashing ? "is-screen-shaking" : undefined}>
             {isScreenFlashing ? <div className="screen-hit-flash" /> : null}
+            {isCritFlashing ? <div className="screen-crit-flash" /> : null}
+            {isCritTextVisible ? <div className="crit-text">CRITICAL!</div> : null}
             <div className="enemy">
                 <span className="enemy-name">{enemy.name}</span>
                 <span className="enemy-hp">{enemyHealth} HP</span>
@@ -176,14 +258,34 @@ function Fight() {
                         type="button"
                         className={`spell-slot ${flashingSlotId === spell.id ? "is-flashing" : ""}`}
                         disabled={usedSpellIds.includes(spell.id) || isGameOver}
-                        onClick={() => handleSlotClick(spell)}
+                        style={getSpellSlotStyle(spell.type1, spell.type2)}
+                        onMouseEnter={() => setHoveredSpellId(spell.id)}
+                        onMouseLeave={() => setHoveredSpellId((current) => (current === spell.id ? null : current))}
+                        onClick={() => handleSlotClick({
+                            id: spell.id,
+                            damage: spell.damage,
+                            type1: spell.type1,
+                            type2: spell.type2,
+                        })}
                         onAnimationEnd={() => handleFlashEnd(spell.id)}
                     >
+                        {hoveredSpellId === spell.id ? (
+                            <span className="spell-hover-tooltip">Damage: {spell.damage}</span>
+                        ) : null}
                         <span>{spell.letter}</span>
                         <span>{spell.damage}</span>
                     </button>
                 ))}
+                <button
+                    type="button"
+                    className="end-turn-button"
+                    onClick={handleEndTurn}
+                    disabled={isGameOver || enemyHealth <= 0}
+                >
+                    End Turn
+                </button>
             </div>
+
             <PlayerStats
                 level={player.level}
                 hp={player.hp}

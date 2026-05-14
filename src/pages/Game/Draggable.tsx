@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import "./Game.scss";
+import "./Draggable.scss";
 
 type Position = {
 	x: number;
@@ -9,7 +9,10 @@ type Position = {
 type Props = {
 	id: number;
 	letter: string;
+	damage: number;
 	description: string;
+	type1?: string;
+	type2?: string;
 	containerRef: React.RefObject<HTMLDivElement | null>;
 	dropZoneRefs: Array<React.RefObject<HTMLDivElement | null>>;
 	initialPosition: Position;
@@ -20,7 +23,10 @@ type Props = {
 function Draggable({
 	id,
 	letter,
+	damage,
 	description,
+	type1,
+	type2,
 	containerRef,
 	dropZoneRefs,
 	initialPosition,
@@ -178,6 +184,12 @@ function Draggable({
 		setIsDragging(true);
 	};
 
+	const types = [type1, type2].filter(
+		(value): value is string => Boolean(value && value.trim().length > 0),
+	);
+	const toTypeClass = (value: string) =>
+		`type-${value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+
 	return (
 		<div
 			id="Draggable"
@@ -201,7 +213,7 @@ function Draggable({
 				border: "3px solid black",
 			}}
 		>
-			{isHovered && !isDragging && description.length > 0 ? (
+			{isHovered && !isDragging ? (
 				<div
 					ref={popupRef}
 					className={`drag-description-popup ${popupBelow ? "is-below" : ""}`}
@@ -209,7 +221,22 @@ function Draggable({
 						["--popup-offset-x" as string]: `${popupOffsetX}px`,
 					}}
 				>
-					{description}
+					{description.length > 0 ? <div className="drag-description-text">{description}</div> : null}
+					<div className="drag-damage-text">Damage: {damage}</div>
+					<div className="drag-type-text">
+						<span className="drag-type-label">Types:</span>
+						<span className="drag-type-list">
+							{types.length > 0 ? (
+								types.map((type) => (
+									<span key={type} className={`type-chip ${toTypeClass(type)}`}>
+										{type}
+									</span>
+								))
+							) : (
+								<span className="type-chip type-none">None</span>
+							)}
+						</span>
+					</div>
 				</div>
 			) : null}
 			{letter}
