@@ -4,175 +4,254 @@
         min-width: fit-content;
         width: 2rem;
         height: 2rem;
-        background-color: white;
+        border-radius: 4px;
+        border: 2px solid #dce3ff;
+        background: linear-gradient(180deg, #5f76ee 0%, #354ebf 100%);
+        color: #fff7ab;
+        font-family: "VT323", "Lucida Console", monospace;
+        font-size: 1.08rem;
+        font-weight: 700;
+        text-align: center;
+        text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.72);
+        box-shadow:
+            inset 0 0 0 1px #9aaaff,
+            inset 0 0 0 2px #1a276f,
+            0 4px 0 rgba(0, 0, 0, 0.28);
+        transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
         touch-action: none;
         z-index: 2;
 
-        .drag-description-popup {
+        &.is-discoverable:not(.drag-preview)::after {
+            content: "";
             position: absolute;
-            bottom: calc(100% + 8px);
-            left: 50%;
-            transform: translateX(calc(-50% + var(--popup-offset-x, 0px)));
-            max-width: 12rem;
-            min-width: 8rem;
-            padding: 0.35rem 0.5rem;
-            border: 2px solid #1f1f1f;
-            border-radius: 0.5rem;
-            background-color: #fff7cf;
-            color: #202020;
-            font-size: 0.75rem;
-            line-height: 1.2;
-            text-align: center;
-            white-space: normal;
-            pointer-events: none;
-            box-shadow: 0 6px 14px rgba(0, 0, 0, 0.2);
-            z-index: 4;
+            inset: -0.24rem;
+            border: 2px solid rgba(173, 189, 255, 0.92);
+            border-radius: 6px;
             opacity: 0;
-            animation: popup-fade-in 0.16s ease-out forwards;
+            transform: scale(0.88);
+            pointer-events: none;
+            animation: drag-discoverability-pulse 1900ms cubic-bezier(0.22, 1, 0.36, 1) infinite;
+        }
 
-            .drag-description-text {
-                padding-bottom: .25rem;
-                border-bottom: 1px solid rgba(32, 32, 32, 0.2);
-                margin-bottom: 0.25rem;
+        &:hover {
+            transform: translateY(-1px);
+            border-color: #edf1ff;
+            box-shadow:
+                inset 0 0 0 1px #afbcff,
+                inset 0 0 0 2px #1a276f,
+                0 7px 0 rgba(0, 0, 0, 0.34);
+        }
+
+            &.is-dragging {
+                transform: translateY(-1px) scale(1.05);
+                border-color: #f7f9ff;
+                box-shadow:
+                inset 0 0 0 1px #bfd0ff,
+                inset 0 0 0 2px #1a276f,
+                0 9px 0 rgba(0, 0, 0, 0.38);
             }
 
-            .drag-damage-text {
-                margin-bottom: 0.25rem;
-                font-size: 0.74rem;
-                font-weight: 800;
-                color: #1f1f1f;
-                padding-bottom: 0.2rem;
+        &.drag-preview {
+            border-color: #d8fff1;
+            background: linear-gradient(180deg, #5bcda8 0%, #2f8c73 100%);
+            color: #ebfff8;
+            box-shadow:
+                inset 0 0 0 1px rgba(183, 255, 233, 0.62),
+                inset 0 0 0 2px rgba(11, 69, 58, 0.84),
+                0 5px 0 rgba(0, 0, 0, 0.3);
+            opacity: 0.5;
+        }
+    }
+
+    .drag-description-popup {
+        position: absolute;
+        bottom: calc(100% + 8px);
+        left: 50%;
+        transform: translateX(calc(-50% + var(--popup-offset-x, 0px)));
+        max-width: 12rem;
+        min-width: 10rem;
+        padding: 0.58rem 0.62rem;
+        border: 2px solid #102060;
+        border-radius: 5px;
+        background: linear-gradient(180deg, #fff6d6 0%, #f1dcaa 100%);
+        color: #181818;
+        font-size: 0.76rem;
+        line-height: 1.23;
+        text-align: left;
+        white-space: normal;
+        pointer-events: none;
+        box-shadow:
+            inset 0 0 0 1px #ffe7b6,
+            inset 0 0 0 2px #c9b071,
+            0 7px 0 rgba(0, 0, 0, 0.33);
+        z-index: 4;
+        opacity: 0;
+        animation: popup-fade-in 0.16s ease-out forwards;
+
+        &::after {
+            content: "";
+            position: absolute;
+            left: 50%;
+            bottom: -0.5rem;
+            width: 0;
+            height: 0;
+            margin-left: -0.46rem;
+            border-left: 0.46rem solid transparent;
+            border-right: 0.46rem solid transparent;
+            border-top: 0.52rem solid #102060;
+        }
+
+        .drag-description-text {
+            padding-bottom: 0.34rem;
+            border-bottom: 1px solid rgba(30, 35, 85, 0.22);
+            margin-bottom: 0.18rem;
+            color: #2a2006;
+            text-shadow: none;
+        }
+
+        .drag-damage-text {
+            margin-bottom: 0.2rem;
+            font-size: 0.73rem;
+            font-weight: 800;
+            color: #141f53;
+            text-shadow: none;
+        }
+
+        .drag-type-text {
+            border-top: 1px solid rgba(30, 35, 85, 0.22);
+            padding-top: 0.22rem;
+            font-size: 0.7rem;
+            font-weight: 800;
+            color: #3c3c3c;
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+
+            .drag-type-label {
+                font-size: 0.62rem;
+                letter-spacing: 0.06em;
+                text-transform: uppercase;
             }
 
-            .drag-type-text {
-                border-top: 1px solid rgba(32, 32, 32, 0.2);
-                padding-top: 0.2rem;
-                font-size: 0.72rem;
-                font-weight: 700;
-                color: #3a2f16;
+            .drag-type-list {
                 display: flex;
-                flex-direction: column;
-                gap: 0.2rem;
-
-                .drag-type-label {
-                    font-size: 0.66rem;
-                    letter-spacing: 0.04em;
-                    text-transform: uppercase;
-                }
-
-                .drag-type-list {
-                    display: flex;
-                    flex-wrap: wrap;
-                    justify-content: center;
-                    gap: 0.25rem;
-                }
-
-                .type-chip {
-                    display: inline-flex;
-                    align-items: center;
-                    border: 1px solid rgba(0, 0, 0, 0.25);
-                    border-radius: 999px;
-                    padding: 0.04rem 0.4rem;
-                    font-size: 0.66rem;
-                    line-height: 1.2;
-                    color: #101010;
-                    background-color: #ececec;
-                }
-
-                .type-fire { background-color: #ffb17d; }
-                .type-water { background-color: #9ad6ff; }
-                .type-earth { background-color: #cdb48a; }
-                .type-air { background-color: #d5eef9; }
-                .type-lightning { background-color: #ffe56d; }
-                .type-ice { background-color: #b8f0ff; }
-                .type-light { background-color: #fff4b5; }
-                .type-dark { background-color: #8f86aa; color: #f4f4f4; }
-                .type-arcane { background-color: #ffbfe1; }
-                .type-none { background-color: #d4d4d4; color: #505050; }
+                flex-wrap: wrap;
+                gap: 0.25rem;
             }
 
-            .drag-effect-text {
-                border-top: 1px solid rgba(32, 32, 32, 0.2);
-                padding-top: 0.2rem;
-                margin-top: 0.2rem;
-                font-size: 0.72rem;
-                font-weight: 700;
-                color: #2d2d2d;
+            .type-chip {
+                display: inline-flex;
+                align-items: center;
+                border: 1px solid rgba(0, 0, 0, 0.25);
+                border-radius: 999px;
+                padding: 0.05rem 0.4rem;
+                font-size: 0.65rem;
+                line-height: 1.15;
+                color: #101010;
+                background-color: #ececec;
+                text-shadow: none;
+            }
+
+            .type-fire { background-color: #ffb17d; }
+            .type-water { background-color: #9ad6ff; }
+            .type-earth { background-color: #cdb48a; }
+            .type-air { background-color: #d5eef9; }
+            .type-lightning { background-color: #ffe56d; }
+            .type-ice { background-color: #b8f0ff; }
+            .type-light { background-color: #fff4b5; }
+            .type-dark { background-color: #8f86aa; color: #f4f4f4; }
+            .type-arcane { background-color: #ffbfe1; }
+            .type-none { background-color: #d4d4d4; color: #505050; }
+        }
+
+        .drag-effect-text {
+            border-top: 1px solid rgba(30, 35, 85, 0.22);
+            padding-top: 0.22rem;
+            margin-top: 0.02rem;
+            font-size: 0.7rem;
+            font-weight: 800;
+            color: #3c3c3c;
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+
+            .drag-effect-label {
+                font-size: 0.62rem;
+                letter-spacing: 0.06em;
+                text-transform: uppercase;
+            }
+
+            .drag-effect-list {
                 display: flex;
-                flex-direction: column;
-                gap: 0.2rem;
+                flex-wrap: wrap;
+                gap: 0.25rem;
+            }
 
-                .drag-effect-label {
-                    font-size: 0.66rem;
-                    letter-spacing: 0.04em;
-                    text-transform: uppercase;
-                }
+            .effect-chip {
+                display: inline-flex;
+                align-items: center;
+                border: 1px solid rgba(0, 0, 0, 0.25);
+                border-radius: 999px;
+                padding: 0.05rem 0.4rem;
+                font-size: 0.65rem;
+                line-height: 1.15;
+                color: #111;
+                background-color: #e8ecff;
+                text-shadow: none;
+            }
 
-                .drag-effect-list {
-                    display: flex;
-                    flex-wrap: wrap;
-                    justify-content: center;
-                    gap: 0.25rem;
-                }
+            .effect-default {
+                background-color: #e8ecff;
+                color: #111;
+            }
 
-                .effect-chip {
-                    display: inline-flex;
-                    align-items: center;
-                    border: 1px solid rgba(0, 0, 0, 0.25);
-                    border-radius: 999px;
-                    padding: 0.04rem 0.4rem;
-                    font-size: 0.66rem;
-                    line-height: 1.2;
-                    color: #111;
-                    background-color: #e8ecff;
-                }
+            .effect-heal {
+                background-color: #c9f4d2;
+                color: #1d4f2c;
+                border-color: rgba(44, 120, 67, 0.45);
+            }
 
-                .effect-default {
-                    background-color: #e8ecff;
-                    color: #111;
-                }
+            .effect-burn {
+                background-color: #ffd2b1;
+                color: #6a2d11;
+                border-color: rgba(157, 73, 32, 0.5);
+            }
 
-                .effect-heal {
-                    background-color: #c9f4d2;
-                    color: #1d4f2c;
-                    border-color: rgba(44, 120, 67, 0.45);
-                }
+            .effect-shield {
+                background-color: #cde8ff;
+                color: #133a69;
+                border-color: rgba(39, 101, 168, 0.45);
+            }
 
-                .effect-burn {
-                    background-color: #ffd2b1;
-                    color: #6a2d11;
-                    border-color: rgba(157, 73, 32, 0.5);
-                }
+            .effect-lifesteal {
+                background-color: #f4c8d9;
+                color: #6b1d3a;
+                border-color: rgba(133, 41, 79, 0.45);
+            }
 
-                .effect-shield {
-                    background-color: #cde8ff;
-                    color: #133a69;
-                    border-color: rgba(39, 101, 168, 0.45);
-                }
+            .effect-soak {
+                background-color: #ccecff;
+                color: #11486b;
+                border-color: rgba(43, 124, 171, 0.45);
+            }
 
-                .effect-lifesteal {
-                    background-color: #f4c8d9;
-                    color: #6b1d3a;
-                    border-color: rgba(133, 41, 79, 0.45);
-                }
-
-                .effect-soak {
-                    background-color: #ccecff;
-                    color: #11486b;
-                    border-color: rgba(43, 124, 171, 0.45);
-                }
-
-                .effect-multi-hit {
-                    background-color: #e2d6ff;
-                    color: #402a7a;
-                    border-color: rgba(86, 62, 157, 0.45);
-                }
+            .effect-multi-hit {
+                background-color: #e2d6ff;
+                color: #402a7a;
+                border-color: rgba(86, 62, 157, 0.45);
             }
         }
 
-        .drag-description-popup.is-below {
+        &.is-below {
             bottom: auto;
             top: calc(100% + 8px);
+
+            &::after {
+                bottom: auto;
+                top: -0.5rem;
+                border-top: 0;
+                border-bottom: 0.52rem solid #102060;
+            }
         }
 
         @keyframes popup-fade-in {
@@ -188,8 +267,12 @@
     }
 
     .drag.is-invalid-drop {
-        background-color: #ff6b6b;
-        border-color: #7b0909 !important;
+        background: linear-gradient(180deg, #de604f 0%, #a92d20 100%);
+        border-color: #ffe4e0 !important;
+        box-shadow:
+            inset 0 0 0 1px #ffb0a7,
+            inset 0 0 0 2px #751812,
+            0 6px 0 rgba(0, 0, 0, 0.34);
         animation: invalid-drop-shake 0.35s ease-in-out;
     }
 
@@ -200,5 +283,33 @@
         60% { transform: translateX(-4px); }
         80% { transform: translateX(4px); }
         100% { transform: translateX(0); }
+    }
+
+    @keyframes drag-discoverability-pulse {
+        0% {
+            opacity: 0;
+            transform: scale(0.84);
+        }
+
+        20% {
+            opacity: 0.78;
+            transform: scale(1.08);
+        }
+
+        36% {
+            opacity: 0;
+            transform: scale(1.16);
+        }
+
+        100% {
+            opacity: 0;
+            transform: scale(1.16);
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .drag.is-discoverable:not(.drag-preview)::after {
+            animation: none;
+        }
     }
 }

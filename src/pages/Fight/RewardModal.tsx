@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { LevelDefinition, RewardElement } from "../../context/PlayerContext";
+import FloatingTooltip from "../Game/FloatingTooltip";
 import "./RewardModal.scss";
 
 type AnimSegment = {
@@ -69,7 +70,6 @@ type RewardModalProps = {
 function RewardModal({ xpGained, currentXp, levels, rewardElements, onConfirm }: RewardModalProps) {
     const [selectedElement, setSelectedElement] = useState<RewardElement | null>(null);
     const [hoveredLetter, setHoveredLetter] = useState<string | null>(null);
-    const [popupPos, setPopupPos] = useState<{ x: number; y: number } | null>(null);
     const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
     const [isClosing, setIsClosing] = useState(false);
     const closeTimeoutRef = useRef<number | null>(null);
@@ -271,15 +271,9 @@ function RewardModal({ xpGained, currentXp, levels, rewardElements, onConfirm }:
                                 onClick={() => setSelectedElement(element)}
                                 onMouseEnter={e => {
                                     setHoveredLetter(element.letter);
-                                    const rect = e.currentTarget.getBoundingClientRect();
-                                    setPopupPos({
-                                        x: rect.left + rect.width / 2,
-                                        y: rect.top
-                                    });
                                 }}
                                 onMouseLeave={() => {
                                     setHoveredLetter(current => (current === element.letter ? null : current));
-                                    setPopupPos(null);
                                 }}
                             >
                                 <span className="reward-element-letter">{element.letter}</span>
@@ -298,7 +292,7 @@ function RewardModal({ xpGained, currentXp, levels, rewardElements, onConfirm }:
                     </button>
                 </div>
             </div>
-            {hoveredLetter && popupPos && (() => {
+            {hoveredLetter ? (() => {
                 const element = rewardElements.find(e => e.letter === hoveredLetter);
                 if (!element) return null;
 
@@ -307,13 +301,11 @@ function RewardModal({ xpGained, currentXp, levels, rewardElements, onConfirm }:
                 );
                 const effectLines = getEffectSummaryLines(element.effects);
 
-                return createPortal(
-                    <div
+                return (
+                    <FloatingTooltip
+                        anchorElement={buttonRefs.current[hoveredLetter]}
+                        open={Boolean(hoveredLetter)}
                         className="reward-element-tooltip-shell"
-                        style={{
-                            left: popupPos.x,
-                            top: popupPos.y - 12,
-                        }}
                     >
                         <div className="reward-element-info">
                             {element.description.length > 0 ? (
@@ -347,11 +339,9 @@ function RewardModal({ xpGained, currentXp, levels, rewardElements, onConfirm }:
                                 </span>
                             ) : null}
                         </div>
-                        <span className="reward-element-tooltip-arrow" aria-hidden="true" />
-                    </div>,
-                    document.body
+                    </FloatingTooltip>
                 );
-            })()}
+            })() : null}
         </>
     );
 

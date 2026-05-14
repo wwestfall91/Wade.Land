@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import type { RewardElement } from "../../context/PlayerContext";
+import FloatingTooltip from "./FloatingTooltip";
 import "./StartMenuModal.scss";
 
 type StartMenuModalProps = {
@@ -12,7 +12,6 @@ type StartMenuModalProps = {
 
 function StartMenuModal({ choices, selected, onSelect, onConfirm }: StartMenuModalProps) {
     const [hoveredLetter, setHoveredLetter] = useState<string | null>(null);
-    const [popupPos, setPopupPos] = useState<{ x: number; y: number } | null>(null);
     const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
 
     const toTypeClass = (value: string) =>
@@ -110,15 +109,9 @@ function StartMenuModal({ choices, selected, onSelect, onConfirm }: StartMenuMod
                                 onClick={() => onSelect(element)}
                                 onMouseEnter={e => {
                                     setHoveredLetter(element.letter);
-                                    const rect = e.currentTarget.getBoundingClientRect();
-                                    setPopupPos({
-                                        x: rect.left + rect.width / 2,
-                                        y: rect.top
-                                    });
                                 }}
                                 onMouseLeave={() => {
                                     setHoveredLetter(current => (current === element.letter ? null : current));
-                                    setPopupPos(null);
                                 }}
                             >
                                 <span className="start-menu-element-letter">{element.letter}</span>
@@ -136,7 +129,7 @@ function StartMenuModal({ choices, selected, onSelect, onConfirm }: StartMenuMod
                     </button>
                 </div>
             </div>
-            {hoveredLetter && popupPos && (() => {
+            {hoveredLetter ? (() => {
                 const element = choices.find(e => e.letter === hoveredLetter);
                 if (!element) return null;
 
@@ -145,13 +138,11 @@ function StartMenuModal({ choices, selected, onSelect, onConfirm }: StartMenuMod
                 );
                 const effectLines = getEffectSummaryLines(element.effects);
 
-                return createPortal(
-                    <div
+                return (
+                    <FloatingTooltip
+                        anchorElement={buttonRefs.current[hoveredLetter]}
+                        open={Boolean(hoveredLetter)}
                         className="start-menu-element-tooltip-shell"
-                        style={{
-                            left: popupPos.x,
-                            top: popupPos.y - 12,
-                        }}
                     >
                         <div className="start-menu-element-info">
                             {element.description.length > 0 ? (
@@ -185,11 +176,9 @@ function StartMenuModal({ choices, selected, onSelect, onConfirm }: StartMenuMod
                                 </span>
                             ) : null}
                         </div>
-                        <span className="start-menu-element-tooltip-arrow" aria-hidden="true" />
-                    </div>,
-                    document.body
+                    </FloatingTooltip>
                 );
-            })()}
+            })() : null}
         </>
     );
 }

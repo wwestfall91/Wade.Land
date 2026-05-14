@@ -7,6 +7,7 @@ import PlayerStats from "../../components/PlayerStats";
 import EnemyInfo from "../../components/EnemyInfo";
 import { parseSpellEffectsFromRow, type SpellEffectConfig } from "../../combat/spellEffects";
 import { type RewardElement, usePlayer } from "../../context/PlayerContext";
+import FloatingTooltip from "./FloatingTooltip";
 import "./Game.scss";
 
 // TODO: Add special effects (Healing, burn, multi-hit)
@@ -214,14 +215,11 @@ function Game() {
     const [zoneOccupants, setZoneOccupants] = useState<Array<number | null>>([null, null]);
     const [isPreviewDragging, setIsPreviewDragging] = useState(false);
     const [isPreviewHovered, setIsPreviewHovered] = useState(false);
-    const [previewPopupOffsetX, setPreviewPopupOffsetX] = useState(0);
-    const [previewPopupBelow, setPreviewPopupBelow] = useState(false);
     const [previewHomePosition, setPreviewHomePosition] = useState<Position | null>(null);
     const [previewPosition, setPreviewPosition] = useState<Position | null>(null);
     const [previewPointerOffset, setPreviewPointerOffset] = useState<Position>({ x: 0, y: 0 });
     const previewPositionRef = useRef<Position | null>(null);
     const previewPointerClientRef = useRef<Position>({ x: 0, y: 0 });
-    const previewPopupRef = useRef<HTMLDivElement | null>(null);
     const nextId = useRef(1);
 
     const getSpawnPosition = (index: number): Position => {
@@ -501,8 +499,6 @@ function Game() {
 
         setIsPreviewDragging(false);
         setIsPreviewHovered(false);
-        setPreviewPopupOffsetX(0);
-        setPreviewPopupBelow(false);
         setPreviewHomePosition(null);
         setPreviewPosition(null);
         previewPositionRef.current = null;
@@ -518,45 +514,6 @@ function Game() {
             setPreviewHomePosition(centered);
         }
     }, [getOutputCenterPosition, isPreviewDragging, previewCombination]);
-
-    useEffect(() => {
-        if (!previewCombination || !isPreviewHovered || isPreviewDragging) {
-            setPreviewPopupOffsetX(0);
-            setPreviewPopupBelow(false);
-            return;
-        }
-
-        const updatePopupPosition = () => {
-            const dragRect = previewRef.current?.getBoundingClientRect();
-            const popupRect = previewPopupRef.current?.getBoundingClientRect();
-            if (!dragRect || !popupRect) {
-                return;
-            }
-
-            const screenPadding = 8;
-            const popupLeft = dragRect.left + dragRect.width / 2 - popupRect.width / 2;
-            const popupRight = popupLeft + popupRect.width;
-
-            if (popupLeft < screenPadding) {
-                setPreviewPopupOffsetX(screenPadding - popupLeft);
-            } else if (popupRight > window.innerWidth - screenPadding) {
-                setPreviewPopupOffsetX(window.innerWidth - screenPadding - popupRight);
-            } else {
-                setPreviewPopupOffsetX(0);
-            }
-
-            const topIfAbove = dragRect.top - 8 - popupRect.height;
-            setPreviewPopupBelow(topIfAbove < screenPadding);
-        };
-
-        const rafId = window.requestAnimationFrame(updatePopupPosition);
-        window.addEventListener("resize", updatePopupPosition);
-
-        return () => {
-            window.cancelAnimationFrame(rafId);
-            window.removeEventListener("resize", updatePopupPosition);
-        };
-    }, [isPreviewDragging, isPreviewHovered, previewCombination, previewPosition?.x, previewPosition?.y]);
 
     useEffect(() => {
         if (!isPreviewDragging) {
@@ -634,8 +591,6 @@ function Game() {
         setPreviewPointerOffset(offset);
         setPreviewPosition(initial);
         setIsPreviewHovered(false);
-        setPreviewPopupOffsetX(0);
-        setPreviewPopupBelow(false);
         previewPositionRef.current = initial;
         setIsPreviewDragging(true);
     };
@@ -728,102 +683,101 @@ function Game() {
             ))}
 
             {previewCombination ? (
-                <div
-                    ref={previewRef}
-                    className="drag drag-preview"
-                    onPointerDown={handlePreviewPointerDown}
-                    onMouseEnter={() => setIsPreviewHovered(true)}
-                    onMouseLeave={() => setIsPreviewHovered(false)}
-                    style={{
-                        top: (isPreviewDragging ? previewPosition : previewHomePosition)?.y ?? 0,
-                        left: (isPreviewDragging ? previewPosition : previewHomePosition)?.x ?? 0,
-                        display: "flex",
-                        justifyContent: "center",
-                        alignItems: "center",
-                        cursor: isPreviewDragging ? "grabbing" : "grab",
-                        userSelect: "none",
-                        color: "black",
-                        textAlign: "center",
-                        borderRadius: "1rem",
-                        border: "1px dashed black",
-                    }}
-                >
-                    {isPreviewHovered && !isPreviewDragging ? (
-                        <div
-                            ref={previewPopupRef}
-                            className={`drag-description-popup ${previewPopupBelow ? "is-below" : ""}`}
-                            style={{
-                                ["--popup-offset-x" as string]: `${previewPopupOffsetX}px`,
-                            }}
-                        >
-                            {previewCombination.description.length > 0 ? (
-                                <div className="drag-description-text">{previewCombination.description}</div>
-                            ) : null}
-                            <div className="drag-damage-text">Damage: {previewCombination.damage}</div>
-                            <div className="drag-type-text">
-                                <span className="drag-type-label">Types:</span>
-                                <span className="drag-type-list">
-                                    {[previewCombination.type1, previewCombination.type2].filter(
-                                        (value): value is string => Boolean(value && value.trim().length > 0),
-                                    ).length > 0 ? (
-                                        [previewCombination.type1, previewCombination.type2]
-                                            .filter((value): value is string => Boolean(value && value.trim().length > 0))
-                                            .map((type) => (
-                                                <span
-                                                    key={type}
-                                                    className={`type-chip type-${type
-                                                        .trim()
-                                                        .toLowerCase()
-                                                        .replace(/[^a-z0-9]+/g, "-")}`}
-                                                >
-                                                    {type}
-                                                </span>
-                                            ))
-                                    ) : (
-                                        <span className="type-chip type-none">None</span>
-                                    )}
+                <>
+                    <div
+                        ref={previewRef}
+                        className={`drag drag-preview ${isPreviewDragging ? "is-dragging" : ""}`}
+                        onPointerDown={handlePreviewPointerDown}
+                        onMouseEnter={() => setIsPreviewHovered(true)}
+                        onMouseLeave={() => setIsPreviewHovered(false)}
+                        style={{
+                            top: (isPreviewDragging ? previewPosition : previewHomePosition)?.y ?? 0,
+                            left: (isPreviewDragging ? previewPosition : previewHomePosition)?.x ?? 0,
+                            display: "flex",
+                            justifyContent: "center",
+                            alignItems: "center",
+                            cursor: isPreviewDragging ? "grabbing" : "grab",
+                            userSelect: "none",
+                        }}
+                    >
+                        {previewCombination.letter}
+                    </div>
+                    <FloatingTooltip
+                        anchorElement={previewRef.current}
+                        open={isPreviewHovered && !isPreviewDragging}
+                        className="drag-description-popup"
+                    >
+                        {previewCombination.description.length > 0 ? (
+                            <div className="drag-description-text">{previewCombination.description}</div>
+                        ) : null}
+                        <div className="drag-damage-text">Damage: {previewCombination.damage}</div>
+                        <div className="drag-type-text">
+                            <span className="drag-type-label">Types:</span>
+                            <span className="drag-type-list">
+                                {[previewCombination.type1, previewCombination.type2].filter(
+                                    (value): value is string => Boolean(value && value.trim().length > 0),
+                                ).length > 0 ? (
+                                    [previewCombination.type1, previewCombination.type2]
+                                        .filter((value): value is string => Boolean(value && value.trim().length > 0))
+                                        .map((type) => (
+                                            <span
+                                                key={type}
+                                                className={`type-chip type-${type
+                                                    .trim()
+                                                    .toLowerCase()
+                                                    .replace(/[^a-z0-9]+/g, "-")}`}
+                                            >
+                                                {type}
+                                            </span>
+                                        ))
+                                ) : (
+                                    <span className="type-chip type-none">None</span>
+                                )}
+                            </span>
+                        </div>
+                        {getEffectSummaryLines(previewCombination.effects).length > 0 ? (
+                            <div className="drag-effect-text">
+                                <span className="drag-effect-label">Effects:</span>
+                                <span className="drag-effect-list">
+                                    {getEffectSummaryLines(previewCombination.effects).map((line) => (
+                                        <span key={line} className={`effect-chip ${getEffectChipClass(line)}`}>{line}</span>
+                                    ))}
                                 </span>
                             </div>
-                            {getEffectSummaryLines(previewCombination.effects).length > 0 ? (
-                                <div className="drag-effect-text">
-                                    <span className="drag-effect-label">Effects:</span>
-                                    <span className="drag-effect-list">
-                                        {getEffectSummaryLines(previewCombination.effects).map((line) => (
-                                            <span key={line} className={`effect-chip ${getEffectChipClass(line)}`}>{line}</span>
-                                        ))}
-                                    </span>
-                                </div>
-                            ) : null}
-                        </div>
-                    ) : null}
-                    {previewCombination.letter}
-                </div>
+                        ) : null}
+                    </FloatingTooltip>
+                </>
             ) : null}
 
             <div className="element-start" ref={elementStartRef}></div>
-            <div className="combination-station">
-                <div className="combination-equation">
-                    <div className="drop-zone-area">
-                        <div className="drop-zone" ref={dropZoneRefA} />
-                        <div>+</div>
-                        <div className="drop-zone" ref={dropZoneRefB} />
-                        <div>=</div>
+            <div className="game-controls-stack">
+                <div className="combination-station">
+                    <div className="combination-equation">
+                        <div className="drop-zone-area">
+                            <div className="drop-zone" ref={dropZoneRefA} />
+                            <div>+</div>
+                            <div className="drop-zone" ref={dropZoneRefB} />
+                            <div>=</div>
+                        </div>
+                        <div className="output" ref={outputRef} />
                     </div>
-                    <div className="output" ref={outputRef} />
+
+                    <button className="combine-button" disabled={!canCombine} onClick={handleCombine}>
+                        COMBINE!
+                    </button>
                 </div>
 
-                <button className="combine-button" disabled={!canCombine} onClick={handleCombine}>
-                    COMBINE!
-                </button>
-                <button className="fight-button" onClick={handleFight}>
-                    FIGHT!
-                </button>
-                <PlayerStats
-                    level={playerProgress.level}
-                    hp={playerProgress.hp}
-                    experience={playerProgress.experience}
-                    fillPercent={levelFillPercent}
-                />
+                <div className="battle-station">
+                    <button className="fight-button" onClick={handleFight}>
+                        FIGHT!
+                    </button>
+                    <PlayerStats
+                        level={playerProgress.level}
+                        hp={playerProgress.hp}
+                        experience={playerProgress.experience}
+                        fillPercent={levelFillPercent}
+                    />
+                </div>
             </div>
             <EnemyInfo 
                 enemyName={nextEnemy?.name ?? "Unknown Enemy"} 

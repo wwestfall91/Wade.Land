@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { SpellEffectConfig } from "../../combat/spellEffects";
+import FloatingTooltip from "./FloatingTooltip";
 import "./Draggable.scss";
 
 type Position = {
@@ -37,53 +38,12 @@ function Draggable({
 	canSnapToZone,
 }: Props) {
 	const [isDragging, setIsDragging] = useState(false);
+	const [hasBeenDragged, setHasBeenDragged] = useState(false);
 	const [isInvalidDrop, setIsInvalidDrop] = useState(false);
 	const [isHovered, setIsHovered] = useState(false);
-	const [popupOffsetX, setPopupOffsetX] = useState(0);
-	const [popupBelow, setPopupBelow] = useState(false);
 	const [mouseOffset, setMouseOffset] = useState({ x: 0, y: 0 });
 	const [position, setPosition] = useState<Position>(initialPosition);
 	const draggableRef = useRef<HTMLDivElement | null>(null);
-	const popupRef = useRef<HTMLDivElement | null>(null);
-
-	useEffect(() => {
-		if (!isHovered || isDragging || !description.length) {
-			setPopupOffsetX(0);
-			setPopupBelow(false);
-			return;
-		}
-
-		const updatePopupPosition = () => {
-			const dragRect = draggableRef.current?.getBoundingClientRect();
-			const popupRect = popupRef.current?.getBoundingClientRect();
-			if (!dragRect || !popupRect) {
-				return;
-			}
-
-			const screenPadding = 8;
-			const popupLeft = dragRect.left + dragRect.width / 2 - popupRect.width / 2;
-			const popupRight = popupLeft + popupRect.width;
-
-			if (popupLeft < screenPadding) {
-				setPopupOffsetX(screenPadding - popupLeft);
-			} else if (popupRight > window.innerWidth - screenPadding) {
-				setPopupOffsetX(window.innerWidth - screenPadding - popupRight);
-			} else {
-				setPopupOffsetX(0);
-			}
-
-			const topIfAbove = dragRect.top - 8 - popupRect.height;
-			setPopupBelow(topIfAbove < screenPadding);
-		};
-
-		const rafId = window.requestAnimationFrame(updatePopupPosition);
-		window.addEventListener("resize", updatePopupPosition);
-
-		return () => {
-			window.cancelAnimationFrame(rafId);
-			window.removeEventListener("resize", updatePopupPosition);
-		};
-	}, [description, isDragging, isHovered, position.x, position.y]);
 
 	useEffect(() => {
 		if (!isDragging) return;
@@ -93,14 +53,16 @@ function Draggable({
 			if (!rect) return;
 
 			setPosition({
-				x: e.clientX - rect.left - mouseOffset.x,
-				y: e.clientY - rect.top - mouseOffset.y,
+				x: Math.round(e.clientX - rect.left - mouseOffset.x),
+				y: Math.round(e.clientY - rect.top - mouseOffset.y),
 			});
 		};
 
 		const onUp = () => {
 			const containerRect = containerRef.current?.getBoundingClientRect();
 			const dragRect = draggableRef.current?.getBoundingClientRect();
+			const dragWidth = draggableRef.current?.offsetWidth ?? dragRect?.width ?? 0;
+			const dragHeight = draggableRef.current?.offsetHeight ?? dragRect?.height ?? 0;
 
 			if (containerRect && dragRect) {
 				const intersectingZoneIndex = dropZoneRefs.findIndex((zoneRef) => {
@@ -128,16 +90,18 @@ function Draggable({
 					const dropZoneRect = dropZoneRefs[snapZoneIndex].current?.getBoundingClientRect();
 					if (dropZoneRect) {
 						setIsInvalidDrop(false);
-					setPosition({
-						x:
-							dropZoneRect.left -
-							containerRect.left +
-							(dropZoneRect.width - dragRect.width) / 2,
-						y:
-							dropZoneRect.top -
-							containerRect.top +
-							(dropZoneRect.height - dragRect.height) / 2,
-					});
+						setPosition({
+							x: Math.round(
+								dropZoneRect.left -
+								containerRect.left +
+								(dropZoneRect.width - dragWidth) / 2,
+							),
+							y: Math.round(
+								dropZoneRect.top -
+								containerRect.top +
+								(dropZoneRect.height - dragHeight) / 2,
+							),
+						});
 						onSnapChange(id, snapZoneIndex);
 					}
 				} else {
@@ -181,9 +145,8 @@ function Draggable({
 			y: e.clientY - rect.top - position.y,
 		});
 		setIsHovered(false);
-		setPopupOffsetX(0);
-		setPopupBelow(false);
 		onSnapChange(id, null);
+		setHasBeenDragged(true);
 		setIsDragging(true);
 	};
 
@@ -276,7 +239,7 @@ function Draggable({
 		<div
 			id="Draggable"
 			ref={draggableRef}
-			className={`drag ${isInvalidDrop ? "is-invalid-drop" : ""}`}
+			className={`drag ${isInvalidDrop ? "is-invalid-drop" : ""} ${isDragging ? "is-dragging" : ""} ${!hasBeenDragged ? "is-discoverable" : ""}`}
 			onPointerDown={handlePointerDown}
 			onAnimationEnd={() => setIsInvalidDrop(false)}
 			onMouseEnter={() => setIsHovered(true)}
@@ -289,48 +252,40 @@ function Draggable({
 				left: position.x,
 				cursor: isDragging ? "grabbing" : "grab",
 				userSelect: "none",
-				color: "black",
-				textAlign: "center",
-				borderRadius: "1rem",
-				border: "3px solid black",
 			}}
 		>
-			{isHovered && !isDragging ? (
-				<div
-					ref={popupRef}
-					className={`drag-description-popup ${popupBelow ? "is-below" : ""}`}
-					style={{
-						["--popup-offset-x" as string]: `${popupOffsetX}px`,
-					}}
-				>
-					{description.length > 0 ? <div className="drag-description-text">{description}</div> : null}
-					<div className="drag-damage-text">Damage: {damage}</div>
-					<div className="drag-type-text">
-						<span className="drag-type-label">Types:</span>
-						<span className="drag-type-list">
-							{types.length > 0 ? (
-								types.map((type) => (
-									<span key={type} className={`type-chip ${toTypeClass(type)}`}>
-										{type}
-									</span>
-								))
-							) : (
-								<span className="type-chip type-none">None</span>
-							)}
+			<FloatingTooltip
+				anchorElement={draggableRef.current}
+				open={isHovered && !isDragging && description.length > 0}
+				className="drag-description-popup"
+			>
+				{description.length > 0 ? <div className="drag-description-text">{description}</div> : null}
+				<div className="drag-damage-text">Damage: {damage}</div>
+				<div className="drag-type-text">
+					<span className="drag-type-label">Types:</span>
+					<span className="drag-type-list">
+						{types.length > 0 ? (
+							types.map((type) => (
+								<span key={type} className={`type-chip ${toTypeClass(type)}`}>
+									{type}
+								</span>
+							))
+						) : (
+							<span className="type-chip type-none">None</span>
+						)}
+					</span>
+				</div>
+				{effectLines.length > 0 ? (
+					<div className="drag-effect-text">
+						<span className="drag-effect-label">Effects:</span>
+						<span className="drag-effect-list">
+							{effectLines.map((line) => (
+								<span key={line} className={`effect-chip ${getEffectChipClass(line)}`}>{line}</span>
+							))}
 						</span>
 					</div>
-					{effectLines.length > 0 ? (
-						<div className="drag-effect-text">
-							<span className="drag-effect-label">Effects:</span>
-							<span className="drag-effect-list">
-								{effectLines.map((line) => (
-									<span key={line} className={`effect-chip ${getEffectChipClass(line)}`}>{line}</span>
-								))}
-							</span>
-						</div>
-					) : null}
-				</div>
-			) : null}
+				) : null}
+			</FloatingTooltip>
 			{letter}
 		</div>
 	);
