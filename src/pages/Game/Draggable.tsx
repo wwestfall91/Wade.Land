@@ -258,6 +258,7 @@ function Draggable({
 				anchorElement={draggableRef.current}
 				open={isHovered && !isDragging && description.length > 0}
 				className="drag-description-popup"
+				clampHorizontal={false}
 			>
 				{description.length > 0 ? <div className="drag-description-text">{description}</div> : null}
 				<div className="drag-damage-text">Damage: {damage}</div>
