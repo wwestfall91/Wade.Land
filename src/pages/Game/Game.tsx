@@ -776,6 +776,7 @@ function Game() {
                         hp={playerProgress.hp}
                         experience={playerProgress.experience}
                         fillPercent={levelFillPercent}
+                        className="player-stats-dock"
                     />
                 </div>
             </div>

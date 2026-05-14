@@ -1,7 +1,37 @@
 #Game{
-    width:100vw;
+    display: flex;
+    position: relative;
+    flex-direction: column;
+    gap:3.5rem;
+    width: 100vw;
     height:100vh;
-    gap: 5rem;
+    justify-content: center;
+    align-items: center;
+    color: #f5f4ff;
+    font-family: "VT323", "Lucida Console", monospace;
+    letter-spacing: 0.01em;
+    line-height: 1.15;
+    text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.65);
+    // background:
+    //     radial-gradient(circle at 14% 12%, rgba(122, 139, 255, 0.25), transparent 32%),
+    //     radial-gradient(circle at 80% 85%, rgba(84, 98, 218, 0.2), transparent 30%),
+    //     linear-gradient(180deg, #141f7a 0%, #10155b 52%, #0a0f44 100%);
+
+    &::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: repeating-linear-gradient(
+            0deg,
+            rgba(255, 255, 255, 0.045) 0,
+            rgba(255, 255, 255, 0.045) 1px,
+            transparent 1px,
+            transparent 4px
+        );
+        opacity: 0.35;
+        z-index: 0;
+    }
 
     .element-start{
         position: absolute;
@@ -60,6 +90,14 @@
         flex-direction: column;
         gap: 1rem;
         align-items: center;
+    }
+
+    .player-stats.player-stats-dock {
+        position: fixed;
+        left: 1rem;
+        bottom: 1rem;
+        width: min(15rem, 44vw);
+        z-index: 30;
     }
 
     .combination-equation{
@@ -254,6 +292,16 @@
 
         &:active {
             transform: translateY(0);
+        }
+    }
+}
+
+@media (max-width: 640px) {
+    #Game {
+        .player-stats.player-stats-dock {
+            left: 0.75rem;
+            bottom: 0.75rem;
+            width: min(15rem, calc(100vw - 1.5rem));
         }
     }
 }
