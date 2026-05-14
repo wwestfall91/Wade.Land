@@ -61,6 +61,13 @@
             opacity: 0.75;
         }
 
+        .enemy-status {
+            font-size: 0.92rem;
+            font-weight: 700;
+            color: #ffae5a;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+        }
+
         .enemy-experience {
             font-size: 1rem;
             opacity: 0.7;
@@ -194,7 +201,10 @@
             left: 50%;
             transform: translateX(-50%);
             pointer-events: none;
-            white-space: nowrap;
+            display: flex;
+            flex-direction: column;
+            gap: 0.1rem;
+            min-width: 9rem;
             font-size: 0.76rem;
             font-weight: 700;
             letter-spacing: 0.02em;
@@ -206,6 +216,59 @@
             box-shadow: 0 7px 14px rgba(0, 0, 0, 0.22);
             z-index: 5;
             animation: spell-tooltip-in 120ms ease-out;
+
+            .spell-hover-tooltip-line {
+                display: block;
+                text-align: left;
+                white-space: nowrap;
+            }
+
+            .effect-chip {
+                display: inline-flex;
+                align-items: center;
+                border: 1px solid rgba(0, 0, 0, 0.25);
+                border-radius: 999px;
+                padding: 0.06rem 0.44rem;
+                font-size: 0.68rem;
+                line-height: 1.2;
+                color: #111;
+                background-color: #e8ecff;
+            }
+
+            .effect-default {
+                background-color: #e8ecff;
+                color: #111;
+            }
+
+            .effect-heal {
+                background-color: #c9f4d2;
+                color: #1d4f2c;
+                border-color: rgba(44, 120, 67, 0.45);
+            }
+
+            .effect-burn {
+                background-color: #ffd2b1;
+                color: #6a2d11;
+                border-color: rgba(157, 73, 32, 0.5);
+            }
+
+            .effect-shield {
+                background-color: #cde8ff;
+                color: #133a69;
+                border-color: rgba(39, 101, 168, 0.45);
+            }
+
+            .effect-lifesteal {
+                background-color: #f4c8d9;
+                color: #6b1d3a;
+                border-color: rgba(133, 41, 79, 0.45);
+            }
+
+            .effect-multi-hit {
+                background-color: #e2d6ff;
+                color: #402a7a;
+                border-color: rgba(86, 62, 157, 0.45);
+            }
         }
     }
 
@@ -286,6 +349,13 @@
         font-weight: 700;
         color: #fff;
         text-shadow: 0 1px 2px rgba(0, 0, 0, 0.62);
+    }
+
+    .player-status {
+        font-size: 0.92rem;
+        font-weight: 700;
+        color: #8fd8ff;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
     }
 
     .player-hp-dock.is-hit {

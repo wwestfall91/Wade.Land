@@ -5,6 +5,7 @@ import StartMenuModal from "./StartMenuModal.tsx";
 import { useNavigate } from "react-router";
 import PlayerStats from "../../components/PlayerStats";
 import EnemyInfo from "../../components/EnemyInfo";
+import { parseSpellEffectsFromRow, type SpellEffectConfig } from "../../combat/spellEffects";
 import { type RewardElement, usePlayer } from "../../context/PlayerContext";
 import "./Game.scss";
 
@@ -25,6 +26,7 @@ type DraggableItem = {
     description: string;
     type1?: string;
     type2?: string;
+    effects?: SpellEffectConfig[];
     initialPosition: Position;
 };
 
@@ -37,9 +39,11 @@ type CombinationRecipe = {
     description: string;
     type1?: string;
     type2?: string;
+    effects?: SpellEffectConfig[];
 };
 
 type ElementRow = {
+    [key: string]: unknown;
     name?: string;
     Name?: string;
     ["Element 1"]?: string;
@@ -93,6 +97,7 @@ type PreviewCombination = {
     description: string;
     type1?: string;
     type2?: string;
+    effects?: SpellEffectConfig[];
 };
 
 const SPREAD_X = 200;
@@ -103,6 +108,75 @@ const normalizeType = (value?: string): string => value?.trim().toLowerCase() ??
 const getRandomUniqueElements = (elements: RewardElement[], count: number): RewardElement[] => {
     const shuffled = [...elements].sort(() => Math.random() - 0.5);
     return shuffled.slice(0, Math.min(count, shuffled.length));
+};
+
+const getEffectSummaryLines = (effects?: SpellEffectConfig[]): string[] => {
+    const lines: string[] = [];
+    const normalizedEffects = effects ?? [];
+
+    const multiHit = normalizedEffects.find((effect) => effect.kind === "multi_hit");
+    if (multiHit?.hits && multiHit.hits > 1) {
+        lines.push(`Hits: ${multiHit.hits}x`);
+    }
+
+    normalizedEffects.forEach((effect) => {
+        switch (effect.kind) {
+            case "heal": {
+                const amount = Math.max(0, effect.amount ?? 0);
+                if (amount > 0) {
+                    lines.push(`Heal: +${amount}`);
+                }
+                break;
+            }
+            case "burn": {
+                const amount = Math.max(0, effect.amount ?? 0);
+                const duration = Math.max(1, effect.duration ?? 1);
+                if (amount > 0) {
+                    lines.push(`Burn: +${amount} for ${duration} turns`);
+                }
+                break;
+            }
+            case "shield": {
+                const amount = Math.max(0, effect.amount ?? 0);
+                if (amount > 0) {
+                    lines.push(`Shield: +${amount}`);
+                }
+                break;
+            }
+            case "lifesteal": {
+                const amount = Math.max(0, effect.amount ?? 0);
+                if (amount > 0) {
+                    const percent = amount > 1 ? amount : Math.round(amount * 100);
+                    lines.push(`Lifesteal: ${percent}%`);
+                }
+                break;
+            }
+            default:
+                break;
+        }
+    });
+
+    return lines;
+};
+
+const getEffectChipClass = (line: string): string => {
+    if (line.startsWith("Heal:")) {
+        return "effect-heal";
+    }
+    if (line.startsWith("Burn:")) {
+        return "effect-burn";
+    }
+    if (line.startsWith("Shield:")) {
+        return "effect-shield";
+    }
+    if (line.startsWith("Lifesteal:")) {
+        return "effect-lifesteal";
+    }
+    if (line.startsWith("Hits:")) {
+        return "effect-multi-hit";
+    }
+
+    return "effect-default";
 };
 
 function Game() {
@@ -181,6 +255,7 @@ function Game() {
                     description: (row.Description ?? row.description ?? "").trim(),
                     type1: normalizeType((row["Type 1"] ?? row.Type1 ?? "") as string),
                     type2: normalizeType((row["Type 2"] ?? row.Type2 ?? "") as string),
+                    effects: parseSpellEffectsFromRow(row),
                 }))
                 .filter((row) => row.name.length > 0);
 
@@ -195,6 +270,7 @@ function Game() {
                     description: row.description,
                     type1: row.type1,
                     type2: row.type2,
+                    effects: row.effects,
                 }));
 
             setRecipes(combinationRecipes);
@@ -209,6 +285,7 @@ function Game() {
                     description: row.description,
                     type1: row.type1,
                     type2: row.type2,
+                    effects: row.effects,
                 })),
             );
         };
@@ -267,6 +344,7 @@ function Game() {
                         description: element.description,
                         type1: element.type1,
                         type2: element.type2,
+                        effects: element.effects,
                     };
                 }
 
@@ -341,6 +419,7 @@ function Game() {
                 : "Unstable fusion of two primal forces.",
             type1: matchingRecipe?.type1,
             type2: matchingRecipe?.type2,
+            effects: matchingRecipe?.effects,
         };
     }, [canCombine, draggables, dropZoneRefs.length, recipes, zoneOccupants]);
 
@@ -380,6 +459,7 @@ function Game() {
             description: previewCombination.description,
             type1: previewCombination.type1,
             type2: previewCombination.type2,
+            effects: previewCombination.effects,
         };
 
         nextId.current += 1;
@@ -630,6 +710,7 @@ function Game() {
                     description={draggable.description}
                     type1={draggable.type1}
                     type2={draggable.type2}
+                    effects={draggable.effects}
                     containerRef={gameRef}
                     dropZoneRefs={dropZoneRefs}
                     initialPosition={draggable.initialPosition}
@@ -695,6 +776,16 @@ function Game() {
                                     )}
                                 </span>
                             </div>
+                            {getEffectSummaryLines(previewCombination.effects).length > 0 ? (
+                                <div className="drag-effect-text">
+                                    <span className="drag-effect-label">Effects:</span>
+                                    <span className="drag-effect-list">
+                                        {getEffectSummaryLines(previewCombination.effects).map((line) => (
+                                            <span key={line} className={`effect-chip ${getEffectChipClass(line)}`}>{line}</span>
+                                        ))}
+                                    </span>
+                                </div>
+                            ) : null}
                         </div>
                     ) : null}
                     {previewCombination.letter}

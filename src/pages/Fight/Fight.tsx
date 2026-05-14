@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import "./Fight.scss";
+import {
+    getPerHitSpellEffects,
+    getSpellHitCount,
+    type ActiveBurnStatus,
+    type SpellEffectConfig,
+} from "../../combat/spellEffects";
 import { usePlayer, type RewardElement } from "../../context/PlayerContext";
 import RewardModal from "./RewardModal";
 
@@ -38,7 +44,7 @@ type FightLocationState = {
 function Fight() {
     const location = useLocation();
     const navigate = useNavigate();
-    const { player, levels, addExperience, addElement, applyEnemyAttack, resetGame } = usePlayer();
+    const { player, levels, addExperience, addElement, applyEnemyAttack, healPlayer, resetGame } = usePlayer();
     const [flashingSlotId, setFlashingSlotId] = useState<number | null>(null);
     const [hoveredSpellId, setHoveredSpellId] = useState<number | null>(null);
     const [usedSpellIds, setUsedSpellIds] = useState<number[]>([]);
@@ -52,6 +58,8 @@ function Fight() {
     const [isCritTextVisible, setIsCritTextVisible] = useState(false);
     const [showRewardModal, setShowRewardModal] = useState(false);
     const [rewardElements, setRewardElements] = useState<RewardElement[]>([]);
+    const [enemyBurnStatus, setEnemyBurnStatus] = useState<ActiveBurnStatus | null>(null);
+    const [playerShield, setPlayerShield] = useState(0);
     const preRewardXp = useRef(player.experience);
     const hasResolvedVictory = useRef(false);
     const playerHitTimeoutRef = useRef<number | null>(null);
@@ -127,6 +135,75 @@ function Fight() {
         return hexToRgba(primary, 0.18);
     };
 
+    const getSpellTooltipLines = (spell: { damage: number; effects?: SpellEffectConfig[] }) => {
+        const lines = [`Damage: ${spell.damage}`];
+        const effects = spell.effects ?? [];
+
+        const multiHit = effects.find((effect) => effect.kind === "multi_hit");
+        if (multiHit?.hits && multiHit.hits > 1) {
+            lines.push(`Hits: ${multiHit.hits}x`);
+        }
+
+        effects.forEach((effect) => {
+            switch (effect.kind) {
+                case "heal": {
+                    const amount = Math.max(0, effect.amount ?? 0);
+                    if (amount > 0) {
+                        lines.push(`Heal: +${amount}`);
+                    }
+                    break;
+                }
+                case "burn": {
+                    const amount = Math.max(0, effect.amount ?? 0);
+                    const duration = Math.max(1, effect.duration ?? 1);
+                    if (amount > 0) {
+                        lines.push(`Burn: +${amount} for ${duration} turns`);
+                    }
+                    break;
+                }
+                case "shield": {
+                    const amount = Math.max(0, effect.amount ?? 0);
+                    if (amount > 0) {
+                        lines.push(`Shield: +${amount}`);
+                    }
+                    break;
+                }
+                case "lifesteal": {
+                    const amount = Math.max(0, effect.amount ?? 0);
+                    if (amount > 0) {
+                        const percent = amount > 1 ? amount : Math.round(amount * 100);
+                        lines.push(`Lifesteal: ${percent}%`);
+                    }
+                    break;
+                }
+                default:
+                    break;
+            }
+        });
+
+        return lines;
+    };
+
+    const getEffectChipClass = (line: string): string => {
+        if (line.startsWith("Heal:")) {
+            return "effect-heal";
+        }
+        if (line.startsWith("Burn:")) {
+            return "effect-burn";
+        }
+        if (line.startsWith("Shield:")) {
+            return "effect-shield";
+        }
+        if (line.startsWith("Lifesteal:")) {
+            return "effect-lifesteal";
+        }
+        if (line.startsWith("Hits:")) {
+            return "effect-multi-hit";
+        }
+
+        return "effect-default";
+    };
+
     useEffect(() => {
         if (turnMessage.length === 0) {
             return;
@@ -178,8 +255,39 @@ function Fight() {
             return;
         }
 
-        applyEnemyAttack(enemy.power);
-        setTurnMessage(`Enemy attacks for ${enemy.power} damage`);
+        const turnMessages: string[] = [];
+        let nextEnemyHealth = enemyHealth;
+
+        if (enemyBurnStatus) {
+            const burnDamage = Math.max(0, enemyBurnStatus.stacks);
+            if (burnDamage > 0) {
+                nextEnemyHealth = Math.max(0, nextEnemyHealth - burnDamage);
+                setEnemyHealth(nextEnemyHealth);
+                turnMessages.push(`Burn deals ${burnDamage} damage`);
+            }
+
+            const nextDuration = enemyBurnStatus.remainingTurns - 1;
+            setEnemyBurnStatus(nextDuration > 0
+                ? { ...enemyBurnStatus, remainingTurns: nextDuration }
+                : null);
+
+            if (nextEnemyHealth <= 0) {
+                setTurnMessage(turnMessages.join(". "));
+                return;
+            }
+        }
+
+        const absorbedDamage = Math.min(playerShield, enemy.power);
+        const remainingDamage = Math.max(0, enemy.power - absorbedDamage);
+
+        if (absorbedDamage > 0) {
+            setPlayerShield((previous) => Math.max(0, previous - absorbedDamage));
+            turnMessages.push(`Shield blocks ${absorbedDamage}`);
+        }
+
+        applyEnemyAttack(remainingDamage);
+        turnMessages.push(`Enemy attacks for ${remainingDamage} damage`);
+        setTurnMessage(turnMessages.join(". "));
         if (playerHitTimeoutRef.current !== null) {
             window.clearTimeout(playerHitTimeoutRef.current);
         }
@@ -211,7 +319,7 @@ function Fight() {
         setUsedSpellIds([]);
     };
 
-    const handleSlotClick = (spell: { id: number; damage: number; type1?: string; type2?: string }) => {
+    const handleSlotClick = (spell: { id: number; damage: number; type1?: string; type2?: string; effects?: SpellEffectConfig[] }) => {
         if (usedSpellIds.includes(spell.id) || enemyHealth <= 0 || isGameOver) {
             return;
         }
@@ -229,15 +337,104 @@ function Fight() {
         });
 
         setFlashingSlotId(spell.id);
-        // Determine if this is a critical hit
         const spellTypes = [spell.type1, spell.type2].map(normalizeType).filter(Boolean);
         const enemyWeaknesses = (enemy.weaknesses ?? []).map(normalizeType).filter(Boolean);
-        const isCritical = spellTypes.some((type) => enemyWeaknesses.includes(type));
-        const critDamage = isCritical ? spell.damage * 2 : spell.damage;
-        const nextEnemyHealth = Math.max(0, enemyHealth - critDamage);
+        const hitCount = getSpellHitCount(spell.effects);
+        const perHitEffects = getPerHitSpellEffects(spell.effects);
+
+        let totalDamage = 0;
+        let totalHealing = 0;
+        let totalBurnApplied = 0;
+        let totalShieldGranted = 0;
+        let burnDuration = 0;
+        let hadCriticalHit = false;
+
+        for (let hitIndex = 0; hitIndex < hitCount; hitIndex += 1) {
+            const isCritical = spellTypes.some((type) => enemyWeaknesses.includes(type));
+            hadCriticalHit ||= isCritical;
+            const hitDamage = isCritical ? spell.damage * 2 : spell.damage;
+            totalDamage += hitDamage;
+
+            perHitEffects.forEach((effect) => {
+                switch (effect.kind) {
+                    case "heal": {
+                        if (effect.target === "enemy") {
+                            return;
+                        }
+
+                        const amount = Math.max(0, effect.amount ?? 0);
+                        if (amount > 0) {
+                            healPlayer(amount);
+                            totalHealing += amount;
+                        }
+                        break;
+                    }
+                    case "burn": {
+                        if (effect.target === "self") {
+                            return;
+                        }
+
+                        const amount = Math.max(0, effect.amount ?? 0);
+                        const duration = Math.max(1, effect.duration ?? 1);
+                        totalBurnApplied += amount;
+                        burnDuration = Math.max(burnDuration, duration);
+                        break;
+                    }
+                    case "shield": {
+                        if (effect.target === "enemy") {
+                            return;
+                        }
+
+                        const amount = Math.max(0, effect.amount ?? 0);
+                        totalShieldGranted += amount;
+                        break;
+                    }
+                    case "lifesteal": {
+                        if (effect.target === "enemy") {
+                            return;
+                        }
+
+                        const amount = Math.max(0, effect.amount ?? 0);
+                        const multiplier = amount > 1 ? amount / 100 : amount;
+                        const healing = Math.max(0, Math.round(hitDamage * multiplier));
+                        if (healing > 0) {
+                            healPlayer(healing);
+                            totalHealing += healing;
+                        }
+                        break;
+                    }
+                    default:
+                        break;
+                }
+            });
+        }
+
+        const nextEnemyHealth = Math.max(0, enemyHealth - totalDamage);
         setEnemyHealth(nextEnemyHealth);
 
-        if (isCritical) {
+        if (nextEnemyHealth > 0 && totalBurnApplied > 0) {
+            setEnemyBurnStatus((previous) => {
+                if (!previous) {
+                    return {
+                        kind: "burn",
+                        stacks: totalBurnApplied,
+                        remainingTurns: burnDuration,
+                    };
+                }
+
+                return {
+                    kind: "burn",
+                    stacks: previous.stacks + totalBurnApplied,
+                    remainingTurns: Math.max(previous.remainingTurns, burnDuration),
+                };
+            });
+        }
+
+        if (totalShieldGranted > 0) {
+            setPlayerShield((previous) => previous + totalShieldGranted);
+        }
+
+        if (hadCriticalHit) {
             setIsCritFlashing(false);
             setIsCritTextVisible(false);
             window.requestAnimationFrame(() => {
@@ -246,6 +443,20 @@ function Fight() {
                 setTimeout(() => setIsCritFlashing(false), 320);
                 setTimeout(() => setIsCritTextVisible(false), 520);
             });
+        }
+
+        const effectMessages: string[] = [];
+        if (hitCount > 1) {
+            effectMessages.push(`Hits ${hitCount}x`);
+        }
+        if (totalHealing > 0) {
+            effectMessages.push(`Heals ${totalHealing}`);
+        }
+        if (totalShieldGranted > 0) {
+            effectMessages.push(`Shield +${totalShieldGranted}`);
+        }
+        if (totalBurnApplied > 0 && nextEnemyHealth > 0) {
+            effectMessages.push(`Burn +${totalBurnApplied}`);
         }
 
         setUsedSpellIds((previous) => {
@@ -261,6 +472,10 @@ function Fight() {
                     setTurnMessage("All spell slots used");
                 }
                 return next;
+            }
+
+            if (effectMessages.length > 0) {
+                setTurnMessage(effectMessages.join(". "));
             }
 
             return next;
@@ -311,6 +526,9 @@ function Fight() {
                     <div className="enemy-hp-fill" style={{ width: `${enemyHpFillPercent}%` }} />
                     <span className="enemy-hp-label">{enemyHealth} / {enemyMaxHp} HP</span>
                 </div>
+                {enemyBurnStatus ? (
+                    <span className="enemy-status">Burn {enemyBurnStatus.stacks} for {enemyBurnStatus.remainingTurns} turns</span>
+                ) : null}
                 <span className="enemy-power">{enemy.power} POW</span>
                 <span className="enemy-experience">{enemy.experience} XP</span>
             </div>
@@ -329,11 +547,18 @@ function Fight() {
                             damage: spell.damage,
                             type1: spell.type1,
                             type2: spell.type2,
+                            effects: spell.effects,
                         })}
                         onAnimationEnd={() => handleFlashEnd(spell.id)}
                     >
                         {hoveredSpellId === spell.id ? (
-                            <span className="spell-hover-tooltip">Damage: {spell.damage}</span>
+                            <span className="spell-hover-tooltip">
+                                {getSpellTooltipLines(spell).map((line) => (
+                                    <span key={line} className={`spell-hover-tooltip-line effect-chip ${getEffectChipClass(line)}`}>
+                                        {line}
+                                    </span>
+                                ))}
+                            </span>
                         ) : null}
                         <span>{spell.letter}</span>
                         <span>{spell.damage}</span>
@@ -352,6 +577,7 @@ function Fight() {
                 <div className="player-hp-fill" style={{ width: `${playerHpFillPercent}%` }} />
                 <span className="player-hp-label">{player.hp} / {playerMaxHp} HP</span>
             </div>
+            {playerShield > 0 ? <span className="player-status">Shield {playerShield}</span> : null}
 
             {isGameOver ? (
                 <div className="game-over-overlay" role="dialog" aria-modal="true" aria-labelledby="game-over-title">

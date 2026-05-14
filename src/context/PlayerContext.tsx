@@ -9,6 +9,7 @@ import {
     type ReactNode,
 } from "react";
 import * as XLSX from "xlsx";
+import type { SpellEffectConfig } from "../combat/spellEffects";
 
 type LevelRow = {
     Level?: number | string;
@@ -34,6 +35,7 @@ export type PlayerElement = {
     description: string;
     type1?: string;
     type2?: string;
+    effects?: SpellEffectConfig[];
 };
 
 export type PlayerProgress = {
@@ -64,6 +66,7 @@ type PlayerContextValue = {
     initializeElements: (elements: PlayerElement[]) => void;
     combineElements: (consumedIds: number[], newElement: PlayerElement) => void;
     applyEnemyAttack: (power: number) => void;
+    healPlayer: (amount: number) => void;
     resetGame: () => void;
     addElement: (element: RewardElement) => void;
     selectedEnemy: SelectedEnemy | null;
@@ -221,6 +224,16 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
         });
     }, [experience, levels]);
 
+    const healPlayer = useCallback((amount: number) => {
+        const normalizedAmount = Math.max(0, amount);
+        setCurrentHp((previousHp) => {
+            const matchedLevel = resolveLevelForExperience(experience, levels);
+            const maxHp = matchedLevel?.hp ?? 0;
+            const startingHp = previousHp ?? maxHp;
+            return Math.min(maxHp, startingHp + normalizedAmount);
+        });
+    }, [experience, levels]);
+
     const resetGame = useCallback(() => {
         setExperience(0);
         setElements([]);
@@ -245,6 +258,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             initializeElements,
             combineElements,
             applyEnemyAttack,
+            healPlayer,
             resetGame,
             addElement,
             selectedEnemy,
@@ -258,6 +272,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             levelFillPercent,
             levels,
             player,
+            healPlayer,
             resetGame,
             addElement,
             selectedEnemy,

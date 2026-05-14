@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import type { SpellEffectConfig } from "../../combat/spellEffects";
 import "./Draggable.scss";
 
 type Position = {
@@ -13,6 +14,7 @@ type Props = {
 	description: string;
 	type1?: string;
 	type2?: string;
+	effects?: SpellEffectConfig[];
 	containerRef: React.RefObject<HTMLDivElement | null>;
 	dropZoneRefs: Array<React.RefObject<HTMLDivElement | null>>;
 	initialPosition: Position;
@@ -27,6 +29,7 @@ function Draggable({
 	description,
 	type1,
 	type2,
+	effects,
 	containerRef,
 	dropZoneRefs,
 	initialPosition,
@@ -190,6 +193,77 @@ function Draggable({
 	const toTypeClass = (value: string) =>
 		`type-${value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
 
+	const getEffectSummaryLines = (nextEffects?: SpellEffectConfig[]) => {
+		const lines: string[] = [];
+		const normalizedEffects = nextEffects ?? [];
+
+		const multiHit = normalizedEffects.find((effect) => effect.kind === "multi_hit");
+		if (multiHit?.hits && multiHit.hits > 1) {
+			lines.push(`Hits: ${multiHit.hits}x`);
+		}
+
+		normalizedEffects.forEach((effect) => {
+			switch (effect.kind) {
+				case "heal": {
+					const amount = Math.max(0, effect.amount ?? 0);
+					if (amount > 0) {
+						lines.push(`Heal: +${amount}`);
+					}
+					break;
+				}
+				case "burn": {
+					const amount = Math.max(0, effect.amount ?? 0);
+					const duration = Math.max(1, effect.duration ?? 1);
+					if (amount > 0) {
+						lines.push(`Burn: +${amount} for ${duration} turns`);
+					}
+					break;
+				}
+				case "shield": {
+					const amount = Math.max(0, effect.amount ?? 0);
+					if (amount > 0) {
+						lines.push(`Shield: +${amount}`);
+					}
+					break;
+				}
+				case "lifesteal": {
+					const amount = Math.max(0, effect.amount ?? 0);
+					if (amount > 0) {
+						const percent = amount > 1 ? amount : Math.round(amount * 100);
+						lines.push(`Lifesteal: ${percent}%`);
+					}
+					break;
+				}
+				default:
+					break;
+			}
+		});
+
+		return lines;
+	};
+
+	const getEffectChipClass = (line: string) => {
+		if (line.startsWith("Heal:")) {
+			return "effect-heal";
+		}
+		if (line.startsWith("Burn:")) {
+			return "effect-burn";
+		}
+		if (line.startsWith("Shield:")) {
+			return "effect-shield";
+		}
+		if (line.startsWith("Lifesteal:")) {
+			return "effect-lifesteal";
+		}
+		if (line.startsWith("Hits:")) {
+			return "effect-multi-hit";
+		}
+
+		return "effect-default";
+	};
+
+	const effectLines = getEffectSummaryLines(effects);
+
 	return (
 		<div
 			id="Draggable"
@@ -237,6 +311,16 @@ function Draggable({
 							)}
 						</span>
 					</div>
+					{effectLines.length > 0 ? (
+						<div className="drag-effect-text">
+							<span className="drag-effect-label">Effects:</span>
+							<span className="drag-effect-list">
+								{effectLines.map((line) => (
+									<span key={line} className={`effect-chip ${getEffectChipClass(line)}`}>{line}</span>
+								))}
+							</span>
+						</div>
+					) : null}
 				</div>
 			) : null}
 			{letter}
