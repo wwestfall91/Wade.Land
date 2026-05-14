@@ -127,7 +127,6 @@ function FloatingTooltip({
             }}
         >
             <div className="floating-tooltip__panel">{children}</div>
-            <span className="floating-tooltip__arrow" aria-hidden="true" />
         </div>,
         document.body,
     );

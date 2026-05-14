@@ -6,6 +6,7 @@ import { useNavigate } from "react-router";
 import PlayerStats from "../../components/PlayerStats";
 import EnemyInfo from "../../components/EnemyInfo";
 import { parseSpellEffectsFromRow, type SpellEffectConfig } from "../../combat/spellEffects";
+import { getEffectChipClass, getEffectSummaryLines } from "../../combat/effectSummary";
 import { type RewardElement, usePlayer } from "../../context/PlayerContext";
 import FloatingTooltip from "./FloatingTooltip";
 import "./Game.scss";
@@ -110,83 +111,6 @@ const normalizeType = (value?: string): string => value?.trim().toLowerCase() ??
 const getRandomUniqueElements = (elements: RewardElement[], count: number): RewardElement[] => {
     const shuffled = [...elements].sort(() => Math.random() - 0.5);
     return shuffled.slice(0, Math.min(count, shuffled.length));
-};
-
-const getEffectSummaryLines = (effects?: SpellEffectConfig[]): string[] => {
-    const lines: string[] = [];
-    const normalizedEffects = effects ?? [];
-
-    const multiHit = normalizedEffects.find((effect) => effect.kind === "multi_hit");
-    if (multiHit?.hits && multiHit.hits > 1) {
-        lines.push(`Hits: ${multiHit.hits}x`);
-    }
-
-    normalizedEffects.forEach((effect) => {
-        switch (effect.kind) {
-            case "heal": {
-                const amount = Math.max(0, effect.amount ?? 0);
-                if (amount > 0) {
-                    lines.push(`Heal: +${amount}`);
-                }
-                break;
-            }
-            case "burn": {
-                const amount = Math.max(0, effect.amount ?? 0);
-                const duration = Math.max(1, effect.duration ?? 1);
-                if (amount > 0) {
-                    lines.push(`Burn: +${amount}`);
-                }
-                break;
-            }
-            case "shield": {
-                const amount = Math.max(0, effect.amount ?? 0);
-                if (amount > 0) {
-                    lines.push(`Shield: +${amount}`);
-                }
-                break;
-            }
-            case "lifesteal": {
-                const amount = Math.max(0, effect.amount ?? 0);
-                if (amount > 0) {
-                    const percent = amount > 1 ? amount : Math.round(amount * 100);
-                    lines.push(`Lifesteal: ${percent}%`);
-                }
-                break;
-            }
-            case "soak": {
-                const amount = Math.max(1, effect.amount ?? 1);
-                lines.push(`Soak: +${amount}`);
-                break;
-            }
-            default:
-                break;
-        }
-    });
-
-    return lines;
-};
-
-const getEffectChipClass = (line: string): string => {
-    if (line.startsWith("Heal:")) {
-        return "effect-heal";
-    }
-    if (line.startsWith("Burn:")) {
-        return "effect-burn";
-    }
-    if (line.startsWith("Shield:")) {
-        return "effect-shield";
-    }
-    if (line.startsWith("Lifesteal:")) {
-        return "effect-lifesteal";
-    }
-    if (line.startsWith("Soak:")) {
-        return "effect-soak";
-    }
-    if (line.startsWith("Hits:")) {
-        return "effect-multi-hit";
-    }
-
-    return "effect-default";
 };
 
 function Game() {

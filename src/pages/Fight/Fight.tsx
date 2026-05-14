@@ -8,9 +8,11 @@ import {
     type ActiveSoakStatus,
     type SpellEffectConfig,
 } from "../../combat/spellEffects";
+import { getEffectChipClass, getEffectSummaryLines } from "../../combat/effectSummary";
 import EnemyInfoSprite from "../../components/EnemyInfoSprite";
 import { usePlayer, type RewardElement } from "../../context/PlayerContext";
 import RewardModal from "./RewardModal";
+import FloatingTooltip from "../Game/FloatingTooltip";
 
 type EnemyDamagePopup = {
     id: number;
@@ -119,6 +121,7 @@ function Fight() {
     const enemyDamagePopupIdRef = useRef(1);
     const eventLogIdRef = useRef(1);
     const eventLogContainerRef = useRef<HTMLDivElement | null>(null);
+    const spellSlotRefs = useRef<Record<number, HTMLButtonElement | null>>({});
     const healFlashTimeoutRef = useRef<number | null>(null);
     const shieldFlashTimeoutRef = useRef<number | null>(null);
     const playerHitTimeoutRef = useRef<number | null>(null);
@@ -237,79 +240,7 @@ function Fight() {
     };
 
     const getSpellTooltipLines = (spell: { damage: number; effects?: SpellEffectConfig[] }) => {
-        const lines = [`Damage: ${spell.damage}`];
-        const effects = spell.effects ?? [];
-
-        const multiHit = effects.find((effect) => effect.kind === "multi_hit");
-        if (multiHit?.hits && multiHit.hits > 1) {
-            lines.push(`Hits: ${multiHit.hits}x`);
-        }
-
-        effects.forEach((effect) => {
-            switch (effect.kind) {
-                case "heal": {
-                    const amount = Math.max(0, effect.amount ?? 0);
-                    if (amount > 0) {
-                        lines.push(`Heal: +${amount}`);
-                    }
-                    break;
-                }
-                case "burn": {
-                    const amount = Math.max(0, effect.amount ?? 0);
-                    if (amount > 0) {
-                        lines.push(`Burn: +${amount}`);
-                    }
-                    break;
-                }
-                case "shield": {
-                    const amount = Math.max(0, effect.amount ?? 0);
-                    if (amount > 0) {
-                        lines.push(`Shield: +${amount}`);
-                    }
-                    break;
-                }
-                case "lifesteal": {
-                    const amount = Math.max(0, effect.amount ?? 0);
-                    if (amount > 0) {
-                        const percent = amount > 1 ? amount : Math.round(amount * 100);
-                        lines.push(`Lifesteal: ${percent}%`);
-                    }
-                    break;
-                }
-                case "soak": {
-                    const amount = Math.max(1, effect.amount ?? 1);
-                    lines.push(`Soak: +${amount}`);
-                    break;
-                }
-                default:
-                    break;
-            }
-        });
-
-        return lines;
-    };
-
-    const getEffectChipClass = (line: string): string => {
-        if (line.startsWith("Heal:")) {
-            return "effect-heal";
-        }
-        if (line.startsWith("Burn:")) {
-            return "effect-burn";
-        }
-        if (line.startsWith("Shield:")) {
-            return "effect-shield";
-        }
-        if (line.startsWith("Lifesteal:")) {
-            return "effect-lifesteal";
-        }
-        if (line.startsWith("Soak:")) {
-            return "effect-soak";
-        }
-        if (line.startsWith("Hits:")) {
-            return "effect-multi-hit";
-        }
-
-        return "effect-default";
+        return [`Damage: ${spell.damage}`, ...getEffectSummaryLines(spell.effects)];
     };
 
     const inferEventKind = (message: string): EventLogEntry["kind"] => {
@@ -908,6 +839,9 @@ function Fight() {
                 {player.elements.map((spell) => (
                     <button
                         key={spell.id}
+                        ref={(element) => {
+                            spellSlotRefs.current[spell.id] = element;
+                        }}
                         type="button"
                         className={`spell-slot ${flashingSlotId === spell.id ? "is-flashing" : ""}`}
                         disabled={usedSpellIds.includes(spell.id) || isGameOver || isResolvingTurn}
@@ -924,15 +858,18 @@ function Fight() {
                         })}
                         onAnimationEnd={() => handleFlashEnd(spell.id)}
                     >
-                        {hoveredSpellId === spell.id ? (
-                            <span className="spell-hover-tooltip">
-                                {getSpellTooltipLines(spell).map((line) => (
-                                    <span key={line} className={`spell-hover-tooltip-line effect-chip ${getEffectChipClass(line)}`}>
-                                        {line}
-                                    </span>
-                                ))}
-                            </span>
-                        ) : null}
+                        <FloatingTooltip
+                            anchorElement={spellSlotRefs.current[spell.id]}
+                            open={hoveredSpellId === spell.id}
+                            className="spell-hover-tooltip-shell"
+                            clampHorizontal={false}
+                        >
+                            {getSpellTooltipLines(spell).map((line) => (
+                                <span key={line} className={`spell-hover-tooltip-line effect-chip ${getEffectChipClass(line)}`}>
+                                    {line}
+                                </span>
+                            ))}
+                        </FloatingTooltip>
                         <span>{spell.letter}</span>
                         <span>{spell.damage}</span>
                     </button>
