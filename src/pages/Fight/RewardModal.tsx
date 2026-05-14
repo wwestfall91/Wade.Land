@@ -66,7 +66,7 @@ type RewardModalProps = {
 };
 
 function RewardModal({ xpGained, currentXp, levels, rewardElements, onConfirm }: RewardModalProps) {
-    const [selectedElement, setSelectedElement] = useState<RewardElement>(rewardElements[0]);
+    const [selectedElement, setSelectedElement] = useState<RewardElement | null>(null);
 
     const segments = useMemo(
         () => computeAnimSegments(currentXp, xpGained, levels),
@@ -132,8 +132,6 @@ function RewardModal({ xpGained, currentXp, levels, rewardElements, onConfirm }:
     return (
         <div className="reward-menu-overlay">
             <div className="reward-menu">
-                <h2 className="reward-title">Choose your reward!</h2>
-
                 <div className="reward-xp-section">
                     <div className="reward-level-label">
                         Level {displayLevel}
@@ -147,7 +145,7 @@ function RewardModal({ xpGained, currentXp, levels, rewardElements, onConfirm }:
                     </div>
                     <div className="reward-xp-gained">+{xpGained} XP</div>
                 </div>
-
+                <h2 className="reward-title">Pick 1 Element!</h2>
                 <div className="reward-elements">
                     {rewardElements.map((element) => (
                         <button
@@ -165,7 +163,14 @@ function RewardModal({ xpGained, currentXp, levels, rewardElements, onConfirm }:
                 <button
                     type="button"
                     className="reward-return-button"
-                    onClick={() => onConfirm(selectedElement)}
+                    disabled={!selectedElement}
+                    onClick={() => {
+                        if (!selectedElement) {
+                            return;
+                        }
+
+                        onConfirm(selectedElement);
+                    }}
                 >
                     CONTINUE
                 </button>

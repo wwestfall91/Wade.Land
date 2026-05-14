@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 import "./Fight.scss";
-import PlayerStats from "../../components/PlayerStats";
 import { usePlayer, type RewardElement } from "../../context/PlayerContext";
 import RewardModal from "./RewardModal";
 
@@ -39,7 +38,7 @@ type FightLocationState = {
 function Fight() {
     const location = useLocation();
     const navigate = useNavigate();
-    const { player, levelFillPercent, levels, addExperience, addElement, applyEnemyAttack, resetGame } = usePlayer();
+    const { player, levels, addExperience, addElement, applyEnemyAttack, resetGame } = usePlayer();
     const [flashingSlotId, setFlashingSlotId] = useState<number | null>(null);
     const [hoveredSpellId, setHoveredSpellId] = useState<number | null>(null);
     const [usedSpellIds, setUsedSpellIds] = useState<number[]>([]);
@@ -70,6 +69,10 @@ function Fight() {
     }, [location.state]);
 
     const [enemyHealth, setEnemyHealth] = useState(() => enemy.hp);
+    const enemyMaxHp = Math.max(1, enemy.hp);
+    const enemyHpFillPercent = Math.max(0, Math.min(100, (enemyHealth / enemyMaxHp) * 100));
+    const playerMaxHp = levels.find((levelDef) => levelDef.level === player.level)?.hp ?? Math.max(player.hp, 1);
+    const playerHpFillPercent = Math.max(0, Math.min(100, (player.hp / playerMaxHp) * 100));
 
     const normalizeType = (value?: string) => value?.trim().toLowerCase() ?? "";
 
@@ -176,7 +179,7 @@ function Fight() {
         }
 
         applyEnemyAttack(enemy.power);
-        setTurnMessage(`attacks for ${enemy.power} damage`);
+        setTurnMessage(`Enemy attacks for ${enemy.power} damage`);
         if (playerHitTimeoutRef.current !== null) {
             window.clearTimeout(playerHitTimeoutRef.current);
         }
@@ -255,7 +258,7 @@ function Fight() {
 
             if (isTurnOver) {
                 if (nextEnemyHealth > 0) {
-                    setTurnMessage("All spell slots used. End your turn.");
+                    setTurnMessage("All spell slots used");
                 }
                 return next;
             }
@@ -297,12 +300,20 @@ function Fight() {
             {isCritFlashing ? <div className="screen-crit-flash" /> : null}
             {isCritTextVisible ? <div className="crit-text">CRITICAL!</div> : null}
             <div className="enemy">
+                <div
+                    className={`turn-message ${turnMessage.length > 0 ? "is-visible" : ""}`}
+                    aria-live="polite"
+                >
+                    {turnMessage.length > 0 ? turnMessage : " "}
+                </div>
                 <span className="enemy-name">{enemy.name}</span>
-                <span className="enemy-hp">{enemyHealth} HP</span>
+                <div className="enemy-hp-bar" role="progressbar" aria-valuemin={0} aria-valuemax={enemyMaxHp} aria-valuenow={enemyHealth}>
+                    <div className="enemy-hp-fill" style={{ width: `${enemyHpFillPercent}%` }} />
+                    <span className="enemy-hp-label">{enemyHealth} / {enemyMaxHp} HP</span>
+                </div>
                 <span className="enemy-power">{enemy.power} POW</span>
                 <span className="enemy-experience">{enemy.experience} XP</span>
             </div>
-            {turnMessage.length > 0 ? <div className="turn-message">{turnMessage}</div> : null}
             <div className="spells">
                 {player.elements.map((spell) => (
                     <button
@@ -337,14 +348,11 @@ function Fight() {
                     End Turn
                 </button>
             </div>
+            <div className="player-hp-bar" role="progressbar" aria-valuemin={0} aria-valuemax={playerMaxHp} aria-valuenow={player.hp}>
+                <div className="player-hp-fill" style={{ width: `${playerHpFillPercent}%` }} />
+                <span className="player-hp-label">{player.hp} / {playerMaxHp} HP</span>
+            </div>
 
-            <PlayerStats
-                level={player.level}
-                hp={player.hp}
-                experience={player.experience}
-                fillPercent={levelFillPercent}
-                className={isPlayerHit ? "is-hit" : undefined}
-            />
             {isGameOver ? (
                 <div className="game-over-overlay" role="dialog" aria-modal="true" aria-labelledby="game-over-title">
                     <div className="game-over-modal">

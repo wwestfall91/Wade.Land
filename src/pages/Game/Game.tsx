@@ -247,7 +247,7 @@ function Game() {
 
         const choices = getRandomUniqueElements(baseElements, 3);
         setStarterChoices(choices);
-        setSelectedStarter(choices[0] ?? null);
+        setSelectedStarter(null);
     }, [baseElements, playerProgress.elements.length, starterChoices.length]);
 
     useEffect(() => {
