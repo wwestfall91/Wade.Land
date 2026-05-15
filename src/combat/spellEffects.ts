@@ -21,6 +21,11 @@ export type ActiveSoakStatus = {
     stacks: number;
 };
 
+export type ActiveFreezeStatus = {
+    kind: "freeze";
+    stacks: number;
+};
+
 const EFFECT_COLUMN_CANDIDATES = (index: number, suffix: string) => [
     `Effect ${index} ${suffix}`,
     `Effect${index} ${suffix}`,

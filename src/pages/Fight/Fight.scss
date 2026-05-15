@@ -4,7 +4,7 @@
     display: flex;
     position: relative;
     flex-direction: column;
-    gap:3.5rem;
+    gap:2rem;
     width: 100vw;
     height:100vh;
     justify-content: center;
@@ -68,13 +68,10 @@
             min-width: 14rem;
             min-height: 1.7rem;
             overflow: hidden;
-            border: 2px solid #e6ebff;
+            border: 2px solid #ffe6e6;
             border-radius: 4px;
-            background: linear-gradient(180deg, #3144cd 0%, #182884 100%);
-            box-shadow:
-                inset 0 0 0 1px #6f82ff,
-                inset 0 0 0 2px #0d1453,
-                0 6px 0 rgba(0, 0, 0, 0.32);
+            background: linear-gradient(180deg, #0a0a0a 0%, #383838 100%);
+
         }
 
         .enemy-hp-fill {
@@ -82,7 +79,7 @@
             left: 0;
             top: 0;
             bottom: 0;
-            background: linear-gradient(90deg, #ff9478 0%, #f4624f 50%, #db3e33 100%);
+            background: linear-gradient(90deg, #ff9478 0%, #f4624f 50%, #db3e33c0 100%);
             transition: width 220ms ease;
             z-index: 0;
         }
@@ -114,6 +111,14 @@
                 inset 0 0 0 2px #0f175a,
                 0 7px 0 rgba(0, 0, 0, 0.3);
             overflow: visible;
+
+            .enemy-sprite-hitbox {
+                display: flex;
+                width: 100%;
+                height: 100%;
+                align-items: center;
+                justify-content: center;
+            }
 
             img {
                 width: 100%;
@@ -160,15 +165,8 @@
                 z-index: 1000;
             }
 
-            &:hover .enemy-meta-tooltip {
+            .enemy-sprite-hitbox:hover ~ .enemy-meta-tooltip {
                 opacity: 1;
-            }
-
-            .enemy-burn-indicator:hover ~ .enemy-meta-tooltip,
-            .enemy-soak-indicator:hover ~ .enemy-meta-tooltip,
-            .enemy-freeze-indicator:hover ~ .enemy-meta-tooltip {
-                cursor:default;
-                opacity: 0;
             }
 
             .enemy-damage-popup {
@@ -190,6 +188,57 @@
                 text-shadow: 0 1px 1px rgba(0, 0, 0, 0.55);
                 pointer-events: none;
                 animation: enemyDamageFloat 460ms ease-out forwards;
+            }
+
+            .enemy-attack-marker {
+                position: absolute;
+                top: 80%;
+                right: -15%;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                width: 1.75rem;
+                height: 2rem;
+                padding: 0.14rem 0.34rem;
+                border-radius: 20px;
+                border: 2px solid #ffe7ad;
+                background: linear-gradient(180deg, #ff1c1c 0%, #5a0000 100%);
+                color: #fff7c2;
+                font-size: 1.25rem;
+                font-weight: 800;
+                letter-spacing: 0.02em;
+                text-transform: uppercase;
+                box-shadow:
+                    inset 0 0 0 1px rgba(255, 233, 180, 0.34),
+                    0 4px 10px rgba(0, 0, 0, 0.28);
+                cursor: default;
+                z-index: 6;
+
+                &.is-hidden {
+                    opacity: 0;
+                    pointer-events: none;
+                }
+
+                &.is-readying {
+                    animation: enemyAttackReadying 520ms cubic-bezier(0.22, 1.4, 0.36, 1) forwards;
+                }
+            }
+
+            .enemy-attack-damage{
+                display: flex;
+                position: absolute;
+                justify-content: center;
+                align-items: center;
+                width: 1.5rem;
+                height: 1.25rem;
+                border: 2px solid white;
+                margin-top: -32px;
+                margin-right:-40px;
+                font-size: 14px;
+                font-weight: bold;
+                background: linear-gradient(180deg, #ff1c1c 0%, #5a0000 100%);
+                padding: .1rem;
+                border-radius: 100px;
             }
 
             .enemy-steam-pop {
@@ -785,10 +834,107 @@
     }
 
     .player-hp-wrap {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.45rem;
+    }
+
+    .player-hp-row {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .player-status-strip {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .player-status-badge {
         position: relative;
         display: inline-flex;
         align-items: center;
-        justify-content: center;
+        gap: 0.18rem;
+        min-width: 1.85rem;
+        min-height: 1.85rem;
+
+        &.is-hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        padding: 0.14rem 0.28rem;
+        border-radius: 4px;
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        font-size: 0.72rem;
+        font-weight: 800;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        font-variant-numeric: tabular-nums;
+        color: #fff;
+        box-shadow: 0 5px 12px rgba(13, 58, 51, 0.22);
+
+        .player-status-icon {
+            font-size: 0.85rem;
+            line-height: 1;
+        }
+
+        .player-status-count {
+            min-width: 1.05rem;
+            text-align: center;
+        }
+
+        .player-status-tooltip {
+            position: absolute;
+            left: 50%;
+            bottom: calc(100% + 0.38rem);
+            transform: translateX(-50%) scale(1.48);
+            transform-origin: bottom center;
+            display: flex;
+            flex-direction: column;
+            gap: 0.1rem;
+            min-width: 10rem;
+            padding: 0.26rem 0.46rem;
+            border-radius: 0.44rem;
+            border: 1px solid rgba(255, 255, 255, 0.24);
+            background: rgba(12, 12, 12, 0.94);
+            font-size: 0.68rem;
+            font-weight: 700;
+            white-space: nowrap;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 130ms ease, transform 130ms ease;
+            z-index: 12;
+
+            > span + span {
+                margin-top: 0.1rem;
+                padding-top: 0.1rem;
+                border-top: 1px solid rgba(255, 255, 255, 0.18);
+            }
+        }
+
+        &:hover .player-status-tooltip {
+            opacity: 1;
+            transform: translateX(-50%) scale(1.48);
+        }
+    }
+
+    .player-status-badge--burn {
+        border-color: #ffdc8e;
+        background: linear-gradient(180deg, #5c3b12 0%, #301f07 100%);
+    }
+
+    .player-status-badge--soak {
+        border-color: #9ccdf5;
+        background: linear-gradient(180deg, #1e4f79 0%, #123250 100%);
+    }
+
+    .player-status-badge--freeze {
+        border-color: #b3e8ff;
+        background: linear-gradient(180deg, #25526a 0%, #173445 100%);
     }
 
     .player-hp-bar {
@@ -801,11 +947,7 @@
         overflow: hidden;
         border: 2px solid #e7ecff;
         border-radius: 4px;
-        background: linear-gradient(180deg, #3144c9 0%, #17277f 100%);
-        box-shadow:
-            inset 0 0 0 1px #7f91ff,
-            inset 0 0 0 2px #0d1552,
-            0 6px 0 rgba(0, 0, 0, 0.34);
+        background: linear-gradient(180deg, #0a0a0a 0%, #383838 100%);
 
         &.has-shield {
             box-shadow: 0 0 0.62rem rgba(103, 218, 196, 0.38);
@@ -842,11 +984,11 @@
         z-index: 0;
 
         &.player-hp-fill--health {
-            background: linear-gradient(90deg, #59db79 0%, #45b95f 100%);
+            background: linear-gradient(90deg, #59db79 0%, #45b95eb6 100%);
         }
 
         &.player-hp-fill--shield {
-            background: linear-gradient(90deg, #9be6dc 0%, #67cbc0 100%);
+            background: linear-gradient(90deg, #9be6dc 0%, #67cbbfb7 100%);
         }
     }
 
@@ -869,10 +1011,7 @@
     }
 
     .player-shield-badge {
-        position: absolute;
-        left: -1.2rem;
-        top: 50%;
-        transform: translate(-100%, -50%);
+        flex-shrink: 0;
         min-width: 1.85rem;
         height: 1.85rem;
         display: inline-flex;
@@ -1159,6 +1298,27 @@
     100% {
         opacity: 0;
         transform: translateY(-18px) scale(1.18);
+    }
+}
+
+@keyframes enemyAttackReadying {
+    0% {
+        transform: translate(-5rem, -3.7rem) scale(0);
+        opacity: 0;
+    }
+
+    30% {
+        opacity: 1;
+    }
+
+    80% {
+        transform: translate(0.18rem, -0.22rem) scale(1.14);
+        opacity: 1;
+    }
+
+    100% {
+        transform: translate(0, 0) scale(1);
+        opacity: 1;
     }
 }
 

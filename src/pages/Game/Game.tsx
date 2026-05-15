@@ -67,14 +67,18 @@ type EnemyRow = {
     name?: string;
     HP?: number | string;
     hp?: number | string;
-    Power?: number | string;
-    power?: number | string;
     Experience?: number | string;
     experience?: number | string;
     Description?: string;
     description?: string;
     Sprite?: string;
     sprite?: string;
+    Element1?: string;
+    Element2?: string;
+    Element3?: string;
+    element1?: string;
+    element2?: string;
+    element3?: string;
     Weak1?: string;
     Weak2?: string;
     ["Weak 1"]?: string;
@@ -84,11 +88,11 @@ type EnemyRow = {
 type Enemy = {
     name: string;
     hp: number;
-    power: number;
     experience: number;
     description: string;
     sprite: string;
     weaknesses: string[];
+    elements: RewardElement[];
 };
 
 type PreviewCombination = {
@@ -107,6 +111,7 @@ const SPREAD_Y = 150;
 const DRAG_TUTORIAL_SEEN_KEY = "game.dragTutorialSeen";
 
 const normalizeType = (value?: string): string => value?.trim().toLowerCase() ?? "";
+const normalizeElementName = (value?: string): string => value?.trim().toLowerCase() ?? "";
 
 const getRandomUniqueElements = (elements: RewardElement[], count: number): RewardElement[] => {
     const shuffled = [...elements].sort(() => Math.random() - 0.5);
@@ -153,6 +158,7 @@ function Game() {
     const previewPositionRef = useRef<Position | null>(null);
     const previewPointerClientRef = useRef<Position>({ x: 0, y: 0 });
     const nextId = useRef(1);
+    const elementCatalogRef = useRef<Map<string, RewardElement>>(new Map());
 
     const getSpawnPosition = (index: number): Position => {
         const containerRect = gameRef.current?.getBoundingClientRect();
@@ -176,7 +182,9 @@ function Game() {
     };
 
     useEffect(() => {
-        const loadRecipesAndEnemies = (buffer: ArrayBuffer) => {
+        let isCancelled = false;
+
+        const loadElements = (buffer: ArrayBuffer) => {
             const wb = XLSX.read(buffer, { type: "array" });
             const ws = wb.Sheets[wb.SheetNames[0]];
             const rows = XLSX.utils.sheet_to_json<ElementRow>(ws);
@@ -215,6 +223,17 @@ function Game() {
             const baseElementRows = parsedRows.filter(
                 (row) => row.element1.length === 0 && row.element2.length === 0,
             );
+            elementCatalogRef.current = new Map(
+                parsedRows.map((row) => [normalizeElementName(row.name), {
+                    letter: row.name,
+                    damage: row.damage,
+                    level: row.level,
+                    description: row.description,
+                    type1: row.type1,
+                    type2: row.type2,
+                    effects: row.effects,
+                } satisfies RewardElement]),
+            );
             setBaseElements(
                 baseElementRows.map((row) => ({
                     letter: row.name,
@@ -228,32 +247,48 @@ function Game() {
             );
         };
 
-        fetch("/elements.xlsx")
-            .then((res) => res.arrayBuffer())
-            .then(loadRecipesAndEnemies);
+        const loadGameData = async () => {
+            const elementsBuffer = await fetch("/elements.xlsx").then((res) => res.arrayBuffer());
+            if (isCancelled) {
+                return;
+            }
 
-        fetch("/enemies.xlsx")
-            .then((res) => res.arrayBuffer())
-            .then((buffer) => {
-                const wb = XLSX.read(buffer, { type: "array" });
-                const ws = wb.Sheets[wb.SheetNames[0]];
-                const rows = XLSX.utils.sheet_to_json<EnemyRow>(ws);
-                const parsed: Enemy[] = rows
-                    .map((row) => ({
-                        name: ((row.Name ?? row.name ?? "") as string).trim(),
-                        hp: Number(row.HP ?? row.hp ?? 0) || 0,
-                        power: Number(row.Power ?? row.power ?? 0) || 0,
-                        experience: Number(row.Experience ?? row.experience ?? 0) || 0,
-                        description: ((row.Description ?? row.description ?? "") as string).trim(),
-                        sprite: ((row.Sprite ?? row.sprite ?? "") as string).trim(),
-                        weaknesses: [row.Weak1, row["Weak 1"], row.Weak2, row["Weak 2"]]
-                            .flatMap((value) => String(value ?? "").split(/[;,/]/g))
-                            .map((value) => normalizeType(value))
-                            .filter(Boolean),
-                    }))
-                    .filter((e) => e.name.length > 0);
-                setEnemies(parsed);
-            });
+            loadElements(elementsBuffer);
+
+            const enemiesBuffer = await fetch("/enemies.xlsx").then((res) => res.arrayBuffer());
+            if (isCancelled) {
+                return;
+            }
+
+            const wb = XLSX.read(enemiesBuffer, { type: "array" });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json<EnemyRow>(ws);
+            const parsed: Enemy[] = rows
+                .map((row) => ({
+                    name: ((row.Name ?? row.name ?? "") as string).trim(),
+                    hp: Number(row.HP ?? row.hp ?? 0) || 0,
+                    experience: Number(row.Experience ?? row.experience ?? 0) || 0,
+                    description: ((row.Description ?? row.description ?? "") as string).trim(),
+                    sprite: ((row.Sprite ?? row.sprite ?? "") as string).trim(),
+                    weaknesses: [row.Weak1, row["Weak 1"], row.Weak2, row["Weak 2"]]
+                        .flatMap((value) => String(value ?? "").split(/[;,/]/g))
+                        .map((value) => normalizeType(value))
+                        .filter(Boolean),
+                    elements: [row.Element1 ?? row.element1, row.Element2 ?? row.element2, row.Element3 ?? row.element3]
+                        .map((value) => String(value ?? "").trim())
+                        .filter((value) => value.length > 0)
+                        .map((value) => elementCatalogRef.current.get(normalizeElementName(value)))
+                        .filter((value): value is RewardElement => Boolean(value)),
+                }))
+                .filter((e) => e.name.length > 0);
+            setEnemies(parsed);
+        };
+
+        void loadGameData();
+
+        return () => {
+            isCancelled = true;
+        };
 
     }, []);
 

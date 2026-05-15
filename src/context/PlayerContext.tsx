@@ -52,9 +52,9 @@ export type SelectedEnemy = {
     hp: number;
     experience: number;
     description: string;
-    power: number;
     sprite: string;
     weaknesses: string[];
+    elements: RewardElement[];
 };
 
 type PlayerContextValue = {

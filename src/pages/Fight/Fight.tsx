@@ -5,10 +5,11 @@ import {
     getPerHitSpellEffects,
     getSpellHitCount,
     type ActiveBurnStatus,
+    type ActiveFreezeStatus,
     type ActiveSoakStatus,
     type SpellEffectConfig,
 } from "../../combat/spellEffects";
-import { getEffectChipClass, getEffectSummaryLines } from "../../combat/effectSummary";
+import { getEffectChipClass, getEffectSummaryLines, getEffectSummaryLinesForTarget } from "../../combat/effectSummary";
 import EnemyInfoSprite from "../../components/EnemyInfoSprite";
 import { usePlayer, type RewardElement } from "../../context/PlayerContext";
 import RewardModal from "./RewardModal";
@@ -18,11 +19,6 @@ type EnemyDamagePopup = {
     id: number;
     text: string;
     color: string;
-};
-
-type ActiveFreezeStatus = {
-    kind: "freeze";
-    stacks: number;
 };
 
 type EventLogEntry = {
@@ -66,10 +62,10 @@ const SPELL_TYPE_COLORS: Record<string, SpellColor> = {
 type FightEnemy = {
     name: string;
     hp: number;
-    power: number;
     experience: number;
     weaknesses?: string[];
     sprite?: string;
+    elements: RewardElement[];
 };
 
 type FightLocationState = {
@@ -92,6 +88,7 @@ function Fight() {
     const { player, levels, addExperience, addElement, applyEnemyAttack, healPlayer, resetGame } = usePlayer();
     const [flashingSlotId, setFlashingSlotId] = useState<number | null>(null);
     const [hoveredSpellId, setHoveredSpellId] = useState<number | null>(null);
+    const [hoveredEnemyAttack, setHoveredEnemyAttack] = useState(false);
     const [usedSpellIds, setUsedSpellIds] = useState<number[]>([]);
     const [eventLogEntries, setEventLogEntries] = useState<EventLogEntry[]>([]);
     const [isGameOver, setIsGameOver] = useState(false);
@@ -106,8 +103,14 @@ function Fight() {
     const [enemyBurnStatus, setEnemyBurnStatus] = useState<ActiveBurnStatus | null>(null);
     const [enemySoakStatus, setEnemySoakStatus] = useState<ActiveSoakStatus | null>(null);
     const [enemyFreezeStatus, setEnemyFreezeStatus] = useState<ActiveFreezeStatus | null>(null);
+    const [playerBurnStatus, setPlayerBurnStatus] = useState<ActiveBurnStatus | null>(null);
+    const [playerSoakStatus, setPlayerSoakStatus] = useState<ActiveSoakStatus | null>(null);
+    const [playerFreezeStatus, setPlayerFreezeStatus] = useState<ActiveFreezeStatus | null>(null);
     const [playerShield, setPlayerShield] = useState(0);
+    const [enemyShield, setEnemyShield] = useState(0);
     const [isResolvingTurn, setIsResolvingTurn] = useState(false);
+    const [queuedEnemyAttack, setQueuedEnemyAttack] = useState<RewardElement | null>(null);
+    const [isReadyingNextAttack, setIsReadyingNextAttack] = useState(false);
     const [isEnemySpriteFlashing, setIsEnemySpriteFlashing] = useState(false);
     const [isEnemySteamVisible, setIsEnemySteamVisible] = useState(false);
     const [enemySpriteFlashColor, setEnemySpriteFlashColor] = useState("rgba(255, 255, 255, 0.6)");
@@ -122,6 +125,7 @@ function Fight() {
     const eventLogIdRef = useRef(1);
     const eventLogContainerRef = useRef<HTMLDivElement | null>(null);
     const spellSlotRefs = useRef<Record<number, HTMLButtonElement | null>>({});
+    const enemyAttackMarkerRef = useRef<HTMLSpanElement | null>(null);
     const healFlashTimeoutRef = useRef<number | null>(null);
     const shieldFlashTimeoutRef = useRef<number | null>(null);
     const playerHitTimeoutRef = useRef<number | null>(null);
@@ -131,7 +135,7 @@ function Fight() {
 
     const enemy = useMemo(() => {
         const state = location.state as FightLocationState | null;
-        return state?.enemy ?? { name: "Unknown", hp: 0, power: 0, experience: 0 };
+        return state?.enemy ?? { name: "Unknown", hp: 0, experience: 0, weaknesses: [], sprite: "", elements: [] };
     }, [location.state]);
 
     const elementPool = useMemo(() => {
@@ -151,6 +155,7 @@ function Fight() {
     const playerHealthFillPercent = Math.max(0, playerTotalFillPercent - playerShieldTailFillPercent);
 
     const normalizeType = (value?: string) => value?.trim().toLowerCase() ?? "";
+    const pickEnemyAttack = () => enemy.elements[Math.floor(Math.random() * enemy.elements.length)] ?? null;
 
     const getSpellSlotStyle = (type1?: string, type2?: string) => {
         const normalized = [type1, type2].map(normalizeType).filter(Boolean);
@@ -373,44 +378,303 @@ function Fight() {
         setIsGameOver(true);
     }, [enemyHealth, levels.length, player.hp]);
 
+    useEffect(() => {
+        if (enemy.elements.length === 0) {
+            setQueuedEnemyAttack(null);
+            setHoveredEnemyAttack(false);
+            return;
+        }
+
+        setQueuedEnemyAttack(enemy.elements[Math.floor(Math.random() * enemy.elements.length)] ?? null);
+        setHoveredEnemyAttack(false);
+        // Re-seed intent whenever a new enemy enters the fight.
+    }, [enemy.elements, enemy.name]);
+
     const triggerEnemyAttack = async () => {
         if (enemyHealth <= 0 || isGameOver) {
             return;
         }
 
-        let nextEnemyHealth = enemyHealth;
+        const attack = queuedEnemyAttack ?? pickEnemyAttack();
+        setHoveredEnemyAttack(false);
+        if (!attack) {
+            setQueuedEnemyAttack(null);
+            return;
+        }
 
-        if (enemyBurnStatus) {
-            const burnDamage = Math.max(0, enemyBurnStatus.stacks * BURN_DAMAGE_PER_STACK);
+        pushEventLog(`Enemy prepares ${attack.letter}`, "enemy", { isDetail: true });
+        await wait(260);
+
+        let simulatedPlayerHp = player.hp;
+        let currentPlayerShield = playerShield;
+        let currentPlayerBurn = playerBurnStatus;
+        let currentPlayerSoak = playerSoakStatus;
+        let currentPlayerFreeze = playerFreezeStatus;
+
+        if (currentPlayerBurn) {
+            const burnDamage = Math.max(0, currentPlayerBurn.stacks * BURN_DAMAGE_PER_STACK);
             if (burnDamage > 0) {
-                nextEnemyHealth = Math.max(0, nextEnemyHealth - burnDamage);
-                setEnemyHealth(nextEnemyHealth);
-                triggerEnemyHitFeedback(burnDamage, "#ff9b57");
-                pushEventLog(`Burn deals ${burnDamage} damage (${enemyBurnStatus.stacks} stack)`, "status");
+                simulatedPlayerHp = Math.max(0, simulatedPlayerHp - burnDamage);
+                applyEnemyAttack(burnDamage);
+                pushEventLog(`Burn deals ${burnDamage} damage (${currentPlayerBurn.stacks} stack${currentPlayerBurn.stacks === 1 ? "" : "s"})`, "status");
                 await wait(EFFECT_STEP_DELAY_MS);
             }
 
-            const nextDuration = enemyBurnStatus.remainingTurns - 1;
-            setEnemyBurnStatus(nextDuration > 0
-                ? { ...enemyBurnStatus, remainingTurns: nextDuration }
-                : null);
+            const nextDuration = currentPlayerBurn.remainingTurns - 1;
+            currentPlayerBurn = nextDuration > 0
+                ? { ...currentPlayerBurn, remainingTurns: nextDuration }
+                : null;
+            setPlayerBurnStatus(currentPlayerBurn);
 
-            if (nextEnemyHealth <= 0) {
+            if (simulatedPlayerHp <= 0) {
+                setQueuedEnemyAttack(null);
                 return;
             }
         }
 
-        const absorbedDamage = Math.min(playerShield, enemy.power);
-        const remainingDamage = Math.max(0, enemy.power - absorbedDamage);
+        const attackTypes = [attack.type1, attack.type2].map(normalizeType).filter(Boolean);
+        const isWaterAttack = attackTypes.includes("water");
+        const isLightningAttack = attackTypes.includes("lightning");
+        const isFireAttack = attackTypes.includes("fire");
+        const isIceAttack = attackTypes.includes("ice");
+        const hitCount = getSpellHitCount(attack.effects);
+        const perHitEffects = getPerHitSpellEffects(attack.effects);
+        const attackDamageBreakdown: number[] = [];
+        let totalDamageTaken = 0;
+        let totalPlayerBurnApplied = 0;
+        let playerBurnDuration = 0;
+        let totalPlayerShieldGranted = 0;
+        let totalPlayerSoakApplied = 0;
+        let playerSoakWasConsumed = false;
+        let playerSoakWasFrozen = false;
+        let playerFreezeWasConsumed = false;
+        let convertedPlayerFreezeStacks = 0;
+        let currentPlayerSoakStacks = currentPlayerSoak?.stacks ?? 0;
+        let currentPlayerFreezeStacks = currentPlayerFreeze?.stacks ?? 0;
+        let totalEnemyHealing = 0;
 
-        if (absorbedDamage > 0) {
-            setPlayerShield((previous) => Math.max(0, previous - absorbedDamage));
-            pushEventLog(`Shield blocks ${absorbedDamage}`, "player");
+        for (let hitIndex = 0; hitIndex < hitCount; hitIndex += 1) {
+            if (simulatedPlayerHp <= 0) {
+                break;
+            }
+
+            const soakBonus = isLightningAttack ? currentPlayerSoakStacks * SOAK_LIGHTNING_BONUS_PER_STACK : 0;
+            const soakPenalty = isFireAttack ? currentPlayerSoakStacks * SOAK_FIRE_PENALTY_PER_STACK : 0;
+            const freezeBonus = isFireAttack ? currentPlayerFreezeStacks * FREEZE_FIRE_BONUS_PER_STACK : 0;
+            const baseHitDamage = Math.max(0, attack.damage + soakBonus - soakPenalty + freezeBonus);
+            const absorbedDamage = Math.min(currentPlayerShield, baseHitDamage);
+            const remainingDamage = Math.max(0, baseHitDamage - absorbedDamage);
+
+            if (absorbedDamage > 0) {
+                currentPlayerShield = Math.max(0, currentPlayerShield - absorbedDamage);
+                setPlayerShield(currentPlayerShield);
+                pushEventLog(`Shield blocks ${absorbedDamage}`, "player");
+                await wait(EFFECT_STEP_DELAY_MS);
+            }
+
+            attackDamageBreakdown.push(remainingDamage);
+            totalDamageTaken += remainingDamage;
+            simulatedPlayerHp = Math.max(0, simulatedPlayerHp - remainingDamage);
+            applyEnemyAttack(remainingDamage);
+
+            if (isWaterAttack && currentPlayerBurn) {
+                currentPlayerBurn = null;
+                setPlayerBurnStatus(null);
+                triggerEnemySteamEffect();
+                pushEventLog("Water extinguishes burn", "status");
+                await wait(EFFECT_STEP_DELAY_MS);
+            }
+
+            if (isIceAttack && !playerSoakWasFrozen && currentPlayerSoakStacks > 0) {
+                convertedPlayerFreezeStacks = currentPlayerSoakStacks;
+                playerSoakWasFrozen = true;
+                currentPlayerSoakStacks = 0;
+                await wait(EFFECT_STEP_DELAY_MS);
+            } else if ((isFireAttack || isLightningAttack) && !playerSoakWasConsumed && currentPlayerSoakStacks > 0) {
+                playerSoakWasConsumed = true;
+                currentPlayerSoakStacks = 0;
+                await wait(EFFECT_STEP_DELAY_MS);
+            }
+
+            if (isFireAttack && !playerFreezeWasConsumed && currentPlayerFreezeStacks > 0) {
+                playerFreezeWasConsumed = true;
+                currentPlayerFreezeStacks = 0;
+                await wait(EFFECT_STEP_DELAY_MS);
+            }
+
+            await wait(HIT_STEP_DELAY_MS);
+
+            perHitEffects.forEach((effect) => {
+                switch (effect.kind) {
+                    case "heal": {
+                        const amount = Math.max(0, effect.amount ?? 0);
+                        if (amount > 0 && effect.target === "enemy") {
+                            totalPlayerBurnApplied += 0;
+                            // Enemy-target heal is applied after the loop as player healing.
+                        }
+                        break;
+                    }
+                    case "burn": {
+                        if (effect.target !== "enemy") {
+                            return;
+                        }
+
+                        const amount = Math.max(0, effect.amount ?? 0);
+                        const duration = Math.max(1, effect.duration ?? 1);
+                        totalPlayerBurnApplied += amount;
+                        playerBurnDuration = Math.max(playerBurnDuration, duration);
+                        break;
+                    }
+                    case "shield": {
+                        if (effect.target !== "enemy") {
+                            return;
+                        }
+
+                        const amount = Math.max(0, effect.amount ?? 0);
+                        totalPlayerShieldGranted += amount;
+                        break;
+                    }
+                    case "lifesteal": {
+                        if (effect.target !== "self") {
+                            return;
+                        }
+
+                        const amount = Math.max(0, effect.amount ?? 0);
+                        const multiplier = amount > 1 ? amount / 100 : amount;
+                        const healing = Math.max(0, Math.round(remainingDamage * multiplier));
+                        if (healing > 0) {
+                            totalEnemyHealing += healing;
+                        }
+                        break;
+                    }
+                    case "soak": {
+                        if (effect.target !== "enemy") {
+                            return;
+                        }
+
+                        totalPlayerSoakApplied += Math.max(1, effect.amount ?? 1);
+                        break;
+                    }
+                    default:
+                        break;
+                }
+            });
+
+            if (simulatedPlayerHp <= 0) {
+                break;
+            }
+        }
+
+        if (playerSoakWasFrozen) {
+            setPlayerSoakStatus(null);
+            setPlayerFreezeStatus((previous) => {
+                if (!previous) {
+                    return { kind: "freeze", stacks: convertedPlayerFreezeStacks };
+                }
+
+                return {
+                    kind: "freeze",
+                    stacks: previous.stacks + convertedPlayerFreezeStacks,
+                };
+            });
+            await wait(EFFECT_STEP_DELAY_MS);
+        } else if (playerSoakWasConsumed) {
+            setPlayerSoakStatus(null);
             await wait(EFFECT_STEP_DELAY_MS);
         }
 
-        applyEnemyAttack(remainingDamage);
-        pushEventLog(`Enemy attacks for ${remainingDamage} damage`, "enemy");
+        if (playerFreezeWasConsumed) {
+            setPlayerFreezeStatus(null);
+            await wait(EFFECT_STEP_DELAY_MS);
+        }
+
+        if (totalPlayerBurnApplied > 0 && simulatedPlayerHp > 0) {
+            setPlayerBurnStatus((previous) => {
+                if (!previous) {
+                    return {
+                        kind: "burn",
+                        stacks: totalPlayerBurnApplied,
+                        remainingTurns: playerBurnDuration,
+                    };
+                }
+
+                return {
+                    kind: "burn",
+                    stacks: previous.stacks + totalPlayerBurnApplied,
+                    remainingTurns: Math.max(previous.remainingTurns, playerBurnDuration),
+                };
+            });
+            await wait(EFFECT_STEP_DELAY_MS);
+        }
+
+        if (totalPlayerSoakApplied > 0 && simulatedPlayerHp > 0) {
+            setPlayerSoakStatus((previous) => {
+                if (!previous) {
+                    return {
+                        kind: "soak",
+                        stacks: totalPlayerSoakApplied,
+                    };
+                }
+
+                return {
+                    kind: "soak",
+                    stacks: previous.stacks + totalPlayerSoakApplied,
+                };
+            });
+            await wait(EFFECT_STEP_DELAY_MS);
+        }
+
+        if (totalPlayerShieldGranted > 0) {
+            setPlayerShield((previous) => previous + totalPlayerShieldGranted);
+            await wait(EFFECT_STEP_DELAY_MS);
+        }
+
+        if (totalEnemyHealing > 0) {
+            // Enemy self-heal is intentionally kept simple here; it is enough to make healing spells matter.
+            // eslint-disable-next-line react-hooks/exhaustive-deps
+            setEnemyHealth((previous) => Math.min(enemyMaxHp, previous + totalEnemyHealing));
+            await wait(EFFECT_STEP_DELAY_MS);
+        }
+
+        const detailLines: string[] = [];
+        if (hitCount > 1) {
+            detailLines.push(`Hits ${hitCount}x | ${attackDamageBreakdown.join(" + ")}`);
+        }
+        if (totalPlayerBurnApplied > 0) {
+            detailLines.push(`Burn +${totalPlayerBurnApplied}`);
+        }
+        if (totalPlayerShieldGranted > 0) {
+            detailLines.push(`Shield +${totalPlayerShieldGranted}`);
+        }
+        if (totalPlayerSoakApplied > 0) {
+            detailLines.push(`Soak +${totalPlayerSoakApplied}`);
+        }
+        if (playerSoakWasConsumed) {
+            detailLines.push("Soak consumed");
+        }
+        if (playerSoakWasFrozen) {
+            detailLines.push(`Freeze +${convertedPlayerFreezeStacks}`);
+        }
+        if (playerFreezeWasConsumed) {
+            detailLines.push("Freeze consumed");
+        }
+
+        if (detailLines.length > 0) {
+            detailLines.forEach((message) => {
+                pushEventLog(message, "status", { isDetail: true });
+            });
+        }
+
+        if (simulatedPlayerHp <= 0) {
+            setQueuedEnemyAttack(null);
+            return;
+        }
+
+        const strikeMsg = totalDamageTaken > 0
+            ? `${attack.letter} strikes the player for ${totalDamageTaken} damage`
+            : `${attack.letter} strikes the player (absorbed)`;
+        pushEventLog(strikeMsg, "enemy");
+
         if (playerHitTimeoutRef.current !== null) {
             window.clearTimeout(playerHitTimeoutRef.current);
         }
@@ -431,6 +695,15 @@ function Fight() {
                 setIsScreenFlashing(false);
             }, 420);
         });
+
+        const nextAttack = pickEnemyAttack();
+        setQueuedEnemyAttack(nextAttack);
+        if (nextAttack) {
+            pushEventLog(`Enemy prepares ${nextAttack.letter}`, "enemy", { isDetail: true });
+            setIsReadyingNextAttack(true);
+            await wait(560);
+            setIsReadyingNextAttack(false);
+        }
     };
 
     const handleEndTurn = async () => {
@@ -781,7 +1054,24 @@ function Fight() {
                     className={`enemy-sprite-card ${isEnemySpriteFlashing ? "is-hit-flash" : ""}`}
                     style={{ ["--enemy-hit-flash" as string]: enemySpriteFlashColor }}
                 >
-                    <EnemyInfoSprite enemyName={enemy.name} spritePath={enemy.sprite ?? ""} />
+                    <span className="enemy-sprite-hitbox">
+                        <EnemyInfoSprite enemyName={enemy.name} spritePath={enemy.sprite ?? ""} />
+                    </span>
+                    <span
+                        ref={enemyAttackMarkerRef}
+                        className={`enemy-attack-marker ${queuedEnemyAttack ? "" : "is-hidden"} ${isReadyingNextAttack ? "is-readying" : ""}`}
+                        aria-label={queuedEnemyAttack ? `Enemy intends to attack with ${queuedEnemyAttack.letter}` : "Enemy attack not yet queued"}
+                        aria-hidden={!queuedEnemyAttack}
+                        onMouseEnter={() => {
+                            if (queuedEnemyAttack) {
+                                setHoveredEnemyAttack(true);
+                            }
+                        }}
+                        onMouseLeave={() => setHoveredEnemyAttack(false)}
+                    >
+                        {queuedEnemyAttack?.letter ?? "?"}
+                        <div className="enemy-attack-damage">{queuedEnemyAttack?.damage ?? "?"}</div>
+                    </span>
                     {isEnemySteamVisible ? (
                         <span className="enemy-steam-pop" aria-hidden="true">
                             <span className="steam-cloud steam-cloud-one" />
@@ -830,10 +1120,33 @@ function Fight() {
                         </span>
                     ) : null}
                     <div className="enemy-meta-tooltip" aria-hidden="true">
-                        <span>{enemy.power} POW</span>
                         <span>{enemy.experience} XP</span>
+                        <span>{enemy.elements.length} Elements</span>
                     </div>
                 </div>
+                {queuedEnemyAttack && hoveredEnemyAttack ? (
+                    <FloatingTooltip
+                        anchorElement={enemyAttackMarkerRef.current}
+                        open={hoveredEnemyAttack && Boolean(enemyAttackMarkerRef.current)}
+                        className="spell-hover-tooltip-shell enemy-attack-tooltip-shell"
+                        clampHorizontal={false}
+                    >
+                        <span className="spell-hover-tooltip-line">
+                            The enemy intends to attack with {queuedEnemyAttack.letter}.
+                        </span>
+                        <span className="spell-hover-tooltip-line">Damage: {queuedEnemyAttack.damage}</span>
+                        {getEffectSummaryLinesForTarget(queuedEnemyAttack.effects, "enemy").length > 0 ? (
+                            <>
+                                <span className="spell-hover-tooltip-line">Effects:</span>
+                                {getEffectSummaryLinesForTarget(queuedEnemyAttack.effects, "enemy").map((line) => (
+                                    <span key={line} className={`spell-hover-tooltip-line effect-chip ${getEffectChipClass(line)}`}>
+                                        {line}
+                                    </span>
+                                ))}
+                            </>
+                        ) : null}
+                    </FloatingTooltip>
+                ) : null}
             </div>
             <div className="spells">
                 {player.elements.map((spell) => (
@@ -884,14 +1197,55 @@ function Fight() {
                 </button>
             </div>
             <div className="player-hp-wrap">
-                {playerShield > 0 ? (
-                    <span className="player-shield-badge">
-                        {playerShield}
-                        <span className="player-shield-tooltip">You have {playerShield} shield</span>
+                <div className="player-status-strip" aria-label="Player status effects">
+                    <span
+                        className={`player-status-badge player-status-badge--burn ${playerBurnStatus ? "" : "is-hidden"}`}
+                        aria-label={playerBurnStatus ? `Burn ${playerBurnStatus.stacks}` : undefined}
+                        aria-hidden={!playerBurnStatus}
+                    >
+                        <span className="player-status-icon" aria-hidden="true">🔥</span>
+                        <span className="player-status-count">{playerBurnStatus?.stacks ?? ""}</span>
+                        <span className="player-status-tooltip">
+                            <span>Burn Stacks: {playerBurnStatus?.stacks ?? 0}</span>
+                            <span>Expires in: {playerBurnStatus?.remainingTurns ?? 0} turns</span>
+                            <span>Damage: {(playerBurnStatus?.stacks ?? 0) * BURN_DAMAGE_PER_STACK}</span>
+                        </span>
                     </span>
-                ) : null}
-                <div
-                    className={`player-hp-bar ${playerShield > 0 ? "has-shield" : ""} ${isPlayerHealingFlash ? "is-healing" : ""} ${isPlayerShieldFlash ? "is-shield-gain" : ""}`}
+                    <span
+                        className={`player-status-badge player-status-badge--soak ${playerSoakStatus ? "" : "is-hidden"}`}
+                        aria-label={playerSoakStatus ? `Soak ${playerSoakStatus.stacks}` : undefined}
+                        aria-hidden={!playerSoakStatus}
+                    >
+                        <span className="player-status-icon" aria-hidden="true">💧</span>
+                        <span className="player-status-count">{playerSoakStatus?.stacks ?? ""}</span>
+                        <span className="player-status-tooltip">
+                            <span>Soak Stacks: {playerSoakStatus?.stacks ?? 0}</span>
+                            <span>Lightning +{(playerSoakStatus?.stacks ?? 0) * SOAK_LIGHTNING_BONUS_PER_STACK}</span>
+                            <span>Fire -{(playerSoakStatus?.stacks ?? 0) * SOAK_FIRE_PENALTY_PER_STACK}</span>
+                        </span>
+                    </span>
+                    <span
+                        className={`player-status-badge player-status-badge--freeze ${playerFreezeStatus ? "" : "is-hidden"}`}
+                        aria-label={playerFreezeStatus ? `Freeze ${playerFreezeStatus.stacks}` : undefined}
+                        aria-hidden={!playerFreezeStatus}
+                    >
+                        <span className="player-status-icon" aria-hidden="true">❄</span>
+                        <span className="player-status-count">{playerFreezeStatus?.stacks ?? ""}</span>
+                        <span className="player-status-tooltip">
+                            <span>Freeze Stacks: {playerFreezeStatus?.stacks ?? 0}</span>
+                            <span>Fire gains +{(playerFreezeStatus?.stacks ?? 0) * FREEZE_FIRE_BONUS_PER_STACK} damage</span>
+                        </span>
+                    </span>
+                </div>
+                <div className="player-hp-row">
+                    {playerShield > 0 ? (
+                        <span className="player-shield-badge">
+                            {playerShield}
+                            <span className="player-shield-tooltip">You have {playerShield} shield</span>
+                        </span>
+                    ) : null}
+                    <div
+                        className={`player-hp-bar ${playerShield > 0 ? "has-shield" : ""} ${isPlayerHealingFlash ? "is-healing" : ""} ${isPlayerShieldFlash ? "is-shield-gain" : ""}`}
                     role="progressbar"
                     aria-valuemin={0}
                     aria-valuemax={playerMaxHp}
@@ -911,6 +1265,7 @@ function Fight() {
                     <span className={`player-hp-label ${playerShield > 0 ? "has-shield" : ""}`}>
                         {displayedPlayerHp} / {playerMaxHp} HP
                     </span>
+                    </div>
                 </div>
             </div>
 

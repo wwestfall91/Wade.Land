@@ -1,5 +1,7 @@
 import type { SpellEffectConfig } from "./spellEffects";
 
+type EffectTarget = "self" | "enemy";
+
 export const getEffectSummaryLines = (effects?: SpellEffectConfig[] | null): string[] => {
     const lines: string[] = [];
     const normalizedEffects = effects ?? [];
@@ -10,6 +12,66 @@ export const getEffectSummaryLines = (effects?: SpellEffectConfig[] | null): str
     }
 
     normalizedEffects.forEach((effect) => {
+        switch (effect.kind) {
+            case "heal": {
+                const amount = Math.max(0, effect.amount ?? 0);
+                if (amount > 0) {
+                    lines.push(`Heal: +${amount}`);
+                }
+                break;
+            }
+            case "burn": {
+                const amount = Math.max(0, effect.amount ?? 0);
+                if (amount > 0) {
+                    lines.push(`Burn: +${amount}`);
+                }
+                break;
+            }
+            case "shield": {
+                const amount = Math.max(0, effect.amount ?? 0);
+                if (amount > 0) {
+                    lines.push(`Shield: +${amount}`);
+                }
+                break;
+            }
+            case "lifesteal": {
+                const amount = Math.max(0, effect.amount ?? 0);
+                if (amount > 0) {
+                    const percent = amount > 1 ? amount : Math.round(amount * 100);
+                    lines.push(`Lifesteal: ${percent}%`);
+                }
+                break;
+            }
+            case "soak": {
+                const amount = Math.max(1, effect.amount ?? 1);
+                lines.push(`Soak: +${amount}`);
+                break;
+            }
+            default:
+                break;
+        }
+    });
+
+    return lines;
+};
+
+export const getEffectSummaryLinesForTarget = (
+    effects?: SpellEffectConfig[] | null,
+    target: EffectTarget = "enemy",
+): string[] => {
+    const lines: string[] = [];
+    const normalizedEffects = effects ?? [];
+
+    const multiHit = normalizedEffects.find((effect) => effect.kind === "multi_hit");
+    if (multiHit?.hits && multiHit.hits > 1) {
+        lines.push(`Hits: ${multiHit.hits}x`);
+    }
+
+    normalizedEffects.forEach((effect) => {
+        if (effect.kind !== "multi_hit" && effect.target !== target) {
+            return;
+        }
+
         switch (effect.kind) {
             case "heal": {
                 const amount = Math.max(0, effect.amount ?? 0);
