@@ -59,8 +59,10 @@ export type SelectedEnemy = {
 
 type PlayerContextValue = {
     player: PlayerProgress;
+    playerName: string;
     levelFillPercent: number;
     levels: LevelDefinition[];
+    setPlayerName: (name: string) => void;
     setExperience: (experience: number) => void;
     addExperience: (experience: number) => void;
     initializeElements: (elements: PlayerElement[]) => void;
@@ -78,6 +80,26 @@ const DEFAULT_PLAYER_PROGRESS: PlayerProgress = {
     hp: 0,
     experience: 0,
     elements: [],
+};
+
+const PLAYER_NAME_COOKIE = "wade_player_name";
+
+const readCookie = (cookieName: string): string => {
+    if (typeof document === "undefined") {
+        return "";
+    }
+
+    const cookie = document.cookie
+        .split(";")
+        .map((entry) => entry.trim())
+        .find((entry) => entry.startsWith(`${cookieName}=`));
+
+    if (!cookie) {
+        return "";
+    }
+
+    const rawValue = cookie.slice(cookieName.length + 1);
+    return decodeURIComponent(rawValue);
 };
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
@@ -157,6 +179,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
     const [levels, setLevels] = useState<LevelDefinition[]>([]);
     const [elements, setElements] = useState<PlayerElement[]>([]);
     const [currentHp, setCurrentHp] = useState<number | null>(null);
+    const [playerName, setPlayerNameState] = useState(() => readCookie(PLAYER_NAME_COOKIE));
     const [selectedEnemy, setSelectedEnemy] = useState<SelectedEnemy | null>(null);
     const previousLevelRef = useRef<number | null>(null);
 
@@ -201,6 +224,22 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
 
     const addExperience = useCallback((amount: number) => {
         setExperience((previous) => previous + amount);
+    }, []);
+
+    const setPlayerName = useCallback((name: string) => {
+        const trimmedName = name.trim().slice(0, 28);
+        setPlayerNameState(trimmedName);
+
+        if (typeof document === "undefined") {
+            return;
+        }
+
+        if (trimmedName.length === 0) {
+            document.cookie = `${PLAYER_NAME_COOKIE}=; path=/; max-age=0`;
+            return;
+        }
+
+        document.cookie = `${PLAYER_NAME_COOKIE}=${encodeURIComponent(trimmedName)}; path=/; max-age=31536000; SameSite=Lax`;
     }, []);
 
     const initializeElements = useCallback((nextElements: PlayerElement[]) => {
@@ -251,8 +290,10 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
     const contextValue = useMemo(
         () => ({
             player,
+            playerName,
             levelFillPercent,
             levels,
+            setPlayerName,
             setExperience,
             addExperience,
             initializeElements,
@@ -271,11 +312,13 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             initializeElements,
             levelFillPercent,
             levels,
+            playerName,
             player,
             healPlayer,
             resetGame,
             addElement,
             selectedEnemy,
+            setPlayerName,
         ],
     );
 

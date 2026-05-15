@@ -1,0 +1,365 @@
+RPG BALANCING WRITEUP
+
+Project goal
+- Build a starting balance model for the current turn-based RPG that is easy to tune in Excel.
+- Keep the game readable, winnable, and iterative rather than trying to solve balance perfectly up front.
+- Use numbers to establish a baseline, then tune by playtest and observation.
+
+Core balancing principles
+1. Every choice should be meaningful.
+- If one element is always better, the rest become dead content.
+- The goal is not perfect equality. The goal is multiple viable options with situational strengths.
+
+2. Use a power curve, not flat stats.
+- Early game should teach the system.
+- Mid game should expand options.
+- Late game should increase numbers more slowly or in a controlled curve so the game does not explode.
+
+3. Balance the encounter, not just the individual element.
+- Elements matter in combinations.
+- Status effects, multi-hit, and elemental counters change actual combat value.
+- A spell with lower raw damage can still be stronger if it creates better status pressure or better synergy.
+
+4. Tune around target turns-to-kill and turns-to-die.
+- This is the most useful starting point for an RPG.
+- If you can estimate how many turns the player should take to win and how many turns the player should survive, the rest of the numbers become much easier to place.
+
+5. Favor simple, visible systems first.
+- Players should be able to understand why they won or lost.
+- Hidden complexity makes tuning harder and makes the game harder to read.
+
+Recommended target bands
+- Normal enemy: player should usually win in about 3 to 5 player turns.
+- Elite enemy: about 5 to 7 player turns.
+- Boss enemy: about 8 to 12 player turns.
+- Player should survive about 3 to 5 enemy turns in a normal fight.
+- If a fight is intended to feel dangerous, reduce that to 2 to 4 turns, but keep the result readable.
+
+A practical balancing model
+
+Step 1: Convert everything to a score.
+Use one common score for each element and enemy so you can compare them in the sheet.
+
+Suggested element score components:
+- Raw damage value
+- Multi-hit value
+- Status value
+- Flexibility value
+- Weakness/counter value
+
+Example element score:
+ElementScore = Damage + MultiHitBonus + StatusBonus + FlexibilityBonus
+
+Suggested base weights:
+- Damage = 1 point per damage
+- Multi-hit bonus = 15% to 25% of base damage per extra hit, depending on how often the element can be answered by counters
+- Burn = (stacks * damage_per_tick * expected_turns_alive) * 0.8
+- Soak = (expected_bonus_damage_from_later_hits) * 0.8
+- Freeze = (fire_bonus_expected_value) * 0.8
+- Heal / Shield / Sustain = value based on expected survival impact, not raw amount alone
+
+If you want a very simple first pass:
+- 1 point per raw damage
+- burn bonus = burn stacks * 4
+- soak bonus = soak stacks * 3
+- freeze bonus = freeze stacks * 6
+- multi-hit bonus = 25% of raw damage for 2 hits, 45% for 3 hits, 60% for 4 hits
+
+Step 2: Budget enemies by expected damage and survivability.
+Each enemy should have a total combat budget.
+
+Enemy budget split:
+- Offense budget: how much damage the enemy can inflict over a fight
+- Defense budget: HP plus any sustain or mitigation
+- Utility budget: status effects, debuffs, and counter pressure
+
+Simple encounter budget formula:
+EncounterBudget = EnemyHPScore + EnemyOffenseScore + EnemyUtilityScore
+
+A good first approximation for normal enemies:
+- EnemyHPScore = enemy_hp
+- EnemyOffenseScore = expected_enemy_damage_per_turn * target_enemy_turns_alive
+- EnemyUtilityScore = status_score
+
+Step 3: Determine the player baseline.
+For each player level band, calculate:
+- Max HP
+- Average element damage
+- Expected damage per turn
+- Typical healing/shield gain per fight
+
+Then derive enemy numbers from the player baseline instead of picking them in isolation.
+
+Suggested player baseline sheet fields:
+- AvgPlayerDamage
+- AvgPlayerDamageWithCounter
+- AvgPlayerDPT
+- AvgPlayerSurvivalTurns
+- AvgPlayerHealPerFight
+- AvgPlayerShieldPerFight
+
+Step 4: Build a level curve.
+Use a curve instead of linear growth.
+
+Recommended options:
+1. Power curve
+- Easy to understand.
+- Good for damage and HP.
+- Example: stat = base * level^curveExponent
+
+2. Sigmoid / S-curve
+- Slower early, faster midgame, flatter late.
+- Good for experience requirements and pacing.
+- Keeps late-game growth from becoming absurd.
+
+3. Piecewise curve
+- Very practical in Excel.
+- Break levels into early/mid/late segments and tune each band separately.
+
+For this game, a piecewise curve is probably the easiest starting point.
+
+Suggested curve ideas
+- HP growth: slightly faster than player damage growth so fights do not end too quickly.
+- Damage growth: slower than HP growth so players feel progress but still need to think.
+- XP requirements: grow faster than player power so levels feel meaningful.
+
+If you want a simple spreadsheet formula:
+- BaseStat * (Level ^ Exponent)
+
+Starting exponents:
+- Player damage exponent: 1.05 to 1.15
+- Enemy HP exponent: 1.10 to 1.20
+- XP requirement exponent: 1.15 to 1.30
+
+Turn-based tuning formulas
+
+1. Enemy HP from target turns to kill
+EnemyHP = AvgPlayerDamagePerTurn * TargetTurnsToKill / CounterFactor
+
+Where:
+- AvgPlayerDamagePerTurn = average player output after misses/counters/statuses
+- TargetTurnsToKill = 3 to 5 for normal enemies
+- CounterFactor = 0.9 to 1.2 depending on how effective the enemy is against the player
+
+2. Enemy damage from target turns to die
+EnemyDamagePerTurn = PlayerMaxHP / TargetSurvivalTurns * PressureFactor
+
+Where:
+- TargetSurvivalTurns = 3 to 5 for normal encounters
+- PressureFactor = 0.75 to 1.25 depending on how punishing the fight should feel
+
+3. Status effect value
+A status is worth the expected damage or tempo swing it creates.
+
+BurnValue = BurnStacks * BurnDamagePerStack * ExpectedRemainingEnemyTurns * BurnReliability
+SoakValue = ExpectedFutureBonusDamageFromElementSynergy
+FreezeValue = ExpectedFireBonusDamageOrTempoLoss
+
+Starting reliability factors:
+- BurnReliability = 0.7 to 1.0
+- SoakReliability = 0.7 to 1.0
+- FreezeReliability = 0.7 to 1.0
+
+4. Multi-hit value
+Multi-hit is usually stronger than single-hit because it interacts with more effects and can smooth damage spikes.
+
+MultiHitMultiplier examples:
+- 1 hit = 1.00
+- 2 hits = 1.20 to 1.30
+- 3 hits = 1.40 to 1.55
+- 4 hits = 1.60 to 1.80
+
+You can treat multi-hit as a multiplier on total expected damage or as a separate bonus score.
+
+5. Counter value
+A spell should gain value if it hits a common weakness.
+
+CounterBonus = BaseDamage * WeaknessMultiplier
+
+Suggested weakness multiplier:
+- 1.25x for a soft counter
+- 1.50x for a strong counter
+- 2.00x for a major weakness or critical interaction
+
+For balance, avoid making every counter a binary win button. Use soft counters more often than hard counters.
+
+How to structure the Excel sheets
+
+Elements sheet
+Add columns like:
+- ElementName
+- BaseDamage
+- ElementType1
+- ElementType2
+- MultiHitCount
+- BurnStacks
+- SoakStacks
+- FreezeStacks
+- HealAmount
+- ShieldAmount
+- Target
+- ElementScore
+- RarityTier
+- Notes
+
+Enemy sheet
+Add columns like:
+- EnemyName
+- HP
+- Experience
+- Element1
+- Element2
+- Element3
+- Weak1
+- Weak2
+- IntendedRole
+- DifficultyTier
+- EnemyOffenseScore
+- EnemyDefenseScore
+- EnemyUtilityScore
+- TotalEncounterBudget
+
+Suggested spreadsheet formulas
+
+ElementScore example:
+=BaseDamage
++ (MultiHitCount - 1) * BaseDamage * 0.25
++ BurnStacks * 4
++ SoakStacks * 3
++ FreezeStacks * 6
++ HealAmount * 0.75
++ ShieldAmount * 0.75
+
+Enemy offense score example:
+=AVERAGE(ElementScore of Element1, Element2, Element3)
+Or, if the enemy uses one random element each turn:
+=AVERAGE(EnemyElement1Score, EnemyElement2Score, EnemyElement3Score)
+
+Enemy HP example:
+=PlayerAvgDamagePerTurn * TargetPlayerTurnsToKill / EnemyDefenseModifier
+
+Enemy damage example:
+=PlayerMaxHP / TargetSurvivalTurns * PressureFactor
+
+Practical enemy design rule
+- Enemies should feel distinct by element combination, not just higher numbers.
+- Give enemies one clear identity:
+  - fast chip damage
+  - burst damage
+  - burn pressure
+  - soak setup
+  - freeze setup
+  - sustain / self-heal
+
+Avoiding dominant strategies
+- If one element combination is clearly the best in most fights, it is too efficient.
+- Nerf it by reducing one axis rather than all of them at once.
+- Example: if an element is overpowered, lower its damage slightly before deleting its status utility.
+- Keep situational strengths intact so the element stays interesting.
+
+How to balance the current game specifically
+
+1. Use same-level fights as the baseline.
+- A player using average element choices should beat a same-level enemy in the target number of turns.
+- If the player needs 1 or 2 turns, the fight is too easy.
+- If the player needs 7+ turns for a normal enemy, the fight is probably too long unless it is intended to be a mini-boss.
+
+2. Tune around average, not max power.
+- Balance around the median expected player loadout, not the best possible combo.
+- If you balance around the best combo, most of the content will feel too hard.
+
+3. Keep rare spikes for special encounters only.
+- Crits, status combos, and multi-hit chains should exist, but not every enemy should exploit them equally.
+
+4. Use enemy element sets to define difficulty.
+- One-element enemy = straightforward threat.
+- Two-element enemy = moderate tactical fight.
+- Three-element enemy = more adaptive fight.
+
+5. Make status effects worth roughly one turn of value.
+- A strong status should feel valuable without completely deciding the fight.
+- A rough starting rule is: a status effect should be worth around 10% to 30% of a normal fight's total damage budget.
+
+Recommended balancing workflow
+
+1. Set a target band for each level range.
+2. Compute a baseline player output per turn.
+3. Compute enemy HP and damage from those targets.
+4. Assign a score to each element.
+5. Sum enemy element scores and adjust HP/damage downward or upward to match the intended tier.
+6. Playtest.
+7. Record actual turns-to-kill, turns-to-die, and whether certain elements are never or always picked.
+8. Adjust only a few variables at a time.
+
+What to log during playtests
+- Fight length in turns
+- Player HP remaining at victory
+- Enemy HP remaining at victory or defeat
+- Which elements were picked
+- Which elements were never picked
+- How often status effects mattered
+- Whether the player felt they had meaningful choices
+
+Good first tuning targets for this project
+- Average fight length: 4 to 6 turns
+- Player win rate versus normal encounters: about 70% to 85% once the player understands the system
+- Elite fights: about 50% to 70% win rate depending on the area
+- Boss fights: below 50% on first attempt is fine if the fight is readable and fair
+
+Implementation notes for your Excel sheets
+- Put the formulas in helper columns so you can inspect the intermediate values.
+- Use named ranges for player baseline stats so every enemy sheet references the same assumptions.
+- Keep a balance sheet with your target curves and never tune individual enemies without checking the global curve.
+- Use conditional formatting to highlight overpowered and underpowered values.
+
+Script idea for future automation
+- Read the elements and enemy sheets.
+- Compute each element score.
+- Compute enemy encounter budgets.
+- Compare each enemy to the intended tier band.
+- Export a report with "too weak", "too strong", and "in range" labels.
+
+Pseudo algorithm
+1. Load all elements.
+2. Score each element.
+3. Group enemy elements by enemy.
+4. Compute average enemy attack score.
+5. Estimate enemy turns-to-kill and turns-to-die using the current player baseline.
+6. Compare to target bands.
+7. Adjust HP, damage, or status intensity until the encounter lands in range.
+
+Sources
+
+1. Game balance - Wikipedia
+https://en.wikipedia.org/wiki/Game_balance
+Useful takeaways:
+- Balance is about fairness, meaningful decisions, pacing, power curves, counters, and preventing dominant strategies.
+- Balance should be iterative and supported by statistics, feedback, and observation.
+- Dynamic balance matters in PvE because the player’s progression and the enemy challenge evolve over time.
+
+2. Learning curve / Difficulty curve - Wikipedia
+https://en.wikipedia.org/wiki/Learning_curve
+Useful takeaways:
+- Difficulty should increase as player skill increases.
+- Difficulty curves in games are about pacing and the illusion of winnability.
+- Curves can be modeled as S-curves or other smooth progressions rather than flat linear growth.
+
+3. Game mechanics - Wikipedia
+https://en.wikipedia.org/wiki/Game_mechanics
+Useful takeaways:
+- Mechanics are the rules and systems that determine how the game responds to player actions.
+- Turn structure, randomization, resource management, and capture/eliminate mechanics are all balancing-relevant.
+- Balancing should consider how mechanics interact, not just isolated stats.
+
+4. Game balance references cited on Wikipedia
+https://en.wikipedia.org/wiki/Game_balance#References
+Useful takeaways:
+- Ian Schreiber, Jesse Schell, Ernest Adams, and Tynan Sylvester are all commonly cited balancing references.
+- The balancing process should be iterative and supported by a power curve, counters, and statistical analysis.
+
+Practical conclusion
+- Start with a spreadsheet budget model.
+- Use turns-to-kill and turns-to-die as the main control knobs.
+- Score each element and enemy from the same formula family.
+- Keep status effects meaningful but not fight-deciding by default.
+- Iterate from playtest data instead of trying to perfectly predict balance on paper.

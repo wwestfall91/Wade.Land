@@ -57,7 +57,35 @@
         font-size: 12px;
     }
 
+    .player-stats-row--name {
+        align-items: center;
+        justify-content: space-between;
+        font-size: 0.95rem;
+        letter-spacing: 0.04em;
+        color: #ffffff;
+        text-transform: none;
+        background: linear-gradient(
+            90deg,
+            rgba(160, 144, 0, 0.92) 0%,
+            rgba(212, 191, 0, 0.88) var(--xp-fill, 0%),
+            rgba(85, 103, 230, 0.95) var(--xp-fill, 0%),
+            rgba(36, 50, 164, 0.95) 100%
+        );
+
+        .player-name-text,
+        .player-name-level {
+            position: relative;
+            z-index: 1;
+        }
+
+        &:hover .player-name-tooltip,
+        &:focus-within .player-name-tooltip {
+            opacity: 1;
+        }
+    }
+
     .player-stats-row--level {
+        font-size: 12px;
         justify-content: flex-start;
         background: linear-gradient(
             90deg,
@@ -89,6 +117,51 @@
     }
 
     .player-level-tooltip {
+        position: absolute;
+        left: 50%;
+        bottom: calc(100% + 0.4rem);
+        transform: translateX(-50%);
+        min-width: max-content;
+        padding: 0.24rem 0.42rem;
+        border: 2px solid #102060;
+        border-radius: 4px;
+        background: linear-gradient(180deg, #fff6d6 0%, #f1dcaa 100%);
+        box-shadow:
+            inset 0 0 0 1px #ffe7b6,
+            inset 0 0 0 2px #c9b071,
+            0 4px 0 rgba(0, 0, 0, 0.32);
+        color: #121212;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        font-size: 0.78rem;
+        font-weight: 800;
+        line-height: 1.05;
+        letter-spacing: 0;
+        text-shadow: none;
+        font-variant-numeric: tabular-nums;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        text-rendering: geometricPrecision;
+        text-transform: none;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 120ms ease;
+        z-index: 200;
+
+        &::after {
+            content: "";
+            position: absolute;
+            left: 50%;
+            bottom: -0.4rem;
+            width: 0;
+            height: 0;
+            margin-left: -0.35rem;
+            border-left: 0.35rem solid transparent;
+            border-right: 0.35rem solid transparent;
+            border-top: 0.4rem solid #102060;
+        }
+    }
+
+    .player-name-tooltip {
         position: absolute;
         left: 50%;
         bottom: calc(100% + 0.4rem);

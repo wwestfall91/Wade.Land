@@ -109,9 +109,18 @@ type PreviewCombination = {
 const SPREAD_X = 200;
 const SPREAD_Y = 150;
 const DRAG_TUTORIAL_SEEN_KEY = "game.dragTutorialSeen";
+const INTRO_TEXT_VISIBLE_MS = 1850;
+const INTRO_TEXT_FADE_GAP_MS = 850;
+const INTRO_INPUT_FADE_MS = 640;
+const INTRO_SCENE_FADEOUT_MS = 1600;
 
 const normalizeType = (value?: string): string => value?.trim().toLowerCase() ?? "";
 const normalizeElementName = (value?: string): string => value?.trim().toLowerCase() ?? "";
+const wait = (ms: number) => new Promise<void>((resolve) => {
+    window.setTimeout(resolve, ms);
+});
+
+type IntroPhase = "hidden" | "line1" | "line2" | "input" | "line3" | "line4" | "fadeout";
 
 const getRandomUniqueElements = (elements: RewardElement[], count: number): RewardElement[] => {
     const shuffled = [...elements].sort(() => Math.random() - 0.5);
@@ -122,6 +131,8 @@ function Game() {
     const navigate = useNavigate();
     const {
         player: playerProgress,
+        playerName,
+        setPlayerName,
         levelFillPercent,
         initializeElements,
         combineElements,
@@ -155,8 +166,13 @@ function Game() {
     const [previewHomePosition, setPreviewHomePosition] = useState<Position | null>(null);
     const [previewPosition, setPreviewPosition] = useState<Position | null>(null);
     const [previewPointerOffset, setPreviewPointerOffset] = useState<Position>({ x: 0, y: 0 });
+    const [introPhase, setIntroPhase] = useState<IntroPhase>(() => (playerName.trim().length > 0 ? "hidden" : "line1"));
+    const [isIntroTextVisible, setIsIntroTextVisible] = useState(() => playerName.trim().length === 0);
+    const [introNameInput, setIntroNameInput] = useState("");
+    const [isIntroInputFadingOut, setIsIntroInputFadingOut] = useState(false);
     const previewPositionRef = useRef<Position | null>(null);
     const previewPointerClientRef = useRef<Position>({ x: 0, y: 0 });
+    const introChosenNameRef = useRef("");
     const nextId = useRef(1);
     const elementCatalogRef = useRef<Map<string, RewardElement>>(new Map());
 
@@ -180,6 +196,84 @@ function Game() {
             y: startRect.top - containerRect.top + padding + Math.floor(index / columns) * step,
         };
     };
+
+    useEffect(() => {
+        if (playerName.trim().length > 0 && introPhase !== "hidden") {
+            setIntroPhase("hidden");
+            setIsIntroTextVisible(false);
+        }
+    }, [introPhase, playerName]);
+
+    useEffect(() => {
+        if (introPhase === "hidden" || introPhase === "input" || introPhase === "fadeout") {
+            return;
+        }
+
+        let isCancelled = false;
+
+        const playNarrationPhase = async () => {
+            setIsIntroTextVisible(true);
+            await wait(INTRO_TEXT_VISIBLE_MS);
+            if (isCancelled) {
+                return;
+            }
+
+            setIsIntroTextVisible(false);
+            await wait(INTRO_TEXT_FADE_GAP_MS);
+            if (isCancelled) {
+                return;
+            }
+
+            if (introPhase === "line1") {
+                setIntroPhase("line2");
+                return;
+            }
+
+            if (introPhase === "line2") {
+                setIntroPhase("input");
+                return;
+            }
+
+            if (introPhase === "line3") {
+                setIntroPhase("line4");
+                return;
+            }
+
+            if (introPhase === "line4") {
+                setIntroPhase("fadeout");
+            }
+        };
+
+        void playNarrationPhase();
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [introPhase]);
+
+    useEffect(() => {
+        if (introPhase !== "fadeout") {
+            return;
+        }
+
+        let isCancelled = false;
+
+        const fadeOutScene = async () => {
+            await wait(INTRO_SCENE_FADEOUT_MS);
+            if (isCancelled) {
+                return;
+            }
+
+            setIntroPhase("hidden");
+            setIsIntroTextVisible(false);
+        };
+
+        void fadeOutScene();
+
+        return () => {
+            isCancelled = true;
+        };
+    }, [introPhase]);
 
     useEffect(() => {
         let isCancelled = false;
@@ -623,6 +717,21 @@ function Game() {
         });
     };
 
+    const handleIntroNameSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        const trimmedName = introNameInput.trim().slice(0, 28);
+        if (trimmedName.length === 0) {
+            return;
+        }
+
+        introChosenNameRef.current = trimmedName;
+        setIsIntroInputFadingOut(true);
+        await wait(INTRO_INPUT_FADE_MS);
+        setPlayerName(trimmedName);
+        setIsIntroInputFadingOut(false);
+        setIntroPhase("line3");
+    };
+
     const handleConfirmStarter = () => {
         if (!selectedStarter) {
             return;
@@ -639,9 +748,47 @@ function Game() {
     };
 
     const isStartMenuOpen = playerProgress.elements.length === 0 && starterChoices.length > 0;
+    const isIntroVisible = introPhase !== "hidden";
+    const introDisplayName = introChosenNameRef.current || playerName || "Traveler";
+    const introText =
+        introPhase === "line1"
+            ? "Oh - It's you!"
+            : introPhase === "line2"
+                ? "Remind me what your name was again?"
+                : introPhase === "line3"
+                    ? `They're coming for you ${introDisplayName}`
+                    : introPhase === "line4"
+                        ? "Good luck"
+                        : "";
 
     return (
         <div id="Game" ref={gameRef} style={{ position: "relative", width: "100%", height: "100%" }} >
+            {isIntroVisible ? (
+                <div className={`game-intro-overlay ${introPhase === "fadeout" ? "is-fading-out" : ""}`}>
+                    {introPhase === "input" ? (
+                        <form
+                            className={`game-intro-input-shell ${isIntroInputFadingOut ? "is-fading-out" : ""}`}
+                            onSubmit={handleIntroNameSubmit}
+                        >
+                            <input
+                                className="game-intro-input"
+                                type="text"
+                                maxLength={28}
+                                placeholder="Name"
+                                value={introNameInput}
+                                onChange={(event) => setIntroNameInput(event.target.value)}
+                            />
+                            <button className="game-intro-submit" type="submit">
+                                Enter
+                            </button>
+                        </form>
+                    ) : introText.length > 0 ? (
+                        <div className={`game-intro-line ${isIntroTextVisible ? "is-visible" : ""}`}>
+                            {introText}
+                        </div>
+                    ) : null}
+                </div>
+            ) : null}
             {draggables.map((draggable) => (
                 <Draggable
                     key={draggable.id}
@@ -757,6 +904,7 @@ function Game() {
                         FIGHT!
                     </button>
                     <PlayerStats
+                        playerName={playerName}
                         level={playerProgress.level}
                         hp={playerProgress.hp}
                         experience={playerProgress.experience}
@@ -768,8 +916,10 @@ function Game() {
             <EnemyInfo 
                 enemyName={nextEnemy?.name ?? "Unknown Enemy"} 
                 enemyHealth={nextEnemy?.hp ?? 0}
+                enemyExperience={nextEnemy?.experience ?? 0}
                 enemyDescription={nextEnemy?.description ?? ""}
                 enemyWeaknesses={nextEnemy?.weaknesses ?? []}
+                enemyElements={nextEnemy?.elements ?? []}
                 enemySpritePath={nextEnemy?.sprite ?? ""}
             />
             {isStartMenuOpen ? (

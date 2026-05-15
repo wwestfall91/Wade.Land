@@ -3,6 +3,7 @@ import "./PlayerStats.scss";
 import { usePlayer } from "../context/PlayerContext";
 
 type PlayerStatsProps = {
+    playerName?: string;
     level: number;
     hp: number;
     maxHp?: number;
@@ -12,6 +13,7 @@ type PlayerStatsProps = {
 };
 
 function PlayerStats({
+    playerName,
     level,
     hp,
     maxHp,
@@ -40,12 +42,15 @@ function PlayerStats({
 
     return (
         <div className={classes} style={style}>
-            <div className="player-stats-row player-stats-row--level">
-                Level
-                <span className="player-level-tooltip" role="tooltip">
-                    Level {level} ({currentExperienceForLevel}/{requiredExperienceForNextLevel} XP)
-                </span>
-            </div>
+            {playerName?.trim().length ? (
+                <div className="player-stats-row player-stats-row--name">
+                    <span className="player-name-text">{playerName.trim()}</span>
+                    <span className="player-name-level">Level {level}</span>
+                    <span className="player-name-tooltip" role="tooltip">
+                        Level {level} ({currentExperienceForLevel}/{requiredExperienceForNextLevel} XP)
+                    </span>
+                </div>
+            ) : null}
             <div className="player-hp-bar" role="progressbar" aria-valuemin={0} aria-valuemax={playerMaxHp} aria-valuenow={hp}>
                 <div className="player-hp-fill" />
                 <span className="player-hp-overlay">

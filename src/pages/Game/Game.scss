@@ -2,6 +2,82 @@
     position: relative;
     isolation: isolate;
 
+    .game-intro-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 9000;
+        background: #000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: opacity 1.6s ease;
+        opacity: 1;
+
+        &.is-fading-out {
+            opacity: 0;
+            pointer-events: none;
+        }
+    }
+
+    .game-intro-line {
+        color: #fff;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        font-size: clamp(1.2rem, 3.2vw, 2rem);
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        text-shadow: 0 2px 10px rgba(255, 255, 255, 0.2);
+        opacity: 0;
+        transition: opacity 0.9s ease;
+        text-align: center;
+        padding: 0 1rem;
+
+        &.is-visible {
+            opacity: 1;
+        }
+    }
+
+    .game-intro-input-shell {
+        display: flex;
+        gap: 0.7rem;
+        align-items: center;
+        opacity: 1;
+        transition: opacity 0.64s ease;
+
+        &.is-fading-out {
+            opacity: 0;
+        }
+    }
+
+    .game-intro-input {
+        width: min(20rem, 70vw);
+        height: 2.9rem;
+        padding: 0 0.75rem;
+        border-radius: 4px;
+        border: 2px solid #f2f2f2;
+        background: rgba(0, 0, 0, 0.5);
+        color: #fff;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        font-size: 1rem;
+        outline: none;
+    }
+
+    .game-intro-input::placeholder {
+        color: rgba(255, 255, 255, 0.75);
+    }
+
+    .game-intro-submit {
+        height: 2.9rem;
+        padding: 0 1rem;
+        border: 2px solid #f2f2f2;
+        border-radius: 4px;
+        background: rgba(255, 255, 255, 0.08);
+        color: #fff;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        font-size: 1rem;
+        font-weight: 700;
+        cursor: pointer;
+    }
+
     &::before {
         content: "";
         position: fixed;
@@ -87,9 +163,7 @@
     }
 
     .player-stats.player-stats-dock {
-        position: fixed;
-        left: 1rem;
-        bottom: 1rem;
+        display: flex;
         width: min(15rem, 44vw);
         z-index: 30;
     }

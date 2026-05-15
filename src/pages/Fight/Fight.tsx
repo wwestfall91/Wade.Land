@@ -85,7 +85,7 @@ type CastableSpell = {
 function Fight() {
     const location = useLocation();
     const navigate = useNavigate();
-    const { player, levels, addExperience, addElement, applyEnemyAttack, healPlayer, resetGame } = usePlayer();
+    const { player, playerName, levels, addExperience, addElement, applyEnemyAttack, healPlayer, resetGame } = usePlayer();
     const [flashingSlotId, setFlashingSlotId] = useState<number | null>(null);
     const [hoveredSpellId, setHoveredSpellId] = useState<number | null>(null);
     const [hoveredEnemyAttack, setHoveredEnemyAttack] = useState(false);
@@ -156,6 +156,7 @@ function Fight() {
 
     const normalizeType = (value?: string) => value?.trim().toLowerCase() ?? "";
     const pickEnemyAttack = () => enemy.elements[Math.floor(Math.random() * enemy.elements.length)] ?? null;
+    const enemyWeaknesses = (enemy.weaknesses ?? []).map((weakness) => weakness.trim()).filter((weakness) => weakness.length > 0);
 
     const getSpellSlotStyle = (type1?: string, type2?: string) => {
         const normalized = [type1, type2].map(normalizeType).filter(Boolean);
@@ -1120,8 +1121,42 @@ function Fight() {
                         </span>
                     ) : null}
                     <div className="enemy-meta-tooltip" aria-hidden="true">
-                        <span>{enemy.experience} XP</span>
-                        <span>{enemy.elements.length} Elements</span>
+                        <div className="enemy-meta-section">
+                            <span className="enemy-meta-label">HP</span>
+                            <span className="enemy-meta-value">{enemyHealth} / {enemyMaxHp}</span>
+                        </div>
+
+                        <div className="enemy-meta-section">
+                            <span className="enemy-meta-label">Weaknesses</span>
+                            <div className="enemy-meta-chip-list">
+                                {enemyWeaknesses.length > 0 ? (
+                                    enemyWeaknesses.map((weakness) => (
+                                        <span key={weakness} className="enemy-meta-chip">
+                                            {weakness}
+                                        </span>
+                                    ))
+                                ) : (
+                                    <span className="enemy-meta-chip enemy-meta-chip-muted">None</span>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="enemy-meta-section">
+                            <span className="enemy-meta-label">Elements</span>
+                            <div className="enemy-meta-chip-list">
+                                {enemy.elements.length > 0 ? (
+                                    enemy.elements.map((element, index) => (
+                                        <span key={`${element.letter}-${element.damage}-${index}`} className="enemy-meta-chip enemy-meta-chip-attack">
+                                            {element.letter} ({element.damage})
+                                        </span>
+                                    ))
+                                ) : (
+                                    <span className="enemy-meta-chip enemy-meta-chip-muted">None</span>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="enemy-meta-footer">Rewards {enemy.experience} XP</div>
                     </div>
                 </div>
                 {queuedEnemyAttack && hoveredEnemyAttack ? (
@@ -1197,6 +1232,7 @@ function Fight() {
                 </button>
             </div>
             <div className="player-hp-wrap">
+                {playerName.trim().length > 0 ? <div className="player-name-banner">{playerName.trim()}</div> : null}
                 <div className="player-status-strip" aria-label="Player status effects">
                     <span
                         className={`player-status-badge player-status-badge--burn ${playerBurnStatus ? "" : "is-hidden"}`}

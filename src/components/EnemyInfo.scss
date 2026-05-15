@@ -2,11 +2,11 @@
     display: flex;
     flex-direction: column;
     position: fixed;
-    bottom: 0;
-    right: 0;
+    bottom: 44%;
+    right: 26%;
     margin: 1rem;
-    width: 18rem;
-    height: 18rem;
+    width: 14rem;
+    height: 17rem;
     max-height: 25rem;
     overflow: hidden;
     border-radius: 4px;
@@ -46,7 +46,6 @@
     > .enemy-info-header {
         display: flex;
         flex-direction: column;
-        flex-grow: 1;
         justify-content: center;
         align-items: center;
         border-bottom: 2px solid rgba(228, 234, 255, 0.64);
@@ -56,26 +55,10 @@
             inset 0 0 0 2px #101964;
 
         > .enemy-info-name {
-            font-size: 1.55rem;
+            font-size: 1.5rem;
             font-weight: 700;
-            letter-spacing: 0.03em;
-            color: #fff7ad;
-            text-transform: uppercase;
-        }
-
-        > .enemy-info-health {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            width: 100%;
-            margin-top: 0.15rem;
-            padding-top: 0.2rem;
-            border-top: 1px solid rgba(228, 234, 255, 0.58);
             color: #ffffff;
-            font-size: 1rem;
-            font-family: "Trebuchet MS", "Segoe UI", sans-serif;
-            font-variant-numeric: tabular-nums;
-            text-shadow: 0 1px 1px rgba(0, 0, 0, 0.82);
+            text-transform: uppercase;
         }
     }
 
@@ -96,6 +79,20 @@
         }
     }
 
+        .enemy-info-health {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            border-top: 1px solid rgba(228, 234, 255, 0.58);
+            background-color:#0d1557;
+            color: #ffffff;
+            font-size: .75rem;
+            font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+            font-variant-numeric: tabular-nums;
+            text-shadow: 0 1px 1px rgba(0, 0, 0, 0.82);
+        }
+
     &:hover .enemy-info-description {
         opacity: 1;
         transform: translateY(0);
@@ -107,10 +104,10 @@
         inset: 0;
         display: flex;
         flex-direction: column;
-        justify-content: center;
-        align-items: center;
+        justify-content: flex-start;
+        align-items: stretch;
         gap: 0.4rem;
-        padding: 0.8rem;
+        padding: 0.65rem;
         border: 2px solid rgba(228, 234, 255, 0.74);
         background: linear-gradient(180deg, rgba(45, 63, 177, 0.96) 0%, rgba(22, 34, 116, 0.97) 100%);
         box-shadow:
@@ -120,7 +117,7 @@
         font-size: 0.86rem;
         font-weight: 500;
         line-height: 1.32;
-        text-align: center;
+        text-align: left;
         opacity: 0;
         transform: translateY(6px);
         transition: opacity 0.16s ease, transform 0.16s ease;
@@ -128,31 +125,64 @@
         z-index: 101;
 
         > .enemy-description-text {
-            margin-bottom: 0.2rem;
+            display: flex;
+            justify-content: center;
+            margin-bottom: 0.1rem;
+            font-size: 0.79rem;
+            line-height: 1.28;
+            color: #f4f7ff;
         }
 
-        > .enemy-weakness-text {
+        > .enemy-detail-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border: 1px solid rgba(212, 222, 255, 0.4);
+            border-radius: 3px;
+            padding: 0.2rem 0.35rem;
+            background: rgba(11, 20, 81, 0.36);
+
+            > .enemy-detail-label {
+                font-size: 0.72rem;
+                text-transform: uppercase;
+                letter-spacing: 0.04em;
+                color: #fdecb9;
+            }
+
+            > .enemy-detail-value {
+                color: #ffffff;
+                font-size: 0.8rem;
+                font-weight: 700;
+            }
+        }
+
+        > .enemy-weakness-text,
+        > .enemy-element-text {
             width: 100%;
             border-top: 1px solid rgba(255, 255, 255, 0.3);
             padding-top: 0.36rem;
             font-weight: 700;
-            color: #ffd588;
             display: flex;
             flex-direction: column;
-            align-items: center;
+            align-items: flex-start;
             gap: 0.28rem;
 
-            > .enemy-weakness-label {
-                font-size: .85rem;
+            > .enemy-weakness-label,
+            > .enemy-element-label {
+                font-size: .72rem;
                 letter-spacing: 0.05em;
                 text-transform: uppercase;
+                color: #ffd588;
+                cursor:default;
             }
 
-            > .enemy-weakness-list {
+            > .enemy-weakness-list,
+            > .enemy-element-list {
                 display: flex;
                 flex-wrap: wrap;
-                justify-content: center;
+                justify-content: flex-start;
                 gap: 0.3rem;
+                cursor: default;
             }
 
             .type-chip {
@@ -161,42 +191,41 @@
                 border-radius: 999px;
                 border: 1px solid rgba(0, 0, 0, 0.25);
                 padding: 0.06rem 0.45rem;
-                font-size: .85rem;
+                font-size: .75rem;
                 line-height: 1.2;
                 color: #111;
                 background-color: #ececec;
                 text-shadow: none;
             }
 
-            .type-fire { background-color: #ffb17d; }
-            .type-water { background-color: #9ad6ff; }
-            .type-earth { background-color: #cdb48a; }
-            .type-air { background-color: #d5eef9; }
-            .type-lightning { background-color: #ffe56d; }
-            .type-ice { background-color: #b8f0ff; }
-            .type-light { background-color: #fff4b5; }
-            .type-dark { background-color: #8f86aa; color: #f4f4f4; }
-            .type-arcane { background-color: #ffbfe1; }
-            .type-none { background-color: #d4d4d4; color: #505050; }
+            .type-chip-attack {
+                background-color: #751818;
+                border-color: #ffd3d3;
+                color: #ffefc9;
+                cursor: pointer;
+            }
+        }
+
+        > .enemy-xp-footer {
+            margin-top: auto;
+            border-top: 1px solid rgba(255, 255, 255, 0.35);
+            padding-top: 0.3rem;
+            text-align: center;
+            color: #ffe26b;
+            font-size: 0.78rem;
+            letter-spacing: 0.02em;
         }
     }
 
     > .next-enemy-text {
-        position: absolute;
-        z-index: 100;
-        bottom: 2%;
-        left: 2%;
-        padding: 0.14rem 0.45rem;
-        border-radius: 3px;
-        border: 2px solid #d8e0ff;
-        background: linear-gradient(180deg, #2c3fc7 0%, #16257b 100%);
-        box-shadow:
-            inset 0 0 0 1px #7d90ff,
-            inset 0 0 0 2px #0e1757;
-        font-size: 1.08rem;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: .75rem;
         font-weight: 700;
         letter-spacing: 0.03em;
         text-transform: uppercase;
         color: #fff7ab;
+        background-color:#17277f;
     }
 }
