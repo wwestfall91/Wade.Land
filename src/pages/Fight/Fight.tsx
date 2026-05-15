@@ -89,6 +89,7 @@ function Fight() {
     const [flashingSlotId, setFlashingSlotId] = useState<number | null>(null);
     const [hoveredSpellId, setHoveredSpellId] = useState<number | null>(null);
     const [hoveredEnemyAttack, setHoveredEnemyAttack] = useState(false);
+    const [hoveredEnemyMetaElementIndex, setHoveredEnemyMetaElementIndex] = useState<number | null>(null);
     const [usedSpellIds, setUsedSpellIds] = useState<number[]>([]);
     const [eventLogEntries, setEventLogEntries] = useState<EventLogEntry[]>([]);
     const [isGameOver, setIsGameOver] = useState(false);
@@ -126,12 +127,14 @@ function Fight() {
     const eventLogContainerRef = useRef<HTMLDivElement | null>(null);
     const spellSlotRefs = useRef<Record<number, HTMLButtonElement | null>>({});
     const enemyAttackMarkerRef = useRef<HTMLSpanElement | null>(null);
+    const enemyMetaElementRefs = useRef<Record<number, HTMLSpanElement | null>>({});
     const healFlashTimeoutRef = useRef<number | null>(null);
     const shieldFlashTimeoutRef = useRef<number | null>(null);
     const playerHitTimeoutRef = useRef<number | null>(null);
     const screenFlashTimeoutRef = useRef<number | null>(null);
     const spellCastFlashTimeoutRef = useRef<number | null>(null);
     const enemySteamTimeoutRef = useRef<number | null>(null);
+    const enemyIntentReadyingTimeoutRef = useRef<number | null>(null);
 
     const enemy = useMemo(() => {
         const state = location.state as FightLocationState | null;
@@ -155,6 +158,8 @@ function Fight() {
     const playerHealthFillPercent = Math.max(0, playerTotalFillPercent - playerShieldTailFillPercent);
 
     const normalizeType = (value?: string) => value?.trim().toLowerCase() ?? "";
+    const toTypeClass = (value: string) =>
+        `type-${value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
     const pickEnemyAttack = () => enemy.elements[Math.floor(Math.random() * enemy.elements.length)] ?? null;
     const enemyWeaknesses = (enemy.weaknesses ?? []).map((weakness) => weakness.trim()).filter((weakness) => weakness.length > 0);
 
@@ -314,6 +319,9 @@ function Fight() {
             if (enemySteamTimeoutRef.current !== null) {
                 window.clearTimeout(enemySteamTimeoutRef.current);
             }
+            if (enemyIntentReadyingTimeoutRef.current !== null) {
+                window.clearTimeout(enemyIntentReadyingTimeoutRef.current);
+            }
         };
     }, []);
 
@@ -383,11 +391,30 @@ function Fight() {
         if (enemy.elements.length === 0) {
             setQueuedEnemyAttack(null);
             setHoveredEnemyAttack(false);
+            setIsReadyingNextAttack(false);
+            if (enemyIntentReadyingTimeoutRef.current !== null) {
+                window.clearTimeout(enemyIntentReadyingTimeoutRef.current);
+            }
             return;
         }
 
-        setQueuedEnemyAttack(enemy.elements[Math.floor(Math.random() * enemy.elements.length)] ?? null);
+        const initialAttack = pickEnemyAttack();
+        setQueuedEnemyAttack(initialAttack);
         setHoveredEnemyAttack(false);
+        setIsReadyingNextAttack(false);
+
+        if (enemyIntentReadyingTimeoutRef.current !== null) {
+            window.clearTimeout(enemyIntentReadyingTimeoutRef.current);
+        }
+
+        if (initialAttack) {
+            window.requestAnimationFrame(() => {
+                setIsReadyingNextAttack(true);
+                enemyIntentReadyingTimeoutRef.current = window.setTimeout(() => {
+                    setIsReadyingNextAttack(false);
+                }, 560);
+            });
+        }
         // Re-seed intent whenever a new enemy enters the fight.
     }, [enemy.elements, enemy.name]);
 
@@ -1131,7 +1158,7 @@ function Fight() {
                             <div className="enemy-meta-chip-list">
                                 {enemyWeaknesses.length > 0 ? (
                                     enemyWeaknesses.map((weakness) => (
-                                        <span key={weakness} className="enemy-meta-chip">
+                                        <span key={weakness} className={`enemy-meta-chip ${toTypeClass(weakness)}`}>
                                             {weakness}
                                         </span>
                                     ))
@@ -1146,7 +1173,17 @@ function Fight() {
                             <div className="enemy-meta-chip-list">
                                 {enemy.elements.length > 0 ? (
                                     enemy.elements.map((element, index) => (
-                                        <span key={`${element.letter}-${element.damage}-${index}`} className="enemy-meta-chip enemy-meta-chip-attack">
+                                        <span
+                                            key={`${element.letter}-${element.damage}-${index}`}
+                                            ref={(entry) => {
+                                                enemyMetaElementRefs.current[index] = entry;
+                                            }}
+                                            className="enemy-meta-chip enemy-meta-chip-attack"
+                                            onMouseEnter={() => setHoveredEnemyMetaElementIndex(index)}
+                                            onMouseLeave={() => {
+                                                setHoveredEnemyMetaElementIndex((current) => (current === index ? null : current));
+                                            }}
+                                        >
                                             {element.letter} ({element.damage})
                                         </span>
                                     ))
@@ -1159,6 +1196,58 @@ function Fight() {
                         <div className="enemy-meta-footer">Rewards {enemy.experience} XP</div>
                     </div>
                 </div>
+                {hoveredEnemyMetaElementIndex !== null ? (() => {
+                    const hoveredElement = enemy.elements[hoveredEnemyMetaElementIndex];
+                    if (!hoveredElement) {
+                        return null;
+                    }
+
+                    const elementTypes = [hoveredElement.type1, hoveredElement.type2].filter(
+                        (value): value is string => Boolean(value && value.trim().length > 0),
+                    );
+                    const effectLines = getEffectSummaryLines(hoveredElement.effects);
+
+                    return (
+                        <FloatingTooltip
+                            anchorElement={enemyMetaElementRefs.current[hoveredEnemyMetaElementIndex]}
+                            open={Boolean(enemyMetaElementRefs.current[hoveredEnemyMetaElementIndex])}
+                            className="reward-element-tooltip-shell"
+                        >
+                            <div className="reward-element-info">
+                                {hoveredElement.description.length > 0 ? (
+                                    <span className="element-info-description">{hoveredElement.description}</span>
+                                ) : null}
+                                <span className="element-info-damage">Damage: {hoveredElement.damage}</span>
+                                <span className="element-info-types">
+                                    <span className="element-info-label">Types:</span>
+                                    <span className="element-info-list">
+                                        {elementTypes.length > 0 ? (
+                                            elementTypes.map((type) => (
+                                                <span key={type} className={`type-chip ${toTypeClass(type)}`}>
+                                                    {type}
+                                                </span>
+                                            ))
+                                        ) : (
+                                            <span className="type-chip type-none">None</span>
+                                        )}
+                                    </span>
+                                </span>
+                                {effectLines.length > 0 ? (
+                                    <span className="element-info-effects">
+                                        <span className="element-info-label">Effects:</span>
+                                        <span className="element-info-list">
+                                            {effectLines.map((line, lineIndex) => (
+                                                <span key={`${line}-${lineIndex}`} className={`effect-chip ${getEffectChipClass(line)}`}>
+                                                    {line}
+                                                </span>
+                                            ))}
+                                        </span>
+                                    </span>
+                                ) : null}
+                            </div>
+                        </FloatingTooltip>
+                    );
+                })() : null}
                 {queuedEnemyAttack && hoveredEnemyAttack ? (
                     <FloatingTooltip
                         anchorElement={enemyAttackMarkerRef.current}

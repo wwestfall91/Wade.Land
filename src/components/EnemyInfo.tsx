@@ -51,7 +51,7 @@ function EnemyInfo({
                     <span className="enemy-weakness-list">
                         {weaknesses.length > 0 ? (
                             weaknesses.map((weakness) => (
-                                <span key={weakness} className="type-chip">
+                                <span key={weakness} className={`type-chip ${toTypeClass(weakness)}`}>
                                     {weakness}
                                 </span>
                             ))

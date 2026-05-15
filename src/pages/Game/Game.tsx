@@ -109,6 +109,7 @@ type PreviewCombination = {
 const SPREAD_X = 200;
 const SPREAD_Y = 150;
 const DRAG_TUTORIAL_SEEN_KEY = "game.dragTutorialSeen";
+const DROP_ZONE_ONE_TUTORIAL_SEEN_KEY = "game.dropZoneOneTutorialSeen";
 const INTRO_TEXT_VISIBLE_MS = 1850;
 const INTRO_TEXT_FADE_GAP_MS = 850;
 const INTRO_INPUT_FADE_MS = 640;
@@ -160,6 +161,14 @@ function Game() {
 
         return window.localStorage.getItem(DRAG_TUTORIAL_SEEN_KEY) === "1";
     });
+    const [hasSeenDropZoneOneTutorial, setHasSeenDropZoneOneTutorial] = useState(() => {
+        if (typeof window === "undefined") {
+            return false;
+        }
+
+        return window.localStorage.getItem(DROP_ZONE_ONE_TUTORIAL_SEEN_KEY) === "1";
+    });
+    const [hasStartedDraggingElement, setHasStartedDraggingElement] = useState(false);
     const [zoneOccupants, setZoneOccupants] = useState<Array<number | null>>([null, null]);
     const [isPreviewDragging, setIsPreviewDragging] = useState(false);
     const [isPreviewHovered, setIsPreviewHovered] = useState(false);
@@ -198,13 +207,6 @@ function Game() {
     };
 
     useEffect(() => {
-        if (playerName.trim().length > 0 && introPhase !== "hidden") {
-            setIntroPhase("hidden");
-            setIsIntroTextVisible(false);
-        }
-    }, [introPhase, playerName]);
-
-    useEffect(() => {
         if (introPhase === "hidden" || introPhase === "input" || introPhase === "fadeout") {
             return;
         }
@@ -212,6 +214,12 @@ function Game() {
         let isCancelled = false;
 
         const playNarrationPhase = async () => {
+            setIsIntroTextVisible(false);
+            await wait(40);
+            if (isCancelled) {
+                return;
+            }
+
             setIsIntroTextVisible(true);
             await wait(INTRO_TEXT_VISIBLE_MS);
             if (isCancelled) {
@@ -657,6 +665,17 @@ function Game() {
     };
 
     const handleSnapChange = (draggableId: number, zoneIndex: number | null) => {
+        if (zoneIndex === null && !hasStartedDraggingElement) {
+            setHasStartedDraggingElement(true);
+        }
+
+        if (zoneIndex === 0 && !hasSeenDropZoneOneTutorial) {
+            setHasSeenDropZoneOneTutorial(true);
+            if (typeof window !== "undefined") {
+                window.localStorage.setItem(DROP_ZONE_ONE_TUTORIAL_SEEN_KEY, "1");
+            }
+        }
+
         setZoneOccupants((previous) => {
             const next = previous.map((occupantId) =>
                 occupantId === draggableId ? null : occupantId,
@@ -881,7 +900,7 @@ function Game() {
                 <div className="combination-station">
                     <div className="combination-equation">
                         <div className="drop-zone-area">
-                            <div className="drop-zone" ref={dropZoneRefA}>1</div>
+                            <div className={`drop-zone ${hasStartedDraggingElement && !hasSeenDropZoneOneTutorial ? "is-discoverable" : ""}`} ref={dropZoneRefA}>1</div>
                             <div>+</div>
                             <div className="drop-zone" ref={dropZoneRefB}>2</div>
                             <div>=</div>
