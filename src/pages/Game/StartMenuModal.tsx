@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { getEffectChipClass, getEffectSummaryLines } from "../../combat/effectSummary";
 import type { RewardElement } from "../../context/PlayerContext";
 import FloatingTooltip from "./FloatingTooltip";
+import ElementIcon from "../../components/ElementIcon";
 import "./StartMenuModal.scss";
 
 type StartMenuModalProps = {
@@ -38,7 +39,8 @@ function StartMenuModal({ choices, selected, onSelect, onConfirm }: StartMenuMod
                                     setHoveredLetter(current => (current === element.letter ? null : current));
                                 }}
                             >
-                                <span className="start-menu-element-letter">{element.letter}</span>
+                                <div className="start-menu-element-name">{element.letter}</div>
+                                <span className="start-menu-element-letter"><ElementIcon name={element.letter} /></span>
                                 <span className="start-menu-element-damage">{element.damage} DMG</span>
                             </button>
                         ))}

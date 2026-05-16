@@ -14,6 +14,7 @@ import EnemyInfoSprite from "../../components/EnemyInfoSprite";
 import { usePlayer, type RewardElement } from "../../context/PlayerContext";
 import RewardModal from "./RewardModal";
 import FloatingTooltip from "../Game/FloatingTooltip";
+import ElementIcon from "../../components/ElementIcon";
 
 type EnemyDamagePopup = {
     id: number;
@@ -1184,7 +1185,7 @@ function Fight() {
                                                 setHoveredEnemyMetaElementIndex((current) => (current === index ? null : current));
                                             }}
                                         >
-                                            {element.letter} ({element.damage})
+                                            <ElementIcon name={element.letter} /> ({element.damage})
                                         </span>
                                     ))
                                 ) : (

@@ -4,6 +4,17 @@
         min-width: fit-content;
         width: 2rem;
         height: 2rem;
+
+            .element-icon {
+                width: 1.5rem;
+                height: 1.5rem;
+                object-fit: contain;
+                display: block;
+                pointer-events: none;
+                user-select: none;
+                -webkit-user-drag: none;
+            }
+
         border-radius: 16px;
         border: 2px solid #dce3ff;
         background: linear-gradient(180deg, #5f76ee 0%, #354ebf 100%);

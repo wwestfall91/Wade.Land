@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { SpellEffectConfig } from "../../combat/spellEffects";
 import { getEffectChipClass, getEffectSummaryLines } from "../../combat/effectSummary";
 import FloatingTooltip from "./FloatingTooltip";
+import ElementIcon from "../../components/ElementIcon";
 import "./Draggable.scss";
 
 type Position = {
@@ -218,7 +219,7 @@ function Draggable({
 					</div>
 				) : null}
 			</FloatingTooltip>
-			{letter}
+			<ElementIcon name={letter} />
 		</div>
 	);
 }

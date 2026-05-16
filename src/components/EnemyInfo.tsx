@@ -4,6 +4,7 @@ import "./EnemyInfo.scss";
 import type { RewardElement } from "../context/PlayerContext";
 import { getEffectChipClass, getEffectSummaryLines } from "../combat/effectSummary";
 import FloatingTooltip from "../pages/Game/FloatingTooltip";
+import ElementIcon from "./ElementIcon";
 
 type EnemyInfoProps = {
     enemyName: string;
@@ -76,7 +77,7 @@ function EnemyInfo({
                                         setHoveredEnemyElementIndex((current) => (current === index ? null : current));
                                     }}
                                 >
-                                    {element.letter} ({element.damage})
+                                    <ElementIcon name={element.letter} /> ({element.damage})
                                 </span>
                             ))
                         ) : (
