@@ -105,6 +105,12 @@ function EnemyInfo({
                         className="reward-element-tooltip-shell"
                     >
                         <div className="reward-element-info">
+                            <span className="element-info-title">
+                                <span className="element-info-title-icon">
+                                    <ElementIcon name={hoveredElement.letter} />
+                                </span>
+                                <span className="element-info-title-name">{hoveredElement.letter}</span>
+                            </span>
                             {hoveredElement.description.length > 0 ? (
                                 <span className="element-info-description">{hoveredElement.description}</span>
                             ) : null}

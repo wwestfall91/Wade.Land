@@ -263,6 +263,12 @@ function RewardModal({ xpGained, currentXp, levels, rewardElements, onConfirm }:
                         className="reward-element-tooltip-shell"
                     >
                         <div className="reward-element-info">
+                            <span className="element-info-title">
+                                <span className="element-info-title-icon">
+                                    <ElementIcon name={element.letter} />
+                                </span>
+                                <span className="element-info-title-name">{element.letter}</span>
+                            </span>
                             {element.description.length > 0 ? (
                                 <span className="element-info-description">{element.description}</span>
                             ) : null}
@@ -313,6 +319,12 @@ function RewardModal({ xpGained, currentXp, levels, rewardElements, onConfirm }:
                         className="reward-element-tooltip-shell"
                     >
                         <div className="reward-element-info">
+                            <span className="element-info-title">
+                                <span className="element-info-title-icon">
+                                    <ElementIcon name={element.letter} />
+                                </span>
+                                <span className="element-info-title-name">{element.letter}</span>
+                            </span>
                             {element.description.length > 0 ? (
                                 <span className="element-info-description">{element.description}</span>
                             ) : null}
