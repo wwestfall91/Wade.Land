@@ -11,6 +11,7 @@ import {
 } from "../../combat/spellEffects";
 import { getEffectChipClass, getEffectSummaryLines, getEffectSummaryLinesForTarget } from "../../combat/effectSummary";
 import EnemyInfoSprite from "../../components/EnemyInfoSprite";
+import ElementDetailsTooltip from "../../components/ElementDetailsTooltip";
 import { usePlayer, type RewardElement } from "../../context/PlayerContext";
 import RewardModal from "./RewardModal";
 import FloatingTooltip from "../Game/FloatingTooltip";
@@ -1202,57 +1203,13 @@ function Fight() {
                     if (!hoveredElement) {
                         return null;
                     }
-
-                    const elementTypes = [hoveredElement.type1, hoveredElement.type2].filter(
-                        (value): value is string => Boolean(value && value.trim().length > 0),
-                    );
-                    const effectLines = getEffectSummaryLines(hoveredElement.effects);
-
                     return (
-                        <FloatingTooltip
+                        <ElementDetailsTooltip
+                            element={hoveredElement}
                             anchorElement={enemyMetaElementRefs.current[hoveredEnemyMetaElementIndex]}
-                            open={Boolean(enemyMetaElementRefs.current[hoveredEnemyMetaElementIndex])}
+                            open
                             className="reward-element-tooltip-shell"
-                        >
-                            <div className="reward-element-info">
-                                <span className="element-info-title">
-                                    <span className="element-info-title-icon">
-                                        <ElementIcon name={hoveredElement.letter} />
-                                    </span>
-                                    <span className="element-info-title-name">{hoveredElement.letter}</span>
-                                </span>
-                                {hoveredElement.description.length > 0 ? (
-                                    <span className="element-info-description">{hoveredElement.description}</span>
-                                ) : null}
-                                <span className="element-info-damage">Damage: {hoveredElement.damage}</span>
-                                <span className="element-info-types">
-                                    <span className="element-info-label">Types:</span>
-                                    <span className="element-info-list">
-                                        {elementTypes.length > 0 ? (
-                                            elementTypes.map((type) => (
-                                                <span key={type} className={`type-chip ${toTypeClass(type)}`}>
-                                                    {type}
-                                                </span>
-                                            ))
-                                        ) : (
-                                            <span className="type-chip type-none">None</span>
-                                        )}
-                                    </span>
-                                </span>
-                                {effectLines.length > 0 ? (
-                                    <span className="element-info-effects">
-                                        <span className="element-info-label">Effects:</span>
-                                        <span className="element-info-list">
-                                            {effectLines.map((line, lineIndex) => (
-                                                <span key={`${line}-${lineIndex}`} className={`effect-chip ${getEffectChipClass(line)}`}>
-                                                    {line}
-                                                </span>
-                                            ))}
-                                        </span>
-                                    </span>
-                                ) : null}
-                            </div>
-                        </FloatingTooltip>
+                        />
                     );
                 })() : null}
                 {queuedEnemyAttack && hoveredEnemyAttack ? (

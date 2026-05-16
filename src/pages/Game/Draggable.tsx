@@ -20,6 +20,7 @@ type Props = {
 	type1?: string;
 	type2?: string;
 	effects?: SpellEffectConfig[];
+	level?: number;
 	containerRef: React.RefObject<HTMLDivElement | null>;
 	dropZoneRefs: Array<React.RefObject<HTMLDivElement | null>>;
 	initialPosition: Position;
@@ -37,6 +38,7 @@ function Draggable({
 	type1,
 	type2,
 	effects,
+	level,
 	containerRef,
 	dropZoneRefs,
 	initialPosition,
@@ -192,13 +194,17 @@ function Draggable({
 				className="drag-description-popup"
 				clampHorizontal={false}
 			>
-				<div className="drag-title">
-					<span className="drag-title-icon">
-						<ElementIcon name={letter} />
-					</span>
-					<span className="drag-title-name">{letter}</span>
+				<div className="element-info-title-row">
+					<div className="drag-title">
+						<span className="drag-title-icon">
+							<ElementIcon name={letter} />
+						</span>
+						<span className="drag-title-name">{letter}</span>
+					</div>
+					{level === 1 ? <span className="element-info-badge">BASE ELEMENT </span> : null}
+					<div>{description}</div>
 				</div>
-				{description.length > 0 ? <div className="drag-description-text">{description}</div> : null}
+				{/* {description.length > 0 ? <div className="drag-description-text">{description}</div> : null} */}
 				<div className="drag-damage-text">Damage: {damage}</div>
 				<div className="drag-type-text">
 					<span className="drag-type-label">Types:</span>

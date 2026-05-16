@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { getEffectChipClass, getEffectSummaryLines } from "../../combat/effectSummary";
 import { usePlayer, type LevelDefinition, type RewardElement } from "../../context/PlayerContext";
-import FloatingTooltip from "../Game/FloatingTooltip";
 import ElementIcon from "../../components/ElementIcon";
+import ElementDetailsTooltip from "../../components/ElementDetailsTooltip";
 import "./RewardModal.scss";
 
 type AnimSegment = {
@@ -78,9 +77,6 @@ function RewardModal({ xpGained, currentXp, levels, rewardElements, onConfirm }:
     const currentElementRefs = useRef<Record<number, HTMLDivElement | null>>({});
     const [isClosing, setIsClosing] = useState(false);
     const closeTimeoutRef = useRef<number | null>(null);
-
-    const toTypeClass = (value: string) =>
-        `type-${value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
 
     const segments = useMemo(
         () => computeAnimSegments(currentXp, xpGained, levels),
@@ -250,113 +246,25 @@ function RewardModal({ xpGained, currentXp, levels, rewardElements, onConfirm }:
             {hoveredLetter ? (() => {
                 const element = rewardElements.find(e => e.letter === hoveredLetter);
                 if (!element) return null;
-
-                const elementTypes = [element.type1, element.type2].filter(
-                    (value): value is string => Boolean(value && value.trim().length > 0),
-                );
-                const effectLines = getEffectSummaryLines(element.effects);
-
                 return (
-                    <FloatingTooltip
+                    <ElementDetailsTooltip
+                        element={element}
                         anchorElement={buttonRefs.current[hoveredLetter]}
                         open={Boolean(hoveredLetter)}
                         className="reward-element-tooltip-shell"
-                    >
-                        <div className="reward-element-info">
-                            <span className="element-info-title">
-                                <span className="element-info-title-icon">
-                                    <ElementIcon name={element.letter} />
-                                </span>
-                                <span className="element-info-title-name">{element.letter}</span>
-                            </span>
-                            {element.description.length > 0 ? (
-                                <span className="element-info-description">{element.description}</span>
-                            ) : null}
-                            <span className="element-info-damage">Damage: {element.damage}</span>
-                            <span className="element-info-types">
-                                <span className="element-info-label">Types:</span>
-                                <span className="element-info-list">
-                                    {elementTypes.length > 0 ? (
-                                        elementTypes.map((type) => (
-                                            <span key={type} className={`type-chip ${toTypeClass(type)}`}>
-                                                {type}
-                                            </span>
-                                        ))
-                                    ) : (
-                                        <span className="type-chip type-none">None</span>
-                                    )}
-                                </span>
-                            </span>
-                            {effectLines.length > 0 ? (
-                                <span className="element-info-effects">
-                                    <span className="element-info-label">Effects:</span>
-                                    <span className="element-info-list">
-                                        {effectLines.map((line, index) => (
-                                            <span key={`${line}-${index}`} className={`effect-chip ${getEffectChipClass(line)}`}>
-                                                {line}
-                                            </span>
-                                        ))}
-                                    </span>
-                                </span>
-                            ) : null}
-                        </div>
-                    </FloatingTooltip>
+                    />
                 );
             })() : null}
             {hoveredCurrentElementId !== null ? (() => {
                 const element = player.elements.find((entry) => entry.id === hoveredCurrentElementId);
                 if (!element) return null;
-
-                const elementTypes = [element.type1, element.type2].filter(
-                    (value): value is string => Boolean(value && value.trim().length > 0),
-                );
-                const effectLines = getEffectSummaryLines(element.effects);
-
                 return (
-                    <FloatingTooltip
+                    <ElementDetailsTooltip
+                        element={element}
                         anchorElement={currentElementRefs.current[hoveredCurrentElementId]}
                         open
                         className="reward-element-tooltip-shell"
-                    >
-                        <div className="reward-element-info">
-                            <span className="element-info-title">
-                                <span className="element-info-title-icon">
-                                    <ElementIcon name={element.letter} />
-                                </span>
-                                <span className="element-info-title-name">{element.letter}</span>
-                            </span>
-                            {element.description.length > 0 ? (
-                                <span className="element-info-description">{element.description}</span>
-                            ) : null}
-                            <span className="element-info-damage">Damage: {element.damage}</span>
-                            <span className="element-info-types">
-                                <span className="element-info-label">Types:</span>
-                                <span className="element-info-list">
-                                    {elementTypes.length > 0 ? (
-                                        elementTypes.map((type) => (
-                                            <span key={type} className={`type-chip ${toTypeClass(type)}`}>
-                                                {type}
-                                            </span>
-                                        ))
-                                    ) : (
-                                        <span className="type-chip type-none">None</span>
-                                    )}
-                                </span>
-                            </span>
-                            {effectLines.length > 0 ? (
-                                <span className="element-info-effects">
-                                    <span className="element-info-label">Effects:</span>
-                                    <span className="element-info-list">
-                                        {effectLines.map((line, index) => (
-                                            <span key={`${line}-${index}`} className={`effect-chip ${getEffectChipClass(line)}`}>
-                                                {line}
-                                            </span>
-                                        ))}
-                                    </span>
-                                </span>
-                            ) : null}
-                        </div>
-                    </FloatingTooltip>
+                    />
                 );
             })() : null}
         </>

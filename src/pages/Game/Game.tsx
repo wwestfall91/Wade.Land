@@ -820,6 +820,7 @@ function Game() {
                     type1={draggable.type1}
                     type2={draggable.type2}
                     effects={draggable.effects}
+                    level={draggable.level}
                     containerRef={gameRef}
                     dropZoneRefs={dropZoneRefs}
                     initialPosition={draggable.initialPosition}
