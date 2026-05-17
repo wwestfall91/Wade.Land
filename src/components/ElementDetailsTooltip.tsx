@@ -33,19 +33,18 @@ function ElementDetailsTooltip({
             className={className}
             clampHorizontal={clampHorizontal}
         >
-            <div className="reward-element-info">
-                <div className="element-info-title-row">
+            <div className="element-info-title-row">
+                <div className="element-info-header">
 					<div className="drag-title">
-                        <div className="element-header">
-                            <span className="drag-title-icon">
-                                <ElementIcon name={element.letter} />
-                            </span>
-                            <span className="drag-title-name">{element.letter}</span>
-                        </div>
-					    {element.level === 1 ? <span className="element-info-badge">BASE ELEMENT </span> : null}
-					</div>
-                    <div>{element.description}</div>
-				</div>
+                        <span className="drag-title-icon">
+                            <ElementIcon name={element.letter} />
+                        </span>
+                        <span className="drag-title-name">{element.letter}</span>
+                    </div>
+                    {element.level === 1 ? 
+                    <span className="element-info-badge">BASE ELEMENT </span> : null}
+                </div>
+                <div>{element.description}</div>
                 <span className="element-info-damage">Damage: {element.damage}</span>
                 <span className="element-info-types">
                     <span className="element-info-label">Types:</span>

@@ -195,13 +195,16 @@ function Draggable({
 				clampHorizontal={false}
 			>
 				<div className="element-info-title-row">
-					<div className="drag-title">
-						<span className="drag-title-icon">
-							<ElementIcon name={letter} />
-						</span>
-						<span className="drag-title-name">{letter}</span>
+					<div className="element-info-header">
+						<div className="drag-title">
+							<span className="drag-title-icon">
+								<ElementIcon name={letter} />
+							</span>
+							<span className="drag-title-name">{letter}</span>
+						</div>
+						{level === 1 ? 
+						<span className="element-info-badge">BASE ELEMENT </span> : null}
 					</div>
-					{level === 1 ? <span className="element-info-badge">BASE ELEMENT </span> : null}
 					<div>{description}</div>
 				</div>
 				{/* {description.length > 0 ? <div className="drag-description-text">{description}</div> : null} */}
