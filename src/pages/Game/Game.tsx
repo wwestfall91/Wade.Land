@@ -775,9 +775,9 @@ function Game() {
             : introPhase === "line2"
                 ? "Remind me what your name was again?"
                 : introPhase === "line3"
-                    ? `They're coming for you ${introDisplayName}`
+                    ? `You are the boss of this dungeon, ${introDisplayName}`
                     : introPhase === "line4"
-                        ? "Good luck"
+                        ? "Defend this sanctuary with your life!"
                         : "";
 
     return (
