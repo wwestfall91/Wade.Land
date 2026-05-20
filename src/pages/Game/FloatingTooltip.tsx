@@ -170,38 +170,40 @@ function FloatingTooltip({
             }}
         >
             <div className={`floating-tooltip__panel ${elementDetails ? toTypeThemeClass(primaryThemeType) : ""}`}>
-                {elementDetails &&
-                <div className="tooltip-container">
-                    <div className="element-title">
-                        <div>{elementDetails.letter}</div>
-                        <div className="description">{elementDetails.description}</div>
-                    </div>
-                    <div className="tooltip-header">
-                        <span className={`element-info-badge`}>ELEMENT</span>
-                        <div className="element-types">
-                            {elementDetails.type1 &&
-                                <span className={`element-info-badge ${toTypeBadgeClass(elementDetails.type1)}`}>{elementDetails.type1}</span>
-                            }
-                            {elementDetails.type2 &&
-                                <span className={`element-info-badge ${toTypeBadgeClass(elementDetails.type2)}`}>{elementDetails.type2}</span>
-                            }
+                {elementDetails ? (
+                    <div className="tooltip-container">
+                        <div className="element-title">
+                            <div>{elementDetails.letter}</div>
+                            <div className="description">{elementDetails.description}</div>
                         </div>
-                    </div>
+                        <div className="tooltip-header">
+                            <span className="element-info-badge">ELEMENT</span>
+                            <div className="element-types">
+                                {elementDetails.type1 ? (
+                                    <span className={`element-info-badge ${toTypeBadgeClass(elementDetails.type1)}`}>{elementDetails.type1}</span>
+                                ) : null}
+                                {elementDetails.type2 ? (
+                                    <span className={`element-info-badge ${toTypeBadgeClass(elementDetails.type2)}`}>{elementDetails.type2}</span>
+                                ) : null}
+                            </div>
+                        </div>
 
-                    {effectLines.length > 0 ? (
-                        <span className="effects-details">Effects:
-                            {effectLines.map((line, lineIndex) => (
-                                <span
-                                    key={`${line}-${lineIndex}`}
-                                    className={`effect-chip ${getEffectChipClass(line)}`}
-                                >
-                                    {line}
-                                </span>
-                            ))}
-                        </span>
+                        {effectLines.length > 0 ? (
+                            <span className="effects-details">Effects:
+                                {effectLines.map((line, lineIndex) => (
+                                    <span
+                                        key={`${line}-${lineIndex}`}
+                                        className={`effect-chip ${getEffectChipClass(line)}`}
+                                    >
+                                        {line}
+                                    </span>
+                                ))}
+                            </span>
                         ) : null}
-                </div>
-                }
+                    </div>
+                ) : (
+                    children
+                )}
                 {/* {elementDetails ? (
                     <>
                         <div className="element-info-title-row">

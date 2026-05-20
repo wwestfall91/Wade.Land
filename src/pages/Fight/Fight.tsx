@@ -1099,7 +1099,11 @@ function Fight() {
                         }}
                         onMouseLeave={() => setHoveredEnemyAttack(false)}
                     >
-                        {queuedEnemyAttack?.letter ?? "?"}
+                        {queuedEnemyAttack ? (
+                            <ElementIcon name={queuedEnemyAttack.letter} className="enemy-attack-marker-icon" />
+                        ) : (
+                            "?"
+                        )}
                         <div className="enemy-attack-damage">{queuedEnemyAttack?.damage ?? "?"}</div>
                     </span>
                     {isEnemySteamVisible ? (
