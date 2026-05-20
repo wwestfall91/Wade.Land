@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import type { SpellEffectConfig } from "../../combat/spellEffects";
-import { getEffectChipClass, getEffectSummaryLines } from "../../combat/effectSummary";
 import FloatingTooltip from "./FloatingTooltip";
 import ElementIcon from "../../components/ElementIcon";
 import "./Draggable.scss";
@@ -161,14 +160,6 @@ function Draggable({
 		setIsDragging(true);
 	};
 
-	const types = [type1, type2].filter(
-		(value): value is string => Boolean(value && value.trim().length > 0),
-	);
-	const toTypeClass = (value: string) =>
-		`type-${value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
-
-	const effectLines = getEffectSummaryLines(effects);
-
 	return (
 		<div
 			id="Draggable"
@@ -193,47 +184,16 @@ function Draggable({
 				open={isHovered && !isDragging && description.length > 0}
 				className="drag-description-popup"
 				clampHorizontal={false}
-			>
-				<div className="element-info-title-row">
-					<div className="element-info-header">
-						<div className="drag-title">
-							<span className="drag-title-icon">
-								<ElementIcon name={letter} />
-							</span>
-							<span className="drag-title-name">{letter}</span>
-						</div>
-						{level === 1 ? 
-						<span className="element-info-badge">BASE ELEMENT </span> : null}
-					</div>
-					<div>{description}</div>
-				</div>
-				{/* {description.length > 0 ? <div className="drag-description-text">{description}</div> : null} */}
-				<div className="drag-damage-text">Damage: {damage}</div>
-				<div className="drag-type-text">
-					<span className="drag-type-label">Types:</span>
-					<span className="drag-type-list">
-						{types.length > 0 ? (
-							types.map((type) => (
-								<span key={type} className={`type-chip ${toTypeClass(type)}`}>
-									{type}
-								</span>
-							))
-						) : (
-							<span className="type-chip type-none">None</span>
-						)}
-					</span>
-				</div>
-				{effectLines.length > 0 ? (
-					<div className="drag-effect-text">
-						<span className="drag-effect-label">Effects:</span>
-						<span className="drag-effect-list">
-							{effectLines.map((line) => (
-								<span key={line} className={`effect-chip ${getEffectChipClass(line)}`}>{line}</span>
-							))}
-						</span>
-					</div>
-				) : null}
-			</FloatingTooltip>
+				elementDetails={{
+					letter,
+					damage,
+					description,
+					type1,
+					type2,
+					effects,
+					level,
+				}}
+			/>
 			<ElementIcon name={letter} />
 		</div>
 	);
