@@ -5,6 +5,7 @@ import StartMenuModal from "./StartMenuModal.tsx";
 import { useNavigate } from "react-router";
 import PlayerStats from "../../components/PlayerStats";
 import EnemyInfo from "../../components/EnemyInfo";
+import ElementIcon from "../../components/ElementIcon";
 import { parseSpellEffectsFromRow, type SpellEffectConfig } from "../../combat/spellEffects";
 import { getEffectChipClass, getEffectSummaryLines } from "../../combat/effectSummary";
 import { type RewardElement, usePlayer } from "../../context/PlayerContext";
@@ -117,6 +118,8 @@ const INTRO_SCENE_FADEOUT_MS = 1600;
 
 const normalizeType = (value?: string): string => value?.trim().toLowerCase() ?? "";
 const normalizeElementName = (value?: string): string => value?.trim().toLowerCase() ?? "";
+const isPlasmaName = (value?: string): boolean => normalizeElementName(value) === "plasma";
+const isUnstableName = (value?: string): boolean => normalizeElementName(value) === "unstable";
 const wait = (ms: number) => new Promise<void>((resolve) => {
     window.setTimeout(resolve, ms);
 });
@@ -137,6 +140,7 @@ function Game() {
         levelFillPercent,
         initializeElements,
         combineElements,
+        addElement,
         selectedEnemy: nextEnemy,
         setSelectedEnemy: setNextEnemy,
     } = usePlayer();
@@ -144,16 +148,18 @@ function Game() {
     const elementStartRef = useRef<HTMLDivElement | null>(null);
     const dropZoneRefA = useRef<HTMLDivElement | null>(null);
     const dropZoneRefB = useRef<HTMLDivElement | null>(null);
+    const dropZoneRefC = useRef<HTMLDivElement | null>(null);
     const outputRef = useRef<HTMLDivElement | null>(null);
     const previewRef = useRef<HTMLDivElement | null>(null);
-    const dropZoneRefs = [dropZoneRefA, dropZoneRefB];
 
     const [draggables, setDraggables] = useState<DraggableItem[]>([]);
     const [recipes, setRecipes] = useState<CombinationRecipe[]>([]);
     const [enemies, setEnemies] = useState<Enemy[]>([]);
     const [baseElements, setBaseElements] = useState<RewardElement[]>([]);
+    const [allElementOptions, setAllElementOptions] = useState<RewardElement[]>([]);
     const [starterChoices, setStarterChoices] = useState<RewardElement[]>([]);
     const [selectedStarter, setSelectedStarter] = useState<RewardElement | null>(null);
+    const [isDevElementPanelOpen, setIsDevElementPanelOpen] = useState(false);
     const [hasSeenDragTutorial, setHasSeenDragTutorial] = useState(() => {
         if (typeof window === "undefined") {
             return false;
@@ -184,6 +190,68 @@ function Game() {
     const introChosenNameRef = useRef("");
     const nextId = useRef(1);
     const elementCatalogRef = useRef<Map<string, RewardElement>>(new Map());
+    const pendingDropSpawnByIdRef = useRef<Map<number, Position>>(new Map());
+
+    const activeDropZoneRefs = zoneOccupants.length === 3
+        ? [dropZoneRefA, dropZoneRefB, dropZoneRefC]
+        : [dropZoneRefA, dropZoneRefB];
+
+    const getDraggableById = useCallback((draggableId: number | null) => {
+        if (draggableId === null) {
+            return null;
+        }
+
+        return draggables.find((item) => item.id === draggableId) ?? null;
+    }, [draggables]);
+
+    const normalizeZoneOccupants = useCallback((occupants: Array<number | null>): Array<number | null> => {
+        const sanitized = occupants.map((id) => (getDraggableById(id) ? id : null));
+        const plasmaId = sanitized.find((id) => {
+            const item = getDraggableById(id);
+            return item ? isPlasmaName(item.letter) : false;
+        }) ?? null;
+
+        if (plasmaId === null) {
+            const nonPlasma = sanitized.filter((id): id is number => id !== null).slice(0, 2);
+            return [nonPlasma[0] ?? null, nonPlasma[1] ?? null];
+        }
+
+        let left: number | null = null;
+        let right: number | null = null;
+
+        if (sanitized.length === 2) {
+            const [first, second] = sanitized;
+            if (first === plasmaId && second !== null && second !== plasmaId) {
+                right = second;
+            }
+            if (second === plasmaId && first !== null && first !== plasmaId) {
+                left = first;
+            }
+        } else {
+            const possibleLeft = sanitized[0];
+            const possibleRight = sanitized[2];
+            if (possibleLeft !== null && possibleLeft !== plasmaId) {
+                left = possibleLeft;
+            }
+            if (possibleRight !== null && possibleRight !== plasmaId) {
+                right = possibleRight;
+            }
+        }
+
+        const leftovers = sanitized.filter((id): id is number => (
+            id !== null && id !== plasmaId && id !== left && id !== right
+        ));
+
+        if (left === null) {
+            left = leftovers.shift() ?? null;
+        }
+
+        if (right === null) {
+            right = leftovers.shift() ?? null;
+        }
+
+        return [left, plasmaId, right];
+    }, [getDraggableById]);
 
     const getSpawnPosition = (index: number): Position => {
         const containerRect = gameRef.current?.getBoundingClientRect();
@@ -325,6 +393,19 @@ function Game() {
             const baseElementRows = parsedRows.filter(
                 (row) => row.element1.length === 0 && row.element2.length === 0,
             );
+
+            setAllElementOptions(
+                parsedRows.map((row) => ({
+                    letter: row.name,
+                    damage: row.damage,
+                    level: row.level,
+                    description: row.description,
+                    type1: row.type1,
+                    type2: row.type2,
+                    effects: row.effects,
+                })),
+            );
+
             elementCatalogRef.current = new Map(
                 parsedRows.map((row) => [normalizeElementName(row.name), {
                     letter: row.name,
@@ -425,10 +506,12 @@ function Game() {
 
                 return {
                     ...element,
-                    initialPosition: getSpawnPosition(index),
+                    initialPosition: pendingDropSpawnByIdRef.current.get(element.id) ?? getSpawnPosition(index),
                 };
             });
         });
+
+        pendingDropSpawnByIdRef.current.clear();
 
         setZoneOccupants((previous) =>
             previous.map((occupantId) =>
@@ -446,15 +529,81 @@ function Game() {
     }, [playerProgress.elements]);
 
     useEffect(() => {
+        setZoneOccupants((previous) => {
+            const normalized = normalizeZoneOccupants(previous);
+            if (
+                normalized.length === previous.length &&
+                previous.every((value, index) => value === normalized[index])
+            ) {
+                return previous;
+            }
+
+            return normalized;
+        });
+    }, [draggables, normalizeZoneOccupants]);
+
+    useEffect(() => {
         if (enemies.length === 0 || nextEnemy) return;
         // Start with the first enemy row from the sheet.
         setNextEnemy(enemies[0]);
     }, [enemies, nextEnemy, setNextEnemy]);
 
-    const canCombine = zoneOccupants.every((occupantId) => occupantId !== null);
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.ctrlKey && event.key === "/") {
+                event.preventDefault();
+                setIsDevElementPanelOpen((previous) => !previous);
+            }
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+        return () => {
+            window.removeEventListener("keydown", handleKeyDown);
+        };
+    }, []);
+
+    const handleDevElementDragStart = (event: React.DragEvent<HTMLButtonElement>, element: RewardElement) => {
+        event.dataTransfer.effectAllowed = "copy";
+        event.dataTransfer.setData("application/x-wade-element", JSON.stringify(element));
+    };
+
+    const handleGameDrop = (event: React.DragEvent<HTMLDivElement>) => {
+        event.preventDefault();
+        const payload = event.dataTransfer.getData("application/x-wade-element");
+        if (!payload) {
+            return;
+        }
+
+        try {
+            const parsed = JSON.parse(payload) as RewardElement;
+            const nextElementId = playerProgress.elements.reduce(
+                (currentMax, element) => Math.max(currentMax, element.id),
+                0,
+            ) + 1;
+
+            const containerRect = gameRef.current?.getBoundingClientRect();
+            if (containerRect) {
+                pendingDropSpawnByIdRef.current.set(nextElementId, {
+                    x: Math.round(event.clientX - containerRect.left - 16),
+                    y: Math.round(event.clientY - containerRect.top - 16),
+                });
+            }
+
+            addElement(parsed);
+        } catch {
+            // Ignore malformed test-panel payloads.
+        }
+    };
+
+    const handleGameDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+        if (event.dataTransfer.types.includes("application/x-wade-element")) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "copy";
+        }
+    };
 
     const previewCombination = useMemo<PreviewCombination | null>(() => {
-        if (!canCombine) {
+        if (!zoneOccupants.every((occupantId) => occupantId !== null)) {
             return null;
         }
 
@@ -469,6 +618,82 @@ function Game() {
             return null;
         }
 
+        if (consumedIds.length !== zoneOccupants.length) {
+            return null;
+        }
+
+        const buildUnstableCloneResult = (
+            unstableItem: DraggableItem,
+            otherItem: DraggableItem,
+        ): PreviewCombination | null => {
+            const unstableTypes = [unstableItem.type1, unstableItem.type2]
+                .filter((type): type is string => Boolean(type && type.trim().length > 0));
+            const otherTypes = [otherItem.type1, otherItem.type2]
+                .filter((type): type is string => Boolean(type && type.trim().length > 0));
+            const hasSharedType = otherTypes.some((type) => unstableTypes.includes(type));
+
+            if (!hasSharedType) {
+                return null;
+            }
+
+            return {
+                consumedIds,
+                letter: `${otherItem.letter}+`,
+                damage: otherItem.damage,
+                level: otherItem.level,
+                description: otherItem.description,
+                type1: unstableItem.type1,
+                type2: unstableItem.type2,
+                effects: unstableItem.effects,
+            };
+        };
+
+        if (zoneOccupants.length === 3) {
+            const [leftItem, middleItem, rightItem] = occupantItems;
+            if (!leftItem || !middleItem || !rightItem || !isPlasmaName(middleItem.letter)) {
+                return null;
+            }
+
+            const sideEffects = [...(leftItem.effects ?? []), ...(rightItem.effects ?? [])];
+            const leftPrimaryType = leftItem.type1 || leftItem.type2;
+            const rightPrimaryType = rightItem.type1 || rightItem.type2;
+            const mergedTypes = [leftPrimaryType, rightPrimaryType]
+                .filter((type): type is string => Boolean(type && type.trim().length > 0))
+                .filter((type, index, collection) => collection.indexOf(type) === index)
+                .slice(0, 2);
+
+            const leftIsUnstable = isUnstableName(leftItem.letter);
+            const rightIsUnstable = isUnstableName(rightItem.letter);
+            const hasSingleUnstable = leftIsUnstable !== rightIsUnstable;
+
+            if (hasSingleUnstable) {
+                const unstableItem = leftIsUnstable ? leftItem : rightItem;
+                const otherItem = leftIsUnstable ? rightItem : leftItem;
+                return buildUnstableCloneResult(unstableItem, otherItem);
+            }
+
+            return {
+                consumedIds,
+                letter: "Unstable",
+                damage: 0,
+                level: 2,
+                description: "Unstable fusion carrying the effects of both connected elements.",
+                type1: mergedTypes[0],
+                type2: mergedTypes[1],
+                effects: sideEffects,
+            };
+        }
+
+        const [leftItem, rightItem] = occupantItems;
+        const leftIsUnstable = Boolean(leftItem && isUnstableName(leftItem.letter));
+        const rightIsUnstable = Boolean(rightItem && isUnstableName(rightItem.letter));
+
+        if (leftItem && rightItem && leftIsUnstable !== rightIsUnstable) {
+            const unstableItem = leftIsUnstable ? leftItem : rightItem;
+            const otherItem = leftIsUnstable ? rightItem : leftItem;
+            return buildUnstableCloneResult(unstableItem, otherItem);
+        }
+
         const occupantLetters = occupantItems.map((item) => item?.letter ?? "");
         const occupantDamage = occupantItems.reduce((total, item) => total + (item?.damage ?? 0), 0);
         const [leftElement, rightElement] = occupantLetters;
@@ -480,7 +705,7 @@ function Game() {
         );
 
         const combinedLetter = matchingRecipe ? matchingRecipe.result : occupantLetters.join("");
-        if (consumedIds.length !== dropZoneRefs.length || combinedLetter.length === 0) {
+        if (combinedLetter.length === 0) {
             return null;
         }
 
@@ -496,7 +721,9 @@ function Game() {
             type2: matchingRecipe?.type2,
             effects: matchingRecipe?.effects,
         };
-    }, [canCombine, draggables, dropZoneRefs.length, recipes, zoneOccupants]);
+    }, [draggables, recipes, zoneOccupants]);
+
+    const canCombine = previewCombination !== null;
 
     const getOutputCenterPosition = useCallback((): Position | null => {
         const containerRect = gameRef.current?.getBoundingClientRect();
@@ -685,13 +912,29 @@ function Game() {
                 next[zoneIndex] = draggableId;
             }
 
-            return next;
+            return normalizeZoneOccupants(next);
         });
     };
 
     const canSnapToZone = (draggableId: number, zoneIndex: number) => {
         const draggable = draggables.find((item) => item.id === draggableId);
-        if (!draggable || draggable.level >= 2) {
+        if (!draggable) {
+            return false;
+        }
+
+        const isPlasma = isPlasmaName(draggable.letter);
+        const hasThreeSlots = zoneOccupants.length === 3;
+
+        if (hasThreeSlots) {
+            if (isPlasma && zoneIndex !== 1) {
+                return false;
+            }
+            if (!isPlasma && zoneIndex === 1) {
+                return false;
+            }
+        }
+
+        if (!hasThreeSlots && draggable.level >= 2 && !isPlasma && !isUnstableName(draggable.letter)) {
             return false;
         }
 
@@ -781,7 +1024,13 @@ function Game() {
                         : "";
 
     return (
-        <div id="Game" ref={gameRef} style={{ position: "relative", width: "100%", height: "100%" }} >
+        <div
+            id="Game"
+            ref={gameRef}
+            onDragOver={handleGameDragOver}
+            onDrop={handleGameDrop}
+            style={{ position: "relative", width: "100%", height: "100%" }}
+        >
             {isIntroVisible ? (
                 <div className={`game-intro-overlay ${introPhase === "fadeout" ? "is-fading-out" : ""}`}>
                     {introPhase === "input" ? (
@@ -822,7 +1071,7 @@ function Game() {
                     effects={draggable.effects}
                     level={draggable.level}
                     containerRef={gameRef}
-                    dropZoneRefs={dropZoneRefs}
+                    dropZoneRefs={activeDropZoneRefs}
                     initialPosition={draggable.initialPosition}
                     onSnapChange={handleSnapChange}
                     canSnapToZone={canSnapToZone}
@@ -847,7 +1096,7 @@ function Game() {
                             userSelect: "none",
                         }}
                     >
-                        {previewCombination.letter}
+                        <ElementIcon name={previewCombination.letter} />
                     </div>
                     <FloatingTooltip
                         anchorElement={previewRef.current}
@@ -904,6 +1153,12 @@ function Game() {
                             <div className={`drop-zone ${hasStartedDraggingElement && !hasSeenDropZoneOneTutorial ? "is-discoverable" : ""}`} ref={dropZoneRefA}>1</div>
                             <div>+</div>
                             <div className="drop-zone" ref={dropZoneRefB}>2</div>
+                            {zoneOccupants.length === 3 ? (
+                                <>
+                                    <div>+</div>
+                                    <div className="drop-zone" ref={dropZoneRefC}>3</div>
+                                </>
+                            ) : null}
                             <div>=</div>
                         </div>
                         <div className="output" ref={outputRef} />
@@ -949,6 +1204,30 @@ function Game() {
                     onSelect={setSelectedStarter}
                     onConfirm={handleConfirmStarter}
                 />
+            ) : null}
+            {isDevElementPanelOpen ? (
+                <aside className="dev-element-panel" aria-label="Developer element panel">
+                    <div className="dev-element-panel__header">
+                        <h3>Element Spawner</h3>
+                        <button type="button" onClick={() => setIsDevElementPanelOpen(false)}>Close</button>
+                    </div>
+                    <p className="dev-element-panel__hint">Drag an element onto the game scene to spawn a copy.</p>
+                    <div className="dev-element-panel__list">
+                        {allElementOptions.map((element) => (
+                            <button
+                                key={`${element.letter}-${element.level}-${element.damage}`}
+                                type="button"
+                                className="dev-element-panel__item"
+                                draggable
+                                onDragStart={(event) => handleDevElementDragStart(event, element)}
+                                title={`${element.letter} (${element.damage} DMG)`}
+                            >
+                                <ElementIcon name={element.letter} />
+                                <span>{element.letter}</span>
+                            </button>
+                        ))}
+                    </div>
+                </aside>
             ) : null}
         </div>
     );
