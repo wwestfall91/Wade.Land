@@ -221,6 +221,13 @@
                     border-color: #ffcfcf;
                     color: #ffeabf;
                     cursor: pointer;
+
+                    .element-icon {
+                        width: 0.78rem;
+                        height: 0.78rem;
+                        margin-right: 0.14rem;
+                        flex-shrink: 0;
+                    }
                 }
 
                 .enemy-meta-chip-muted {
