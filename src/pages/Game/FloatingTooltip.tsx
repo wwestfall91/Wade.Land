@@ -144,7 +144,16 @@ function FloatingTooltip({
         return `type-badge-${value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
     };
 
+    const toTypeThemeClass = (value?: string) => {
+        if (!value || value.trim().length === 0) {
+            return "tooltip-theme-none";
+        }
+
+        return `tooltip-theme-${value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+    };
+
     const primaryBadgeType = elementDetails?.type1 ?? elementDetails?.type2;
+    const primaryThemeType = elementDetails?.type1 ?? elementDetails?.type2;
 
     return createPortal(
         <div
@@ -160,12 +169,12 @@ function FloatingTooltip({
                 zIndex: 2147483647,
             }}
         >
-            <div className="floating-tooltip__panel">
+            <div className={`floating-tooltip__panel ${elementDetails ? toTypeThemeClass(primaryThemeType) : ""}`}>
                 {elementDetails &&
                 <div className="tooltip-container">
                     <div className="element-title">
                         <div>{elementDetails.letter}</div>
-                        <div className="test-description">{elementDetails.description}</div>
+                        <div className="description">{elementDetails.description}</div>
                     </div>
                     <div className="tooltip-header">
                         <span className={`element-info-badge`}>ELEMENT</span>

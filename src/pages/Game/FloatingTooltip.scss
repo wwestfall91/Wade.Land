@@ -55,8 +55,9 @@
     text-transform: uppercase;
     text-shadow: 1px 1px 1px rgb(31, 31, 31);
 
-    > .test-description{
+    > .description{
         font-size: 12px !important;
+        text-align: center;
         text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.87);
         text-transform: none;
     }
@@ -104,6 +105,46 @@
         inset 0 0 0 2px #c9b071,
         0 8px 0 rgba(0, 0, 0, 0.29),
         0 12px 24px rgba(11, 16, 48, 0.24);
+}
+
+.floating-tooltip__panel.tooltip-theme-fire {
+    background: linear-gradient(180deg, #8b2f11 0%, #d4501f 100%);
+}
+
+.floating-tooltip__panel.tooltip-theme-water {
+    background: linear-gradient(180deg, #124071 0%, #267dc1 100%);
+}
+
+.floating-tooltip__panel.tooltip-theme-earth {
+    background: linear-gradient(180deg, #5b4027 0%, #8d6642 100%);
+}
+
+.floating-tooltip__panel.tooltip-theme-air {
+    background: linear-gradient(180deg, #5e8fa6 0%, #8ec1d4 100%);
+}
+
+.floating-tooltip__panel.tooltip-theme-lightning {
+    background: linear-gradient(180deg, #716305 0%, #b1910e 100%);
+}
+
+.floating-tooltip__panel.tooltip-theme-ice {
+    background: linear-gradient(180deg, #2b7d95 0%, #3ea7bf 100%);
+}
+
+.floating-tooltip__panel.tooltip-theme-light {
+    background: linear-gradient(180deg, #8d7623 0%, #b49a39 100%);
+}
+
+.floating-tooltip__panel.tooltip-theme-dark {
+    background: linear-gradient(180deg, #3c3354 0%, #5f5678 100%);
+}
+
+.floating-tooltip__panel.tooltip-theme-arcane {
+    background: linear-gradient(180deg, #7d3e63 0%, #b86593 100%);
+}
+
+.floating-tooltip__panel.tooltip-theme-none {
+    background: linear-gradient(180deg, #44518f 0%, #6a7ae0 100%);
 }
 
 
