@@ -10,7 +10,16 @@ import {
     type ActiveSoakStatus,
     type SpellEffectConfig,
 } from "../../combat/spellEffects";
-import { getEffectChipClass, getEffectSummaryLinesForTarget } from "../../combat/effectSummary";
+import {
+    BURN_DAMAGE_PER_STACK,
+    FREEZE_FIRE_BONUS_PER_STACK,
+    SOAK_FIRE_PENALTY_PER_STACK,
+    SOAK_LIGHTNING_BONUS_PER_STACK,
+    getBurnTickDamage,
+    getFreezeFireBonus,
+    getSoakFirePenalty,
+    getSoakLightningBonus,
+} from "../../combat/statusMath";
 import EnemyInfoSprite from "../../components/EnemyInfoSprite";
 import ElementDetailsTooltip from "../../components/ElementDetailsTooltip";
 import { usePlayer, type RewardElement } from "../../context/PlayerContext";
@@ -35,10 +44,6 @@ type EventLogEntry = {
 const HIT_FLASH_MS = 190;
 const HIT_STEP_DELAY_MS = 120;
 const EFFECT_STEP_DELAY_MS = 95;
-const BURN_DAMAGE_PER_STACK = 5;
-const SOAK_LIGHTNING_BONUS_PER_STACK = 3;
-const SOAK_FIRE_PENALTY_PER_STACK = 3;
-const FREEZE_FIRE_BONUS_PER_STACK = 10;
 const EVENT_LOG_MAX_ENTRIES = 60;
 const TURN_ENERGY = 4;
 
@@ -467,7 +472,7 @@ function Fight() {
         let currentPlayerFreeze = playerFreezeStatus;
 
         if (currentPlayerBurn) {
-            const burnDamage = Math.max(0, currentPlayerBurn.stacks * BURN_DAMAGE_PER_STACK);
+            const burnDamage = getBurnTickDamage(currentPlayerBurn.stacks);
             if (burnDamage > 0) {
                 simulatedPlayerHp = Math.max(0, simulatedPlayerHp - burnDamage);
                 applyEnemyAttack(burnDamage);
@@ -514,9 +519,9 @@ function Fight() {
                 break;
             }
 
-            const soakBonus = isLightningAttack ? currentPlayerSoakStacks * SOAK_LIGHTNING_BONUS_PER_STACK : 0;
-            const soakPenalty = isFireAttack ? currentPlayerSoakStacks * SOAK_FIRE_PENALTY_PER_STACK : 0;
-            const freezeBonus = isFireAttack ? currentPlayerFreezeStacks * FREEZE_FIRE_BONUS_PER_STACK : 0;
+            const soakBonus = isLightningAttack ? getSoakLightningBonus(currentPlayerSoakStacks) : 0;
+            const soakPenalty = isFireAttack ? getSoakFirePenalty(currentPlayerSoakStacks) : 0;
+            const freezeBonus = isFireAttack ? getFreezeFireBonus(currentPlayerFreezeStacks) : 0;
             const baseHitDamage = Math.max(0, attack.damage + soakBonus - soakPenalty + freezeBonus);
             const absorbedDamage = Math.min(currentPlayerShield, baseHitDamage);
             const remainingDamage = Math.max(0, baseHitDamage - absorbedDamage);
@@ -785,7 +790,7 @@ function Fight() {
         const burnAtTurnEnd = enemyBurnStatus;
         let nextEnemyHealth = enemyHealth;
         if (burnAtTurnEnd && nextEnemyHealth > 0) {
-            const burnDamage = Math.max(0, burnAtTurnEnd.stacks * BURN_DAMAGE_PER_STACK);
+            const burnDamage = getBurnTickDamage(burnAtTurnEnd.stacks);
             if (burnDamage > 0) {
                 nextEnemyHealth = Math.max(0, nextEnemyHealth - burnDamage);
                 setEnemyHealth(nextEnemyHealth);
@@ -927,9 +932,9 @@ function Fight() {
 
             const isCritical = spellTypes.some((type) => enemyWeaknesses.includes(type));
             hadCriticalHit ||= isCritical;
-            const soakBonus = isLightningSpell ? remainingSoakStacks * SOAK_LIGHTNING_BONUS_PER_STACK : 0;
-            const soakPenalty = isFireSpell ? remainingSoakStacks * SOAK_FIRE_PENALTY_PER_STACK : 0;
-            const freezeBonus = isFireSpell ? remainingFreezeStacks * FREEZE_FIRE_BONUS_PER_STACK : 0;
+            const soakBonus = isLightningSpell ? getSoakLightningBonus(remainingSoakStacks) : 0;
+            const soakPenalty = isFireSpell ? getSoakFirePenalty(remainingSoakStacks) : 0;
+            const freezeBonus = isFireSpell ? getFreezeFireBonus(remainingFreezeStacks) : 0;
             const baseHitDamage = Math.max(0, spell.damage + soakBonus - soakPenalty + freezeBonus);
             const hitDamage = isCritical ? baseHitDamage * 2 : baseHitDamage;
             hitDamageBreakdown.push(hitDamage);
@@ -1206,13 +1211,6 @@ function Fight() {
             <div className="enemy-zone">
                 <div className="enemy-header">
                     <span className="enemy-name">{enemy.name}</span>
-                    {enemyWeaknesses.length > 0 ? (
-                        <div className="enemy-weakness-strip" aria-label="Enemy weaknesses">
-                            {enemyWeaknesses.map((weakness) => (
-                                <span key={weakness} className={`enemy-weakness-chip ${toTypeClass(weakness)}`}>{weakness}</span>
-                            ))}
-                        </div>
-                    ) : null}
                 </div>
                 <div className="enemy-hp-bar" role="progressbar" aria-valuemin={0} aria-valuemax={enemyMaxHp} aria-valuenow={enemyHealth}>
                     <div className="enemy-hp-fill" style={{ width: `${enemyHpFillPercent}%` }} />
@@ -1338,28 +1336,14 @@ function Fight() {
                         />
                     );
                 })() : null}
-                {queuedEnemyAttack && hoveredEnemyAttack ? (
-                    <FloatingTooltip
-                        anchorElement={enemyAttackMarkerRef.current}
-                        open={hoveredEnemyAttack && Boolean(enemyAttackMarkerRef.current)}
-                        className="spell-hover-tooltip-shell enemy-attack-tooltip-shell"
+                {queuedEnemyAttack ? (
+                    <ElementDetailsTooltip
+                        element={queuedEnemyAttack}
+                        anchorElement={enemyIntentIconRef.current ?? enemyAttackMarkerRef.current}
+                        open={hoveredEnemyAttack && Boolean(enemyIntentIconRef.current ?? enemyAttackMarkerRef.current)}
+                        className="reward-element-tooltip-shell"
                         clampHorizontal={false}
-                    >
-                        <span className="spell-hover-tooltip-line">
-                            The enemy intends to attack with {queuedEnemyAttack.letter}.
-                        </span>
-                        <span className="spell-hover-tooltip-line">Damage: {queuedEnemyAttack.damage}</span>
-                        {getEffectSummaryLinesForTarget(queuedEnemyAttack.effects, "enemy").length > 0 ? (
-                            <>
-                                <span className="spell-hover-tooltip-line">Effects:</span>
-                                {getEffectSummaryLinesForTarget(queuedEnemyAttack.effects, "enemy").map((line) => (
-                                    <span key={line} className={`spell-hover-tooltip-line effect-chip ${getEffectChipClass(line)}`}>
-                                        {line}
-                                    </span>
-                                ))}
-                            </>
-                        ) : null}
-                    </FloatingTooltip>
+                    />
                 ) : null}
 
                 {/* Intent badge — always visible next to sprite */}
