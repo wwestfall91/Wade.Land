@@ -119,7 +119,10 @@ const INTRO_SCENE_FADEOUT_MS = 1600;
 const normalizeType = (value?: string): string => value?.trim().toLowerCase() ?? "";
 const normalizeElementName = (value?: string): string => value?.trim().toLowerCase() ?? "";
 const isPlasmaName = (value?: string): boolean => normalizeElementName(value) === "plasma";
-const isUnstableName = (value?: string): boolean => normalizeElementName(value) === "unstable";
+const isUnstableName = (value?: string): boolean => {
+    const normalized = normalizeElementName(value).replace(/[^a-z0-9]+/g, "");
+    return normalized === "unstable" || normalized === "unstableelement";
+};
 const wait = (ms: number) => new Promise<void>((resolve) => {
     window.setTimeout(resolve, ms);
 });
@@ -674,7 +677,7 @@ function Game() {
 
             return {
                 consumedIds,
-                letter: "Unstable",
+                letter: "Unstable Element",
                 damage: 0,
                 level: 2,
                 description: "Unstable fusion carrying the effects of both connected elements.",

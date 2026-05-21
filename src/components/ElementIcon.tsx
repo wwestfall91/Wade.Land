@@ -20,9 +20,11 @@ type ElementIconProps = {
 
 function ElementIcon({ name, className, alt }: ElementIconProps) {
     const trimmedName = name.trim();
+    const normalizedName = normalizeIconKey(trimmedName);
     const imageUrl =
         spellImageMap.get(trimmedName.toLowerCase()) ??
-        spellImageMap.get(normalizeIconKey(trimmedName));
+        spellImageMap.get(normalizedName) ??
+        (normalizedName === "unstableelement" ? spellImageMap.get("unstable") : undefined);
 
     if (imageUrl) {
         return (
