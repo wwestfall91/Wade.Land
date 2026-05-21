@@ -22,6 +22,7 @@ type EnemyDamagePopup = {
     id: number;
     text: string;
     color: string;
+    kind?: "default" | "burn";
 };
 
 type EventLogEntry = {
@@ -249,7 +250,12 @@ function Fight() {
         return `${spell.letter}${typeLabel}`;
     };
 
-    const triggerEnemyHitFeedback = (damage: number, flashColor: string) => {
+    const triggerEnemyHitFeedback = (
+        damage: number,
+        flashColor: string,
+        popupText?: string,
+        popupKind: EnemyDamagePopup["kind"] = "default",
+    ) => {
         const popupId = enemyDamagePopupIdRef.current++;
         setEnemySpriteFlashColor(flashColor);
         setIsEnemySpriteFlashing(false);
@@ -262,8 +268,9 @@ function Fight() {
             ...previous,
             {
                 id: popupId,
-                text: `-${damage}`,
+                text: popupText ?? `-${damage}`,
                 color: flashColor,
+                kind: popupKind,
             },
         ]);
 
@@ -774,6 +781,36 @@ function Fight() {
         }
 
         setIsResolvingTurn(true);
+
+        const burnAtTurnEnd = enemyBurnStatus;
+        let nextEnemyHealth = enemyHealth;
+        if (burnAtTurnEnd && nextEnemyHealth > 0) {
+            const burnDamage = Math.max(0, burnAtTurnEnd.stacks * BURN_DAMAGE_PER_STACK);
+            if (burnDamage > 0) {
+                nextEnemyHealth = Math.max(0, nextEnemyHealth - burnDamage);
+                setEnemyHealth(nextEnemyHealth);
+                triggerEnemyHitFeedback(burnDamage, "#ff8f44", `-${burnDamage} BURN`, "burn");
+                pushEventLog(
+                    `Enemy burn deals ${burnDamage} damage (${burnAtTurnEnd.stacks} stack${burnAtTurnEnd.stacks === 1 ? "" : "s"})`,
+                    "status",
+                );
+                await wait(240);
+            }
+
+            const nextDuration = burnAtTurnEnd.remainingTurns - 1;
+            setEnemyBurnStatus(nextDuration > 0 && nextEnemyHealth > 0
+                ? { ...burnAtTurnEnd, remainingTurns: nextDuration }
+                : null);
+        }
+
+        if (nextEnemyHealth <= 0) {
+            setQueuedEnemyAttack(null);
+            setUsedSpellIds([]);
+            setRemainingEnergy(TURN_ENERGY);
+            setIsResolvingTurn(false);
+            return;
+        }
+
         await triggerEnemyAttack();
         setUsedSpellIds([]);
         setRemainingEnergy(TURN_ENERGY);
@@ -1200,7 +1237,7 @@ function Fight() {
                     {enemyDamagePopups.map((popup) => (
                         <span
                             key={popup.id}
-                            className="enemy-damage-popup"
+                            className={`enemy-damage-popup ${popup.kind === "burn" ? "enemy-damage-popup--burn" : ""}`}
                             style={{ ["--popup-color" as string]: popup.color }}
                         >
                             {popup.text}
