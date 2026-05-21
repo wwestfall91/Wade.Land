@@ -112,7 +112,7 @@ describe("Fight energy usage", () => {
 
         renderFight();
 
-        await screen.findByText("Energy 4/4");
+        await screen.findByText("4/4");
 
         const sparkButton = screen.getByRole("button", { name: /spark/i });
         const waveButton = screen.getByRole("button", { name: /wave/i });
@@ -125,7 +125,7 @@ describe("Fight energy usage", () => {
         fireEvent.click(sparkButton);
 
         await waitFor(() => {
-            expect(screen.getByText("Energy 2/4")).toBeTruthy();
+            expect(screen.getByText("2/4")).toBeTruthy();
         });
 
         await waitFor(() => {
@@ -139,7 +139,7 @@ describe("Fight energy usage", () => {
         fireEvent.click(screen.getByRole("button", { name: /wave/i }));
 
         await waitFor(() => {
-            expect(screen.getByText("Energy 0/4")).toBeTruthy();
+            expect(screen.getByText("0/4")).toBeTruthy();
         });
 
         await waitFor(() => {

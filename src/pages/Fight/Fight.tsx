@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router";
 import "./Fight.scss";
 import {
@@ -101,6 +102,17 @@ function Fight() {
     const [isPlayerHit, setIsPlayerHit] = useState(false);
     const [isScreenFlashing, setIsScreenFlashing] = useState(false);
     const [isSpellCastFlashing, setIsSpellCastFlashing] = useState(false);
+
+    type Projectile = {
+        id: number;
+        letter: string;
+        x: number;
+        y: number;
+        dx: number;
+        dy: number;
+        delay: number;
+    };
+    const [projectiles, setProjectiles] = useState<Projectile[]>([]);
     const [spellCastFlashBackground, setSpellCastFlashBackground] = useState<string>("rgba(255, 255, 255, 0.16)");
     const [isCritFlashing, setIsCritFlashing] = useState(false);
     const [isCritTextVisible, setIsCritTextVisible] = useState(false);
@@ -131,7 +143,12 @@ function Fight() {
     const eventLogIdRef = useRef(1);
     const eventLogContainerRef = useRef<HTMLDivElement | null>(null);
     const spellSlotRefs = useRef<Record<number, HTMLButtonElement | null>>({});
-    const enemyAttackMarkerRef = useRef<HTMLSpanElement | null>(null);
+    const enemyAttackMarkerRef = useRef<HTMLDivElement | null>(null);
+    const enemyIntentIconRef = useRef<HTMLDivElement | null>(null);
+    const enemySpriteRef = useRef<HTMLDivElement | null>(null);
+    const playerHpBarRef = useRef<HTMLDivElement | null>(null);
+    const playerStatusStripRef = useRef<HTMLDivElement | null>(null);
+    const projectileIdRef = useRef(1);
     const enemyMetaElementRefs = useRef<Record<number, HTMLSpanElement | null>>({});
     const healFlashTimeoutRef = useRef<number | null>(null);
     const shieldFlashTimeoutRef = useRef<number | null>(null);
@@ -483,6 +500,7 @@ function Fight() {
         let currentPlayerSoakStacks = currentPlayerSoak?.stacks ?? 0;
         let currentPlayerFreezeStacks = currentPlayerFreeze?.stacks ?? 0;
         let totalEnemyHealing = 0;
+        const enemyAttackSource = enemyIntentIconRef.current ?? enemyAttackMarkerRef.current;
 
         for (let hitIndex = 0; hitIndex < hitCount; hitIndex += 1) {
             if (simulatedPlayerHp <= 0) {
@@ -504,9 +522,13 @@ function Fight() {
             }
 
             attackDamageBreakdown.push(remainingDamage);
-            totalDamageTaken += remainingDamage;
-            simulatedPlayerHp = Math.max(0, simulatedPlayerHp - remainingDamage);
-            applyEnemyAttack(remainingDamage);
+            if (remainingDamage > 0) {
+                launchProjectileBurst(attack.letter, enemyAttackSource, playerHpBarRef.current, 1, 180);
+                await wait(220);
+                totalDamageTaken += remainingDamage;
+                simulatedPlayerHp = Math.max(0, simulatedPlayerHp - remainingDamage);
+                applyEnemyAttack(remainingDamage);
+            }
 
             if (isWaterAttack && currentPlayerBurn) {
                 currentPlayerBurn = null;
@@ -594,6 +616,15 @@ function Fight() {
             if (simulatedPlayerHp <= 0) {
                 break;
             }
+        }
+
+        const stackProjectileCount =
+            Math.max(0, totalPlayerBurnApplied) +
+            Math.max(0, totalPlayerSoakApplied) +
+            Math.max(0, convertedPlayerFreezeStacks);
+        if (stackProjectileCount > 0 && simulatedPlayerHp > 0) {
+            launchProjectileBurst(attack.letter, enemyAttackSource, playerStatusStripRef.current, stackProjectileCount, 110);
+            await wait(240);
         }
 
         if (playerSoakWasFrozen) {
@@ -747,6 +778,51 @@ function Fight() {
         setUsedSpellIds([]);
         setRemainingEnergy(TURN_ENERGY);
         setIsResolvingTurn(false);
+    };
+
+    const launchProjectileBurst = (
+        letter: string,
+        fromElement: HTMLElement | null,
+        toElement: HTMLElement | null,
+        count: number,
+        delayStep = 180,
+        startDelay = 0,
+    ) => {
+        if (!fromElement || !toElement || count <= 0) {
+            return startDelay;
+        }
+
+        const fromRect = fromElement.getBoundingClientRect();
+        const toRect = toElement.getBoundingClientRect();
+        const startX = fromRect.left + fromRect.width / 2;
+        const startY = fromRect.top + fromRect.height / 2;
+        const endX = toRect.left + toRect.width / 2;
+        const endY = toRect.top + toRect.height / 2;
+
+        const newProjectiles: Projectile[] = Array.from({ length: count }, (_, i) => ({
+            id: projectileIdRef.current++,
+            letter,
+            x: startX,
+            y: startY,
+            dx: endX - startX,
+            dy: endY - startY,
+            delay: startDelay + i * delayStep,
+        }));
+
+        setProjectiles((prev) => [...prev, ...newProjectiles]);
+
+        const maxDelay = startDelay + Math.max(0, count - 1) * delayStep;
+        window.setTimeout(() => {
+            const ids = new Set(newProjectiles.map((p) => p.id));
+            setProjectiles((prev) => prev.filter((p) => !ids.has(p.id)));
+        }, maxDelay + 600);
+
+        return startDelay + count * delayStep;
+    };
+
+    const launchProjectiles = (spell: { letter: string; effects?: SpellEffectConfig[] }, buttonEl: HTMLButtonElement | null) => {
+        const hitCount = getSpellHitCount(spell.effects);
+        launchProjectileBurst(spell.letter, buttonEl, enemySpriteRef.current, hitCount, 180);
     };
 
     const handleSlotClick = async (spell: CastableSpell) => {
@@ -1085,37 +1161,34 @@ function Fight() {
             {isScreenFlashing ? <div className="screen-hit-flash" /> : null}
             {isCritFlashing ? <div className="screen-crit-flash" /> : null}
             {isCritTextVisible ? <div className="crit-text">CRITICAL!</div> : null}
-            <div className="enemy">
-                <span className="enemy-name">{enemy.name}</span>
+
+            {/* ─── Arena wrapper ─── */}
+            <div className="fight-arena">
+
+            {/* ─── Enemy Zone ─── */}
+            <div className="enemy-zone">
+                <div className="enemy-header">
+                    <span className="enemy-name">{enemy.name}</span>
+                    {enemyWeaknesses.length > 0 ? (
+                        <div className="enemy-weakness-strip" aria-label="Enemy weaknesses">
+                            {enemyWeaknesses.map((weakness) => (
+                                <span key={weakness} className={`enemy-weakness-chip ${toTypeClass(weakness)}`}>{weakness}</span>
+                            ))}
+                        </div>
+                    ) : null}
+                </div>
                 <div className="enemy-hp-bar" role="progressbar" aria-valuemin={0} aria-valuemax={enemyMaxHp} aria-valuenow={enemyHealth}>
                     <div className="enemy-hp-fill" style={{ width: `${enemyHpFillPercent}%` }} />
                     <span className="enemy-hp-label">{enemyHealth} / {enemyMaxHp} HP</span>
                 </div>
+                <div className="enemy-stage">
                 <div
+                    ref={enemySpriteRef}
                     className={`enemy-sprite-card ${isEnemySpriteFlashing ? "is-hit-flash" : ""}`}
                     style={{ ["--enemy-hit-flash" as string]: enemySpriteFlashColor }}
                 >
                     <span className="enemy-sprite-hitbox">
                         <EnemyInfoSprite enemyName={enemy.name} spritePath={enemy.sprite ?? ""} />
-                    </span>
-                    <span
-                        ref={enemyAttackMarkerRef}
-                        className={`enemy-attack-marker ${queuedEnemyAttack ? "" : "is-hidden"} ${isReadyingNextAttack ? "is-readying" : ""}`}
-                        aria-label={queuedEnemyAttack ? `Enemy intends to attack with ${queuedEnemyAttack.letter}` : "Enemy attack not yet queued"}
-                        aria-hidden={!queuedEnemyAttack}
-                        onMouseEnter={() => {
-                            if (queuedEnemyAttack) {
-                                setHoveredEnemyAttack(true);
-                            }
-                        }}
-                        onMouseLeave={() => setHoveredEnemyAttack(false)}
-                    >
-                        {queuedEnemyAttack ? (
-                            <ElementIcon name={queuedEnemyAttack.letter} className="enemy-attack-marker-icon" />
-                        ) : (
-                            "?"
-                        )}
-                        <div className="enemy-attack-damage">{queuedEnemyAttack?.damage ?? "?"}</div>
                     </span>
                     {isEnemySteamVisible ? (
                         <span className="enemy-steam-pop" aria-hidden="true">
@@ -1213,6 +1286,7 @@ function Fight() {
                         <div className="enemy-meta-footer">Rewards {enemy.experience} XP</div>
                     </div>
                 </div>
+                </div>{/* end .enemy-stage */}
                 {hoveredEnemyMetaElementIndex !== null ? (() => {
                     const hoveredElement = enemy.elements[hoveredEnemyMetaElementIndex];
                     if (!hoveredElement) {
@@ -1250,99 +1324,135 @@ function Fight() {
                         ) : null}
                     </FloatingTooltip>
                 ) : null}
-            </div>
-            <div className="spells">
-                <div className="turn-energy-indicator" aria-live="polite" aria-label={`Turn energy ${remainingEnergy} out of ${TURN_ENERGY}`}>
-                    Energy {remainingEnergy}/{TURN_ENERGY}
-                </div>
-                {player.elements.map((spell) => (
-                    <button
-                        key={spell.id}
-                        ref={(element) => {
-                            spellSlotRefs.current[spell.id] = element;
-                        }}
-                        type="button"
-                        className={`spell-slot ${flashingSlotId === spell.id ? "is-flashing" : ""}`}
-                        disabled={
-                            usedSpellIds.includes(spell.id) ||
-                            isGameOver ||
-                            isResolvingTurn ||
-                            remainingEnergy <= 0 ||
-                            remainingEnergy < getSpellEnergyCost(spell)
-                        }
-                        style={getSpellSlotStyle(spell.type1, spell.type2)}
-                        onMouseEnter={() => setHoveredSpellId(spell.id)}
-                        onMouseLeave={() => setHoveredSpellId((current) => (current === spell.id ? null : current))}
-                        onClick={() => handleSlotClick({
-                            id: spell.id,
-                            letter: spell.letter,
-                            damage: spell.damage,
-                            energy: spell.energy,
-                            type1: spell.type1,
-                            type2: spell.type2,
-                            effects: spell.effects,
-                        })}
-                        onAnimationEnd={() => handleFlashEnd(spell.id)}
-                    >
-                        <FloatingTooltip
-                            anchorElement={spellSlotRefs.current[spell.id]}
-                            open={hoveredSpellId === spell.id}
-                            className="drag-description-popup"
-                            clampHorizontal={false}
-                            elementDetails={{
-                                letter: spell.letter,
-                                damage: spell.damage,
-                                energy: spell.energy,
-                                description: spell.description,
-                                type1: spell.type1,
-                                type2: spell.type2,
-                                effects: spell.effects,
-                                level: spell.level,
-                            }}
-                        />
-                        <span className="spell-slot-energy-circle">{getSpellEnergyCost(spell)}</span>
-                        <span>{spell.letter}</span>
-                        <span className="spell-slot-stats">
-                            <span>{spell.damage}</span>
-                        </span>
-                    </button>
-                ))}
-                <button
-                    type="button"
-                    className="end-turn-button"
-                    onClick={handleEndTurn}
-                    disabled={isGameOver || enemyHealth <= 0 || isResolvingTurn}
+
+                {/* Intent badge — always visible next to sprite */}
+                <div
+                    ref={enemyAttackMarkerRef}
+                    className={`enemy-intent-badge ${queuedEnemyAttack ? "" : "is-hidden"} ${isReadyingNextAttack ? "is-readying" : ""}`}
+                    aria-label={queuedEnemyAttack ? `Enemy intends to attack with ${queuedEnemyAttack.letter}` : "Enemy attack not yet queued"}
+                    aria-hidden={!queuedEnemyAttack}
+                    onMouseEnter={() => { if (queuedEnemyAttack) setHoveredEnemyAttack(true); }}
+                    onMouseLeave={() => setHoveredEnemyAttack(false)}
                 >
-                    End Turn
-                </button>
+                    <div ref={enemyIntentIconRef} className="enemy-intent-icon">
+                        {queuedEnemyAttack ? (
+                            <ElementIcon name={queuedEnemyAttack.letter} className="enemy-attack-marker-icon" />
+                        ) : "?"}
+                    </div>
+                    <div className="enemy-intent-damage">{queuedEnemyAttack?.damage ?? "?"}</div>
+                    <div className="enemy-intent-label">NEXT ATTACK</div>
+                </div>
+            </div>{/* end .enemy-zone */}
+
+            {/* ─── Energy Row ─── */}
+            <div className="energy-row" aria-live="polite" aria-label={`Turn energy ${remainingEnergy} out of ${TURN_ENERGY}`}>
+                <span className="energy-row-label">{isResolvingTurn ? "ENEMY TURN" : "YOUR TURN"}</span>
+                <div className="energy-pips">
+                    {Array.from({ length: TURN_ENERGY }).map((_, i) => (
+                        <span
+                            key={i}
+                            className={`energy-pip ${i < remainingEnergy ? "is-active" : "is-spent"}`}
+                            aria-hidden="true"
+                        />
+                    ))}
+                </div>
+                <span className="energy-row-count">{remainingEnergy}/{TURN_ENERGY}</span>
             </div>
-            <div className="player-hp-wrap">
-                {playerName.trim().length > 0 ? <div className="player-name-banner">{playerName.trim()}</div> : null}
-                <div className="player-status-strip" aria-label="Player status effects">
-                    <span
-                        className={`player-status-badge player-status-badge--burn ${playerBurnStatus ? "" : "is-hidden"}`}
-                        aria-label={playerBurnStatus ? `Burn ${playerBurnStatus.stacks}` : undefined}
-                        aria-hidden={!playerBurnStatus}
-                    >
-                        <span className="player-status-icon" aria-hidden="true">🔥</span>
-                        <span className="player-status-count">{playerBurnStatus?.stacks ?? ""}</span>
-                        <span className="player-status-tooltip">
-                            <span>Burn Stacks: {playerBurnStatus?.stacks ?? 0}</span>
-                            <span>Expires in: {playerBurnStatus?.remainingTurns ?? 0} turns</span>
-                            <span>Damage: {(playerBurnStatus?.stacks ?? 0) * BURN_DAMAGE_PER_STACK}</span>
+
+            {/* ─── Spell Hand ─── */}
+            <div className="spell-hand">
+                <div className="spell-hand-scroll">
+                    {player.elements.map((spell) => (
+                        <button
+                            key={spell.id}
+                            ref={(element) => {
+                                spellSlotRefs.current[spell.id] = element;
+                            }}
+                            type="button"
+                            className={`spell-card ${flashingSlotId === spell.id ? "is-flashing" : ""} ${usedSpellIds.includes(spell.id) ? "is-used" : ""} ${(!usedSpellIds.includes(spell.id) && !isGameOver && !isResolvingTurn && remainingEnergy < getSpellEnergyCost(spell)) ? "is-unaffordable" : ""}`}
+                            disabled={
+                                usedSpellIds.includes(spell.id) ||
+                                isGameOver ||
+                                isResolvingTurn ||
+                                remainingEnergy <= 0 ||
+                                remainingEnergy < getSpellEnergyCost(spell)
+                            }
+                            style={getSpellSlotStyle(spell.type1, spell.type2)}
+                            onMouseEnter={() => setHoveredSpellId(spell.id)}
+                            onMouseLeave={() => setHoveredSpellId((current) => (current === spell.id ? null : current))}
+                            onClick={(e) => {
+                                launchProjectiles(
+                                    { letter: spell.letter, effects: spell.effects },
+                                    e.currentTarget as HTMLButtonElement,
+                                );
+                                handleSlotClick({
+                                    id: spell.id,
+                                    letter: spell.letter,
+                                    damage: spell.damage,
+                                    energy: spell.energy,
+                                    type1: spell.type1,
+                                    type2: spell.type2,
+                                    effects: spell.effects,
+                                });
+                            }}
+                            onAnimationEnd={() => handleFlashEnd(spell.id)}
+                        >
+                            <FloatingTooltip
+                                anchorElement={spellSlotRefs.current[spell.id]}
+                                open={hoveredSpellId === spell.id}
+                                className="drag-description-popup"
+                                clampHorizontal={false}
+                                elementDetails={{
+                                    letter: spell.letter,
+                                    damage: spell.damage,
+                                    energy: spell.energy,
+                                    description: spell.description,
+                                    type1: spell.type1,
+                                    type2: spell.type2,
+                                    effects: spell.effects,
+                                    level: spell.level,
+                                }}
+                            />
+                            <span className="spell-card-energy">{getSpellEnergyCost(spell)}</span>
+                            <div className="spell-card-icon">
+                                <ElementIcon name={spell.letter} />
+                            </div>
+                            <div className="spell-card-name">{spell.letter}</div>
+                            <div className="spell-card-damage">{spell.damage}</div>
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* ─── Player HUD ─── */}
+            <div className="player-hud">
+                <div className="player-hud-left">
+                    {playerName.trim().length > 0 ? <div className="player-name-banner">{playerName.trim()}</div> : null}
+                    <div ref={playerStatusStripRef} className="player-status-strip" aria-label="Player status effects">
+                        <span
+                            className={`player-status-badge player-status-badge--burn ${playerBurnStatus ? "" : "is-hidden"}`}
+                            aria-label={playerBurnStatus ? `Burn ${playerBurnStatus.stacks}` : undefined}
+                            aria-hidden={!playerBurnStatus}
+                        >
+                            <span className="player-status-icon" aria-hidden="true">🔥</span>
+                            <span className="player-status-count">{playerBurnStatus?.stacks ?? ""}</span>
+                            <span className="player-status-tooltip">
+                                <span>Burn Stacks: {playerBurnStatus?.stacks ?? 0}</span>
+                                <span>Expires in: {playerBurnStatus?.remainingTurns ?? 0} turns</span>
+                                <span>Damage: {(playerBurnStatus?.stacks ?? 0) * BURN_DAMAGE_PER_STACK}</span>
+                            </span>
                         </span>
-                    </span>
-                    <span
-                        className={`player-status-badge player-status-badge--soak ${playerSoakStatus ? "" : "is-hidden"}`}
-                        aria-label={playerSoakStatus ? `Soak ${playerSoakStatus.stacks}` : undefined}
-                        aria-hidden={!playerSoakStatus}
-                    >
-                        <span className="player-status-icon" aria-hidden="true">💧</span>
-                        <span className="player-status-count">{playerSoakStatus?.stacks ?? ""}</span>
-                        <span className="player-status-tooltip">
-                            <span>Soak Stacks: {playerSoakStatus?.stacks ?? 0}</span>
-                            <span>Lightning +{(playerSoakStatus?.stacks ?? 0) * SOAK_LIGHTNING_BONUS_PER_STACK}</span>
-                            <span>Fire -{(playerSoakStatus?.stacks ?? 0) * SOAK_FIRE_PENALTY_PER_STACK}</span>
+                        <span
+                            className={`player-status-badge player-status-badge--soak ${playerSoakStatus ? "" : "is-hidden"}`}
+                            aria-label={playerSoakStatus ? `Soak ${playerSoakStatus.stacks}` : undefined}
+                            aria-hidden={!playerSoakStatus}
+                        >
+                            <span className="player-status-icon" aria-hidden="true">💧</span>
+                            <span className="player-status-count">{playerSoakStatus?.stacks ?? ""}</span>
+                            <span className="player-status-tooltip">
+                                <span>Soak Stacks: {playerSoakStatus?.stacks ?? 0}</span>
+                                <span>Lightning +{(playerSoakStatus?.stacks ?? 0) * SOAK_LIGHTNING_BONUS_PER_STACK}</span>
+                                <span>Fire -{(playerSoakStatus?.stacks ?? 0) * SOAK_FIRE_PENALTY_PER_STACK}</span>
                         </span>
                     </span>
                     <span
@@ -1357,38 +1467,53 @@ function Fight() {
                             <span>Fire gains +{(playerFreezeStatus?.stacks ?? 0) * FREEZE_FIRE_BONUS_PER_STACK} damage</span>
                         </span>
                     </span>
-                </div>
-                <div className="player-hp-row">
-                    {playerShield > 0 ? (
-                        <span className="player-shield-badge">
-                            {playerShield}
-                            <span className="player-shield-tooltip">You have {playerShield} shield</span>
-                        </span>
-                    ) : null}
-                    <div
-                        className={`player-hp-bar ${playerShield > 0 ? "has-shield" : ""} ${isPlayerHealingFlash ? "is-healing" : ""} ${isPlayerShieldFlash ? "is-shield-gain" : ""}`}
-                    role="progressbar"
-                    aria-valuemin={0}
-                    aria-valuemax={playerMaxHp}
-                    aria-valuenow={displayedPlayerHp}
-                >
-                    <div
-                        className="player-hp-fill player-hp-fill--health"
-                        style={{ width: `${playerHealthFillPercent}%` }}
-                    />
-                    <div
-                        className="player-hp-fill player-hp-fill--shield"
-                        style={{
-                            left: `${playerHealthFillPercent}%`,
-                            width: `${playerShieldTailFillPercent}%`,
-                        }}
-                    />
-                    <span className={`player-hp-label ${playerShield > 0 ? "has-shield" : ""}`}>
-                        {displayedPlayerHp} / {playerMaxHp} HP
-                    </span>
                     </div>
                 </div>
-            </div>
+                <div className="player-hud-center">
+                    <div className="player-hp-row">
+                        {playerShield > 0 ? (
+                            <span className="player-shield-badge">
+                                🛡 {playerShield}
+                                <span className="player-shield-tooltip">You have {playerShield} shield</span>
+                            </span>
+                        ) : null}
+                        <div
+                            ref={playerHpBarRef}
+                            className={`player-hp-bar ${playerShield > 0 ? "has-shield" : ""} ${isPlayerHealingFlash ? "is-healing" : ""} ${isPlayerShieldFlash ? "is-shield-gain" : ""}`}
+                            role="progressbar"
+                            aria-valuemin={0}
+                            aria-valuemax={playerMaxHp}
+                            aria-valuenow={displayedPlayerHp}
+                        >
+                            <div
+                                className="player-hp-fill player-hp-fill--health"
+                                style={{ width: `${playerHealthFillPercent}%` }}
+                            />
+                            <div
+                                className="player-hp-fill player-hp-fill--shield"
+                                style={{
+                                    left: `${playerHealthFillPercent}%`,
+                                    width: `${playerShieldTailFillPercent}%`,
+                                }}
+                            />
+                            <span className={`player-hp-label ${playerShield > 0 ? "has-shield" : ""}`}>
+                                {displayedPlayerHp} / {playerMaxHp} HP
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                <div className="player-hud-right">
+                    <button
+                        type="button"
+                        className="end-turn-button"
+                        onClick={handleEndTurn}
+                        disabled={isGameOver || enemyHealth <= 0 || isResolvingTurn}
+                    >
+                        End Turn
+                    </button>
+                </div>
+            </div>{/* end .player-hud */}
+            </div>{/* end .fight-arena */}
 
             <aside className="event-log-panel" aria-live="polite" aria-label="Fight event log">
                 <h3 className="event-log-title">Battle Log</h3>
@@ -1429,6 +1554,29 @@ function Fight() {
                     onConfirm={handleReturnHome}
                 />
             ) : null}
+            {projectiles.length > 0
+                ? createPortal(
+                    <>
+                        {projectiles.map((proj) => (
+                            <span
+                                key={proj.id}
+                                className="spell-projectile"
+                                aria-hidden="true"
+                                style={{
+                                    left: proj.x,
+                                    top: proj.y,
+                                    ["--proj-dx" as string]: `${proj.dx}px`,
+                                    ["--proj-dy" as string]: `${proj.dy}px`,
+                                    animationDelay: `${proj.delay}ms`,
+                                }}
+                            >
+                                <ElementIcon name={proj.letter} />
+                            </span>
+                        ))}
+                    </>,
+                    document.body,
+                )
+                : null}
         </div>
     );
 }
