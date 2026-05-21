@@ -31,6 +31,7 @@ export type PlayerElement = {
     id: number;
     letter: string;
     damage: number;
+    energy?: number;
     level: number;
     description: string;
     type1?: string;

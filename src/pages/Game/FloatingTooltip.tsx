@@ -22,6 +22,7 @@ type FloatingTooltipProps = {
     elementDetails?: {
         letter: string;
         damage: number;
+        energy?: number;
         description: string;
         type1?: string;
         type2?: string;
@@ -172,6 +173,11 @@ function FloatingTooltip({
             <div className={`floating-tooltip__panel ${elementDetails ? toTypeThemeClass(primaryThemeType) : ""}`}>
                 {elementDetails ? (
                     <div className="tooltip-container">
+                        {typeof elementDetails.energy === "number" ? (
+                            <span className="element-energy-badge" aria-label={`Energy ${elementDetails.energy}`}>
+                                {elementDetails.energy}
+                            </span>
+                        ) : null}
                         <div className="element-title">
                             <div>{elementDetails.letter}</div>
                             <div className="description">{elementDetails.description}</div>

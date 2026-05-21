@@ -13,6 +13,7 @@ type Props = {
 	id: number;
 	letter: string;
 	damage: number;
+	energy?: number;
 	description: string;
 	showTutorialCue?: boolean;
 	onDismissTutorialCue?: () => void;
@@ -31,6 +32,7 @@ function Draggable({
 	id,
 	letter,
 	damage,
+	energy,
 	description,
 	showTutorialCue = false,
 	onDismissTutorialCue,
@@ -187,6 +189,7 @@ function Draggable({
 				elementDetails={{
 					letter,
 					damage,
+					energy,
 					description,
 					type1,
 					type2,

@@ -25,6 +25,7 @@ function ElementDetailsTooltip({
             elementDetails={{
                 letter: element.letter,
                 damage: element.damage,
+                energy: element.energy,
                 description: element.description,
                 type1: element.type1,
                 type2: element.type2,

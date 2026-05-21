@@ -25,6 +25,7 @@ type DraggableItem = {
     id: number;
     letter: string;
     damage: number;
+    energy?: number;
     level: number;
     description: string;
     type1?: string;
@@ -38,6 +39,7 @@ type CombinationRecipe = {
     element2: string;
     result: string;
     damage: number;
+    energy?: number;
     level: number;
     description: string;
     type1?: string;
@@ -53,6 +55,8 @@ type ElementRow = {
     ["Element 2"]?: string;
     damage?: number | string;
     Damage?: number | string;
+    energy?: number | string;
+    Energy?: number | string;
     Level?: number | string;
     level?: number | string;
     Description?: string;
@@ -100,6 +104,7 @@ type PreviewCombination = {
     consumedIds: number[];
     letter: string;
     damage: number;
+    energy?: number;
     level: number;
     description: string;
     type1?: string;
@@ -368,6 +373,7 @@ function Game() {
                     element1: (row["Element 1"] ?? "").trim(),
                     element2: (row["Element 2"] ?? "").trim(),
                     damage: Number(row.damage ?? row.Damage ?? 0) || 0,
+                    energy: Math.max(0, Number(row.energy ?? row.Energy ?? 0) || 0),
                     level:
                         Number(row.Level ?? row.level ?? 0) ||
                         ((row["Element 1"] ?? "").trim().length === 0 ? 1 : 2),
@@ -385,6 +391,7 @@ function Game() {
                     element2: row.element2,
                     result: row.name,
                     damage: row.damage,
+                    energy: row.energy,
                     level: row.level,
                     description: row.description,
                     type1: row.type1,
@@ -401,6 +408,7 @@ function Game() {
                 parsedRows.map((row) => ({
                     letter: row.name,
                     damage: row.damage,
+                    energy: row.energy,
                     level: row.level,
                     description: row.description,
                     type1: row.type1,
@@ -413,6 +421,7 @@ function Game() {
                 parsedRows.map((row) => [normalizeElementName(row.name), {
                     letter: row.name,
                     damage: row.damage,
+                    energy: row.energy,
                     level: row.level,
                     description: row.description,
                     type1: row.type1,
@@ -424,6 +433,7 @@ function Game() {
                 baseElementRows.map((row) => ({
                     letter: row.name,
                     damage: row.damage,
+                    energy: row.energy,
                     level: row.level,
                     description: row.description,
                     type1: row.type1,
@@ -499,6 +509,7 @@ function Game() {
                         ...existing,
                         letter: element.letter,
                         damage: element.damage,
+                        energy: element.energy,
                         level: element.level,
                         description: element.description,
                         type1: element.type1,
@@ -643,6 +654,7 @@ function Game() {
                 consumedIds,
                 letter: `${otherItem.letter}+`,
                 damage: otherItem.damage,
+                energy: otherItem.energy,
                 level: otherItem.level,
                 description: otherItem.description,
                 type1: unstableItem.type1,
@@ -658,6 +670,7 @@ function Game() {
             }
 
             const sideEffects = [...(leftItem.effects ?? []), ...(rightItem.effects ?? [])];
+            const combinedEnergy = Math.max(0, (leftItem.energy ?? 0) + (rightItem.energy ?? 0));
             const leftPrimaryType = leftItem.type1 || leftItem.type2;
             const rightPrimaryType = rightItem.type1 || rightItem.type2;
             const mergedTypes = [leftPrimaryType, rightPrimaryType]
@@ -679,6 +692,7 @@ function Game() {
                 consumedIds,
                 letter: "Unstable Element",
                 damage: 0,
+                energy: combinedEnergy,
                 level: 2,
                 description: "Unstable fusion carrying the effects of both connected elements.",
                 type1: mergedTypes[0],
@@ -716,6 +730,7 @@ function Game() {
             consumedIds,
             letter: combinedLetter,
             damage: matchingRecipe ? matchingRecipe.damage : occupantDamage,
+            energy: matchingRecipe ? matchingRecipe.energy : 0,
             level: matchingRecipe ? matchingRecipe.level : 2,
             description: matchingRecipe
                 ? matchingRecipe.description
@@ -760,6 +775,7 @@ function Game() {
             id: nextId.current,
             letter: previewCombination.letter,
             damage: previewCombination.damage,
+            energy: previewCombination.energy,
             level: previewCombination.level,
             description: previewCombination.description,
             type1: previewCombination.type1,
@@ -1066,6 +1082,7 @@ function Game() {
                     id={draggable.id}
                     letter={draggable.letter}
                     damage={draggable.damage}
+                    energy={draggable.energy}
                     description={draggable.description}
                     showTutorialCue={draggable.id === 1 && !hasSeenDragTutorial}
                     onDismissTutorialCue={handleDismissDragTutorial}

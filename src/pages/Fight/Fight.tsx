@@ -9,7 +9,7 @@ import {
     type ActiveSoakStatus,
     type SpellEffectConfig,
 } from "../../combat/spellEffects";
-import { getEffectChipClass, getEffectSummaryLines, getEffectSummaryLinesForTarget } from "../../combat/effectSummary";
+import { getEffectChipClass, getEffectSummaryLinesForTarget } from "../../combat/effectSummary";
 import EnemyInfoSprite from "../../components/EnemyInfoSprite";
 import ElementDetailsTooltip from "../../components/ElementDetailsTooltip";
 import { usePlayer, type RewardElement } from "../../context/PlayerContext";
@@ -38,6 +38,7 @@ const SOAK_LIGHTNING_BONUS_PER_STACK = 3;
 const SOAK_FIRE_PENALTY_PER_STACK = 3;
 const FREEZE_FIRE_BONUS_PER_STACK = 10;
 const EVENT_LOG_MAX_ENTRIES = 60;
+const TURN_ENERGY = 4;
 
 const wait = (ms: number) => new Promise<void>((resolve) => {
     window.setTimeout(resolve, ms);
@@ -79,6 +80,7 @@ type CastableSpell = {
     id: number;
     letter: string;
     damage: number;
+    energy?: number;
     type1?: string;
     type2?: string;
     effects?: SpellEffectConfig[];
@@ -93,6 +95,7 @@ function Fight() {
     const [hoveredEnemyAttack, setHoveredEnemyAttack] = useState(false);
     const [hoveredEnemyMetaElementIndex, setHoveredEnemyMetaElementIndex] = useState<number | null>(null);
     const [usedSpellIds, setUsedSpellIds] = useState<number[]>([]);
+    const [remainingEnergy, setRemainingEnergy] = useState(TURN_ENERGY);
     const [eventLogEntries, setEventLogEntries] = useState<EventLogEntry[]>([]);
     const [isGameOver, setIsGameOver] = useState(false);
     const [isPlayerHit, setIsPlayerHit] = useState(false);
@@ -252,9 +255,7 @@ function Fight() {
         }, 480);
     };
 
-    const getSpellTooltipLines = (spell: { damage: number; effects?: SpellEffectConfig[] }) => {
-        return [`Damage: ${spell.damage}`, ...getEffectSummaryLines(spell.effects)];
-    };
+    const getSpellEnergyCost = (spell: { energy?: number }) => Math.max(0, spell.energy ?? 0);
 
     const inferEventKind = (message: string): EventLogEntry["kind"] => {
         if (message.startsWith("Enemy attacks")) {
@@ -744,15 +745,25 @@ function Fight() {
         setIsResolvingTurn(true);
         await triggerEnemyAttack();
         setUsedSpellIds([]);
+        setRemainingEnergy(TURN_ENERGY);
         setIsResolvingTurn(false);
     };
 
     const handleSlotClick = async (spell: CastableSpell) => {
-        if (usedSpellIds.includes(spell.id) || enemyHealth <= 0 || isGameOver || isResolvingTurn) {
+        const spellEnergyCost = getSpellEnergyCost(spell);
+        if (
+            usedSpellIds.includes(spell.id) ||
+            enemyHealth <= 0 ||
+            isGameOver ||
+            isResolvingTurn ||
+            remainingEnergy <= 0 ||
+            remainingEnergy < spellEnergyCost
+        ) {
             return;
         }
 
         setIsResolvingTurn(true);
+        setRemainingEnergy((previous) => Math.max(0, previous - spellEnergyCost));
 
         setSpellCastFlashBackground(getSpellCastFlashBackground(spell.type1, spell.type2));
         setIsSpellCastFlashing(false);
@@ -1241,6 +1252,9 @@ function Fight() {
                 ) : null}
             </div>
             <div className="spells">
+                <div className="turn-energy-indicator" aria-live="polite" aria-label={`Turn energy ${remainingEnergy} out of ${TURN_ENERGY}`}>
+                    Energy {remainingEnergy}/{TURN_ENERGY}
+                </div>
                 {player.elements.map((spell) => (
                     <button
                         key={spell.id}
@@ -1249,7 +1263,13 @@ function Fight() {
                         }}
                         type="button"
                         className={`spell-slot ${flashingSlotId === spell.id ? "is-flashing" : ""}`}
-                        disabled={usedSpellIds.includes(spell.id) || isGameOver || isResolvingTurn}
+                        disabled={
+                            usedSpellIds.includes(spell.id) ||
+                            isGameOver ||
+                            isResolvingTurn ||
+                            remainingEnergy <= 0 ||
+                            remainingEnergy < getSpellEnergyCost(spell)
+                        }
                         style={getSpellSlotStyle(spell.type1, spell.type2)}
                         onMouseEnter={() => setHoveredSpellId(spell.id)}
                         onMouseLeave={() => setHoveredSpellId((current) => (current === spell.id ? null : current))}
@@ -1257,6 +1277,7 @@ function Fight() {
                             id: spell.id,
                             letter: spell.letter,
                             damage: spell.damage,
+                            energy: spell.energy,
                             type1: spell.type1,
                             type2: spell.type2,
                             effects: spell.effects,
@@ -1266,17 +1287,24 @@ function Fight() {
                         <FloatingTooltip
                             anchorElement={spellSlotRefs.current[spell.id]}
                             open={hoveredSpellId === spell.id}
-                            className="spell-hover-tooltip-shell"
+                            className="drag-description-popup"
                             clampHorizontal={false}
-                        >
-                            {getSpellTooltipLines(spell).map((line) => (
-                                <span key={line} className={`spell-hover-tooltip-line effect-chip ${getEffectChipClass(line)}`}>
-                                    {line}
-                                </span>
-                            ))}
-                        </FloatingTooltip>
+                            elementDetails={{
+                                letter: spell.letter,
+                                damage: spell.damage,
+                                energy: spell.energy,
+                                description: spell.description,
+                                type1: spell.type1,
+                                type2: spell.type2,
+                                effects: spell.effects,
+                                level: spell.level,
+                            }}
+                        />
+                        <span className="spell-slot-energy-circle">{getSpellEnergyCost(spell)}</span>
                         <span>{spell.letter}</span>
-                        <span>{spell.damage}</span>
+                        <span className="spell-slot-stats">
+                            <span>{spell.damage}</span>
+                        </span>
                     </button>
                 ))}
                 <button
