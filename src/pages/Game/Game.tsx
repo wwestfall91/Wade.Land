@@ -132,6 +132,10 @@ const INTRO_TEXT_FADE_GAP_MS = 850;
 const INTRO_INPUT_FADE_MS = 640;
 const INTRO_SCENE_FADEOUT_MS = 1600;
 const REWARD_CUE_MS = 260;
+const POTION_FILL_PER_WATER_CREATE = 25;
+const POTION_FILL_CAP = 100;
+const POTION_BREW_FLASH_MS = 320;
+const POTION_SPARKLE_TRAVEL_MS = 620;
 const SOULS_PER_FLYING_ICON = 5;
 const SOUL_COLLECTION_TRAVEL_MS = 620;
 const SOUL_COLLECTION_STAGGER_MS = 82;
@@ -144,6 +148,15 @@ type SoulFlightIcon = {
     startY: number;
     midX: number;
     midY: number;
+    toX: number;
+    toY: number;
+    delayMs: number;
+};
+
+type PotionSparkle = {
+    id: number;
+    startX: number;
+    startY: number;
     toX: number;
     toY: number;
     delayMs: number;
@@ -178,6 +191,8 @@ function Game() {
         combineElements,
         addSouls,
         addElement,
+        healPlayer,
+        levels,
         selectedEnemy: nextEnemy,
         setSelectedEnemy: setNextEnemy,
     } = usePlayer();
@@ -224,6 +239,11 @@ function Game() {
     const [isIntroInputFadingOut, setIsIntroInputFadingOut] = useState(false);
     const [fightReward, setFightReward] = useState<FightRewardState | null>(null);
     const [isFightVictoryCueVisible, setIsFightVictoryCueVisible] = useState(false);
+    const [potionCount, setPotionCount] = useState(0);
+    const [potionFillPercent, setPotionFillPercent] = useState(0);
+    const [isPotionUnavailableFeedback, setIsPotionUnavailableFeedback] = useState(false);
+    const [isPotionBrewedFlash, setIsPotionBrewedFlash] = useState(false);
+    const [potionSparkles, setPotionSparkles] = useState<PotionSparkle[]>([]);
     const [isSoulPulseVisible, setIsSoulPulseVisible] = useState(false);
     const [soulPulseAmount, setSoulPulseAmount] = useState(0);
     const [isSoulCounterPopping, setIsSoulCounterPopping] = useState(false);
@@ -236,6 +256,10 @@ function Game() {
     const elementCatalogRef = useRef<Map<string, RewardElement>>(new Map());
     const pendingDropSpawnByIdRef = useRef<Map<number, Position>>(new Map());
     const rewardCueTimeoutRef = useRef<number | null>(null);
+    const potionUnavailableTimeoutRef = useRef<number | null>(null);
+    const potionBrewFlashTimeoutRef = useRef<number | null>(null);
+    const potionSparkleIdRef = useRef(1);
+    const potionSparkleTimeoutsRef = useRef<number[]>([]);
     const soulAnimationTimeoutsRef = useRef<number[]>([]);
     const soulCounterPopTimeoutRef = useRef<number | null>(null);
 
@@ -243,6 +267,15 @@ function Game() {
         if (rewardCueTimeoutRef.current !== null) {
             window.clearTimeout(rewardCueTimeoutRef.current);
         }
+        if (potionUnavailableTimeoutRef.current !== null) {
+            window.clearTimeout(potionUnavailableTimeoutRef.current);
+        }
+        if (potionBrewFlashTimeoutRef.current !== null) {
+            window.clearTimeout(potionBrewFlashTimeoutRef.current);
+        }
+        potionSparkleTimeoutsRef.current.forEach((timeoutId) => {
+            window.clearTimeout(timeoutId);
+        });
         if (soulCounterPopTimeoutRef.current !== null) {
             window.clearTimeout(soulCounterPopTimeoutRef.current);
         }
@@ -266,6 +299,53 @@ function Game() {
             soulCounterPopTimeoutRef.current = window.setTimeout(() => {
                 setIsSoulCounterPopping(false);
             }, 240);
+        });
+    }, []);
+
+    const triggerPotionBrewFlash = useCallback(() => {
+        setIsPotionBrewedFlash(false);
+        window.requestAnimationFrame(() => {
+            setIsPotionBrewedFlash(true);
+            if (potionBrewFlashTimeoutRef.current !== null) {
+                window.clearTimeout(potionBrewFlashTimeoutRef.current);
+            }
+
+            potionBrewFlashTimeoutRef.current = window.setTimeout(() => {
+                setIsPotionBrewedFlash(false);
+            }, POTION_BREW_FLASH_MS);
+        });
+    }, []);
+
+    const launchPotionSparkle = useCallback((spawnViewportPosition: Position) => {
+        const potionTarget = document.querySelector("#Game .player-stats-dock .player-potion-panel") as HTMLElement | null;
+        if (!potionTarget) {
+            return;
+        }
+
+        const targetRect = potionTarget.getBoundingClientRect();
+        const targetX = targetRect.left + targetRect.width / 2;
+        const targetY = targetRect.top + targetRect.height / 2;
+        const burstSparkles: PotionSparkle[] = Array.from({ length: 3 }, (_, index) => {
+            const delayMs = index * 65;
+            const jitterX = (Math.random() - 0.5) * 14;
+            const jitterY = (Math.random() - 0.5) * 14;
+            return {
+                id: potionSparkleIdRef.current++,
+                startX: spawnViewportPosition.x + jitterX,
+                startY: spawnViewportPosition.y + jitterY,
+                toX: targetX - (spawnViewportPosition.x + jitterX),
+                toY: targetY - (spawnViewportPosition.y + jitterY),
+                delayMs,
+            };
+        });
+
+        setPotionSparkles((previous) => [...previous, ...burstSparkles]);
+
+        burstSparkles.forEach((sparkle) => {
+            const cleanupTimeoutId = window.setTimeout(() => {
+                setPotionSparkles((previous) => previous.filter((entry) => entry.id !== sparkle.id));
+            }, sparkle.delayMs + POTION_SPARKLE_TRAVEL_MS + 110);
+            potionSparkleTimeoutsRef.current.push(cleanupTimeoutId);
         });
     }, []);
 
@@ -875,6 +955,30 @@ function Game() {
         nextId.current += 1;
 
         combineElements(previewCombination.consumedIds, newDraggable);
+        const createdElementTypes = [newDraggable.type1, newDraggable.type2]
+            .map((type) => normalizeType(type))
+            .filter((type) => type.length > 0);
+        if (createdElementTypes.includes("water")) {
+            const containerRect = gameRef.current?.getBoundingClientRect();
+            if (containerRect) {
+                launchPotionSparkle({
+                    x: containerRect.left + targetPosition.x + 16,
+                    y: containerRect.top + targetPosition.y + 16,
+                });
+            }
+
+            setPotionFillPercent((previousFill) => {
+                const totalFill = previousFill + POTION_FILL_PER_WATER_CREATE;
+                const createdPotions = Math.floor(totalFill / POTION_FILL_CAP);
+
+                if (createdPotions > 0) {
+                    setPotionCount((previousPotions) => previousPotions + createdPotions);
+                    triggerPotionBrewFlash();
+                }
+
+                return totalFill % POTION_FILL_CAP;
+            });
+        }
 
         setDraggables((previous) => {
             const preserved = previous.filter(
@@ -894,7 +998,7 @@ function Game() {
         setIsPreviewDragging(false);
         setPreviewPosition(null);
         previewPositionRef.current = null;
-    }, [combineElements, getOutputCenterPosition, previewCombination]);
+    }, [combineElements, getOutputCenterPosition, launchPotionSparkle, previewCombination, triggerPotionBrewFlash]);
 
     useEffect(() => {
         if (previewCombination) {
@@ -971,6 +1075,26 @@ function Game() {
             window.removeEventListener("pointerup", handleUp);
         };
     }, [finalizeCombination, isPreviewDragging, previewPointerOffset.x, previewPointerOffset.y]);
+
+    const handlePotionClick = useCallback(() => {
+        if (potionCount <= 0) {
+            setIsPotionUnavailableFeedback(false);
+            window.requestAnimationFrame(() => {
+                setIsPotionUnavailableFeedback(true);
+                if (potionUnavailableTimeoutRef.current !== null) {
+                    window.clearTimeout(potionUnavailableTimeoutRef.current);
+                }
+                potionUnavailableTimeoutRef.current = window.setTimeout(() => {
+                    setIsPotionUnavailableFeedback(false);
+                }, 340);
+            });
+            return;
+        }
+
+        const playerMaxHp = levels.find((levelDef) => levelDef.level === playerProgress.level)?.hp ?? Math.max(playerProgress.hp, 1);
+        setPotionCount((previous) => Math.max(0, previous - 1));
+        healPlayer(playerMaxHp);
+    }, [healPlayer, levels, playerProgress.hp, playerProgress.level, potionCount]);
 
     const handlePreviewPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
         event.stopPropagation();
@@ -1231,6 +1355,25 @@ function Game() {
             onDrop={handleGameDrop}
             style={{ position: "relative", width: "100%", height: "100%" }}
         >
+            {potionSparkles.length > 0 ? (
+                <div className="potion-sparkle-layer" aria-hidden="true">
+                    {potionSparkles.map((sparkle) => (
+                        <span
+                            key={sparkle.id}
+                            className="potion-sparkle"
+                            style={{
+                                left: `${sparkle.startX}px`,
+                                top: `${sparkle.startY}px`,
+                                animationDelay: `${sparkle.delayMs}ms`,
+                                ["--potion-sparkle-x" as string]: `${sparkle.toX}px`,
+                                ["--potion-sparkle-y" as string]: `${sparkle.toY}px`,
+                            }}
+                        >
+                            ✦
+                        </span>
+                    ))}
+                </div>
+            ) : null}
             {isSoulPulseVisible ? (
                 <div className="soul-pulse-cue" aria-hidden="true">
                     <img src={soulIcon} alt="" className="soul-pulse-cue-icon" />
@@ -1415,6 +1558,11 @@ function Game() {
                         playerName={playerName}
                         level={playerProgress.level}
                         hp={playerProgress.hp}
+                        potionCount={potionCount}
+                        potionFillPercent={potionFillPercent}
+                        onPotionClick={handlePotionClick}
+                        isPotionUnavailableFeedback={isPotionUnavailableFeedback}
+                        isPotionBrewedFlash={isPotionBrewedFlash}
                         souls={playerProgress.souls}
                         className={`player-stats-dock${isSoulCounterPopping ? " is-soul-counter-pop" : ""}`}
                     />

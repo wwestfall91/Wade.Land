@@ -9,6 +9,11 @@ type PlayerStatsProps = {
     hp: number;
     maxHp?: number;
     souls: number;
+    potionCount: number;
+    potionFillPercent: number;
+    onPotionClick?: () => void;
+    isPotionUnavailableFeedback?: boolean;
+    isPotionBrewedFlash?: boolean;
     className?: string;
 };
 
@@ -18,6 +23,11 @@ function PlayerStats({
     hp,
     maxHp,
     souls,
+    potionCount,
+    potionFillPercent,
+    onPotionClick,
+    isPotionUnavailableFeedback,
+    isPotionBrewedFlash,
     className,
 }: PlayerStatsProps) {
     const { player, levels } = usePlayer();
@@ -39,13 +49,28 @@ function PlayerStats({
                         <span className="player-level-label">LV</span>
                         <span className="player-level-value">{level}</span>
                     </div>
-                <div className="player-souls-panel" aria-label={`Souls ${souls}`} title="Souls are earned from victories and persist between battles.">
-                    <img src={soulIcon} alt="" aria-hidden="true" className="player-souls-icon" />
-                    <div className="player-souls-copy">
-                        <span className="player-souls-label">SOULS</span>
-                        <span className="player-souls-value">{souls}</span>
+                    <button
+                        type="button"
+                        className={`player-potion-panel${isPotionUnavailableFeedback ? " is-unavailable" : ""}${isPotionBrewedFlash ? " is-brew-flash" : ""}`}
+                        aria-label={`Potions ${potionCount}. Potion charge ${Math.round(potionFillPercent)} percent`}
+                        title={potionCount > 0 ? "Use potion to restore full health" : "Create Water-type elements to brew a potion"}
+                        onClick={onPotionClick}
+                    >
+                        <span className="player-potion-count">{potionCount}</span>
+                        <span className="player-potion-meter" aria-hidden="true">
+                            <span
+                                className="player-potion-meter-fill"
+                                style={{ height: `${Math.max(0, Math.min(100, potionFillPercent))}%` }}
+                            />
+                        </span>
+                    </button>
+                    <div className="player-souls-panel" aria-label={`Souls ${souls}`} title="Souls are earned from victories and persist between battles.">
+                        <img src={soulIcon} alt="" aria-hidden="true" className="player-souls-icon" />
+                        <div className="player-souls-copy">
+                            <span className="player-souls-label">SOULS</span>
+                            <span className="player-souls-value">{souls}</span>
+                        </div>
                     </div>
-                </div>
                 </div>
             </div>
 
