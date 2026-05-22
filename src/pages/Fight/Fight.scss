@@ -671,7 +671,7 @@
     }
 
     .enemy-intent-damage {
-        font-size: 1.3rem;
+        font-size: 1.2rem;
         font-weight: 900;
         color: #fff7c2;
         font-family: "Trebuchet MS", "Segoe UI", sans-serif;
@@ -1391,45 +1391,66 @@
     }
 
     .player-shield-badge {
+        position: relative;
         flex-shrink: 0;
-        min-width: 1.85rem;
-        height: 1.85rem;
+        width: 2.75rem;
+        height: 2.75rem;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        border-radius: 4px;
-        border: 1px solid rgba(77, 163, 147, 0.74);
-        background: linear-gradient(180deg, #b2f5e8, #6ebcae);
-        color: #073a33;
-        font-size: 0.96rem;
-        font-weight: 800;
-        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        background-position: center;
+        background-repeat: no-repeat;
+        background-size: contain;
+        filter: drop-shadow(0 4px 8px rgba(9, 34, 72, 0.5));
+    }
+
+    .player-shield-value {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -62%);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #ffffff;
+        font-size: 1.3rem;
+        font-weight: 600;
+        font-family: Verdana, Tahoma, "Segoe UI", sans-serif;
         font-variant-numeric: tabular-nums;
-        text-shadow: 0 1px 0 rgba(214, 255, 244, 0.45);
-        box-shadow: 0 5px 12px rgba(13, 58, 51, 0.28);
+        line-height: 1;
+        letter-spacing: 0;
+        -webkit-text-stroke: 0;
+        text-shadow:
+            1px 0 0 rgba(0, 0, 0, 0.98),
+            -1px 0 0 rgba(0, 0, 0, 0.98),
+            0 1px 0 rgba(0, 0, 0, 0.98),
+            0 -1px 0 rgba(0, 0, 0, 0.98),
+            0 2px 3px rgba(0, 0, 0, 0.7);
+    }
 
-        .player-shield-tooltip {
-            position: absolute;
-            left: 50%;
-            bottom: calc(100% + 0.45rem);
-            transform: translateX(-50%) scale(1.5);
-            transform-origin: bottom center;
-            padding: 0.26rem 0.5rem;
-            border-radius: 0.45rem;
-            border: 1px solid rgba(255, 255, 255, 0.28);
-            background: rgba(10, 10, 10, 0.92);
-            color: #fff;
-            font-size: 0.68rem;
-            font-weight: 700;
-            white-space: nowrap;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 140ms ease;
-        }
+    .player-shield-tooltip {
+        position: absolute;
+        left: 50%;
+        bottom: calc(100% + 0.35rem);
+        transform: translateX(-50%);
+        padding: 0.2rem 0.46rem;
+        border-radius: 4px;
+        border: 1px solid rgba(255, 255, 255, 0.28);
+        background: rgba(12, 12, 12, 0.93);
+        color: #ffffff;
+        font-size: 0.66rem;
+        font-weight: 700;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        white-space: nowrap;
+        line-height: 1.25;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 140ms ease;
+        z-index: 3;
+    }
 
-        &:hover .player-shield-tooltip {
-            opacity: 1;
-        }
+    .player-shield-badge:hover .player-shield-tooltip {
+        opacity: 1;
     }
 
     .game-over-overlay {

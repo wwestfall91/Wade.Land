@@ -26,6 +26,7 @@ import { usePlayer, type RewardElement } from "../../context/PlayerContext";
 import RewardModal from "./RewardModal";
 import FloatingTooltip from "../Game/FloatingTooltip";
 import ElementIcon from "../../components/ElementIcon";
+import shieldIcon from "../../assets/icons/Shield.png";
 
 type EnemyDamagePopup = {
     id: number;
@@ -1493,9 +1494,13 @@ function Fight() {
                 <div className="player-hud-center">
                     <div className="player-hp-row">
                         {playerShield > 0 ? (
-                            <span className="player-shield-badge">
-                                🛡 {playerShield}
-                                <span className="player-shield-tooltip">You have {playerShield} shield</span>
+                            <span
+                                className="player-shield-badge"
+                                style={{ backgroundImage: `url(${shieldIcon})` }}
+                                aria-label={`Shield ${playerShield}`}
+                            >
+                                <span className="player-shield-value">{playerShield}</span>
+                                <span className="player-shield-tooltip">You have {playerShield} shield this turn</span>
                             </span>
                         ) : null}
                         <div
