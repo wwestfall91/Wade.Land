@@ -219,14 +219,23 @@
             }
         }
 
-        > .enemy-xp-footer {
+        > .enemy-souls-footer {
             margin-top: auto;
             border-top: 1px solid rgba(255, 255, 255, 0.35);
             padding-top: 0.3rem;
-            text-align: center;
-            color: #ffe26b;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.25rem;
+            color: #00BD6F;
             font-size: 0.78rem;
             letter-spacing: 0.02em;
+
+            > .enemy-souls-icon {
+                width: 0.82rem;
+                height: 0.82rem;
+                object-fit: contain;
+            }
         }
     }
 

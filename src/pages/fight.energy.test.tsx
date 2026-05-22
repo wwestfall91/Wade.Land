@@ -29,7 +29,7 @@ const renderFight = () => {
                         enemy: {
                             name: "Training Dummy",
                             hp: 999,
-                            experience: 0,
+                            souls: 0,
                             sprite: "",
                             weaknesses: [],
                             elements: [
@@ -63,7 +63,7 @@ describe("Fight energy usage", () => {
             player: {
                 level: 1,
                 hp: 100,
-                experience: 0,
+                souls: 0,
                 elements: [
                     {
                         id: 1,
@@ -95,11 +95,9 @@ describe("Fight energy usage", () => {
                 ],
             },
             playerName: "Tester",
-            levelFillPercent: 0,
-            levels: [{ level: 1, hp: 100, experience: 0 }],
+            levels: [{ level: 1, hp: 100 }],
             setPlayerName: vi.fn(),
-            setExperience: vi.fn(),
-            addExperience: vi.fn(),
+            addSouls: vi.fn(),
             initializeElements: vi.fn(),
             combineElements: vi.fn(),
             applyEnemyAttack: vi.fn(),

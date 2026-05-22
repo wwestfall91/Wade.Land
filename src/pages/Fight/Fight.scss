@@ -37,7 +37,7 @@
     }
 
     &.is-screen-shaking {
-        animation: enemyHitScreenShake 420ms ease-out;
+        animation: enemyHitScreenShake 263ms ease-out;
     }
 
     .enemy-zone {
@@ -79,7 +79,7 @@
             top: 0;
             bottom: 0;
             background: linear-gradient(90deg, #ff9478 0%, #f4624f 50%, #db3e33c0 100%);
-            transition: width 220ms ease;
+            transition: width 138ms ease;
             z-index: 0;
         }
 
@@ -137,7 +137,7 @@
             }
 
             &.is-hit-flash::after {
-                animation: enemySpriteHitFlash 190ms ease-out;
+                animation: enemySpriteHitFlash 119ms ease-out;
             }
 
             .enemy-meta-tooltip {
@@ -258,9 +258,19 @@
                     margin-top: 0.1rem;
                     padding-top: 0.3rem;
                     border-top: 1px solid rgba(238, 243, 255, 0.45);
-                    color: #ffe26b;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    gap: 0.22rem;
+                    color: #00BD6F;
                     font-size: 0.74rem;
                     text-align: center;
+
+                    .enemy-meta-souls-icon {
+                        width: 0.8rem;
+                        height: 0.8rem;
+                        object-fit: contain;
+                    }
                 }
             }
 
@@ -289,7 +299,7 @@
                 line-height: 1.1;
                 text-shadow: 0 1px 1px rgba(0, 0, 0, 0.55);
                 pointer-events: none;
-                animation: enemyDamageFloat 460ms ease-out forwards;
+                animation: enemyDamageFloat 288ms ease-out forwards;
 
                 &.enemy-damage-popup--burn {
                     border-color: rgba(255, 190, 120, 0.72);
@@ -303,7 +313,7 @@
                     box-shadow:
                         0 0 0 1px rgba(255, 155, 68, 0.34),
                         0 0 12px rgba(255, 122, 41, 0.45);
-                    animation: enemyBurnDamageFloat 560ms cubic-bezier(0.2, 0.75, 0.3, 1) forwards;
+                    animation: enemyBurnDamageFloat 350ms cubic-bezier(0.2, 0.75, 0.3, 1) forwards;
                 }
             }
 
@@ -337,7 +347,7 @@
                 }
 
                 &.is-readying {
-                    animation: enemyAttackReadying 520ms cubic-bezier(0.22, 1.4, 0.36, 1) forwards;
+                    animation: enemyAttackReadying 325ms cubic-bezier(0.22, 1.4, 0.36, 1) forwards;
                 }
 
                 .enemy-attack-marker-icon {
@@ -379,7 +389,7 @@
                     background: radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.92), rgba(198, 235, 255, 0.4) 58%, rgba(255, 255, 255, 0) 72%);
                     filter: blur(1px);
                     opacity: 0;
-                    animation: steamPuffRise 520ms ease-out forwards;
+                    animation: steamPuffRise 325ms ease-out forwards;
                 }
 
                 .steam-cloud-one {
@@ -650,7 +660,7 @@
         }
 
         &.is-readying {
-            animation: enemyAttackReadying 520ms cubic-bezier(0.22, 1.4, 0.36, 1) forwards;
+            animation: enemyAttackReadying 325ms cubic-bezier(0.22, 1.4, 0.36, 1) forwards;
         }
     }
 
@@ -734,14 +744,14 @@
             background: radial-gradient(circle at 30% 25%, #fff9cf 0%, #ffd86b 55%, #c08b19 100%);
             border: 2px solid #fff3b8;
             box-shadow: 0 0 6px rgba(255, 212, 92, 0.8), 0 0 12px rgba(228, 162, 43, 0.55);
-            animation: pipActivate 220ms ease-out;
+            animation: pipActivate 138ms ease-out;
         }
 
         &.is-spent {
             background: radial-gradient(circle at 30% 25%, #3a4060 0%, #1a1e38 100%);
             border: 2px solid rgba(100, 120, 200, 0.35);
             box-shadow: none;
-            animation: pipSpend 220ms ease-out;
+            animation: pipSpend 138ms ease-out;
         }
     }
 
@@ -829,7 +839,7 @@
         }
 
         &.is-flashing {
-            animation: flashYellow 350ms ease;
+            animation: flashYellow 219ms ease;
         }
     }
 
@@ -1117,7 +1127,7 @@
         pointer-events: none;
         background-color: rgba(255, 0, 0, 0.3);
         z-index: 50;
-        animation: enemyHitScreenFlash 420ms ease-out forwards;
+        animation: enemyHitScreenFlash 263ms ease-out forwards;
     }
 
     .screen-spell-flash {
@@ -1126,7 +1136,7 @@
         pointer-events: none;
         background: var(--spell-cast-flash-bg, rgba(255, 255, 255, 0.16));
         z-index: 45;
-        animation: spellCastScreenFlash 190ms ease-out forwards;
+        animation: spellCastScreenFlash 119ms ease-out forwards;
     }
 
     .screen-crit-flash {
@@ -1135,7 +1145,7 @@
         pointer-events: none;
         background-color: rgba(255, 255, 255, 0.7);
         z-index: 60;
-        animation: critScreenFlash 320ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        animation: critScreenFlash 200ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
     }
 
     .crit-text {
@@ -1153,7 +1163,7 @@
             0 0 8px rgba(255, 255, 255, 0.9),
             0 0 24px rgba(255, 208, 74, 0.95),
             0 0 38px rgba(255, 86, 28, 0.75);
-        animation: critTextPop 520ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        animation: critTextPop 325ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
 
     // kept for backwards compatibility / test selectors
@@ -1346,12 +1356,12 @@
         }
 
         &.is-shield-gain {
-            animation: shieldGainPulse 360ms ease-out;
+            animation: shieldGainPulse 225ms ease-out;
         }
 
         &.is-healing .player-hp-fill--health {
-            transition: width 460ms cubic-bezier(0.22, 1, 0.36, 1);
-            animation: healFillPulse 380ms ease;
+            transition: width 288ms cubic-bezier(0.22, 1, 0.36, 1);
+            animation: healFillPulse 238ms ease;
         }
     }
 
@@ -1360,7 +1370,7 @@
         left: 0;
         top: 0;
         bottom: 0;
-        transition: width 220ms ease, left 220ms ease;
+        transition: width 138ms ease, left 138ms ease;
         z-index: 0;
 
         &.player-hp-fill--health {
@@ -1542,7 +1552,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    animation: projectileFly 420ms cubic-bezier(0.4, 0, 0.2, 1) both;
+    animation: projectileFly 263ms cubic-bezier(0.4, 0, 0.2, 1) both;
     opacity: 0;
     filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.8)) drop-shadow(0 0 12px rgba(180, 220, 255, 0.6));
 }

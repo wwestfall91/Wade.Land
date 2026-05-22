@@ -23,10 +23,10 @@ import {
 import EnemyInfoSprite from "../../components/EnemyInfoSprite";
 import ElementDetailsTooltip from "../../components/ElementDetailsTooltip";
 import { usePlayer, type RewardElement } from "../../context/PlayerContext";
-import RewardModal from "./RewardModal";
 import FloatingTooltip from "../Game/FloatingTooltip";
 import ElementIcon from "../../components/ElementIcon";
 import shieldIcon from "../../assets/icons/Shield.png";
+import soulIcon from "../../assets/icons/Soul.png";
 
 type EnemyDamagePopup = {
     id: number;
@@ -42,14 +42,16 @@ type EventLogEntry = {
     isDetail?: boolean;
 };
 
-const HIT_FLASH_MS = 190;
-const HIT_STEP_DELAY_MS = 120;
-const EFFECT_STEP_DELAY_MS = 95;
+const COMBAT_ANIMATION_SPEED_MULTIPLIER = 1.6;
+const scaleCombatAnimationMs = (ms: number) => Math.max(16, Math.round(ms / COMBAT_ANIMATION_SPEED_MULTIPLIER));
+const HIT_FLASH_MS = scaleCombatAnimationMs(190);
+const HIT_STEP_DELAY_MS = scaleCombatAnimationMs(120);
+const EFFECT_STEP_DELAY_MS = scaleCombatAnimationMs(95);
 const EVENT_LOG_MAX_ENTRIES = 60;
 const TURN_ENERGY = 4;
 
 const wait = (ms: number) => new Promise<void>((resolve) => {
-    window.setTimeout(resolve, ms);
+    window.setTimeout(resolve, scaleCombatAnimationMs(ms));
 });
 
 type SpellColor = {
@@ -73,7 +75,7 @@ const SPELL_TYPE_COLORS: Record<string, SpellColor> = {
 type FightEnemy = {
     name: string;
     hp: number;
-    experience: number;
+    souls: number;
     weaknesses?: string[];
     sprite?: string;
     elements: RewardElement[];
@@ -82,6 +84,15 @@ type FightEnemy = {
 type FightLocationState = {
     enemy?: FightEnemy;
     elementPool?: RewardElement[];
+};
+
+type FightRewardState = {
+    soulsGained: number;
+    rewardElements: RewardElement[];
+};
+
+type GameLocationState = {
+    fightReward?: FightRewardState;
 };
 
 type CastableSpell = {
@@ -97,7 +108,7 @@ type CastableSpell = {
 function Fight() {
     const location = useLocation();
     const navigate = useNavigate();
-    const { player, playerName, levels, addExperience, addElement, applyEnemyAttack, healPlayer, resetGame } = usePlayer();
+    const { player, playerName, levels, applyEnemyAttack, healPlayer, resetGame } = usePlayer();
     const [flashingSlotId, setFlashingSlotId] = useState<number | null>(null);
     const [hoveredSpellId, setHoveredSpellId] = useState<number | null>(null);
     const [hoveredEnemyAttack, setHoveredEnemyAttack] = useState(false);
@@ -123,8 +134,6 @@ function Fight() {
     const [spellCastFlashBackground, setSpellCastFlashBackground] = useState<string>("rgba(255, 255, 255, 0.16)");
     const [isCritFlashing, setIsCritFlashing] = useState(false);
     const [isCritTextVisible, setIsCritTextVisible] = useState(false);
-    const [showRewardModal, setShowRewardModal] = useState(false);
-    const [rewardElements, setRewardElements] = useState<RewardElement[]>([]);
     const [enemyBurnStatus, setEnemyBurnStatus] = useState<ActiveBurnStatus | null>(null);
     const [enemySoakStatus, setEnemySoakStatus] = useState<ActiveSoakStatus | null>(null);
     const [enemyFreezeStatus, setEnemyFreezeStatus] = useState<ActiveFreezeStatus | null>(null);
@@ -142,7 +151,6 @@ function Fight() {
     const [enemyDamagePopups, setEnemyDamagePopups] = useState<EnemyDamagePopup[]>([]);
     const [isPlayerHealingFlash, setIsPlayerHealingFlash] = useState(false);
     const [isPlayerShieldFlash, setIsPlayerShieldFlash] = useState(false);
-    const preRewardXp = useRef(player.experience);
     const hasResolvedVictory = useRef(false);
     const previousPlayerHpRef = useRef(player.hp);
     const previousPlayerShieldRef = useRef(playerShield);
@@ -167,7 +175,7 @@ function Fight() {
 
     const enemy = useMemo(() => {
         const state = location.state as FightLocationState | null;
-        return state?.enemy ?? { name: "Unknown", hp: 0, experience: 0, weaknesses: [], sprite: "", elements: [] };
+        return state?.enemy ?? { name: "Unknown", hp: 0, souls: 0, weaknesses: [], sprite: "", elements: [] };
     }, [location.state]);
 
     const elementPool = useMemo(() => {
@@ -282,7 +290,7 @@ function Fight() {
 
         window.setTimeout(() => {
             setEnemyDamagePopups((previous) => previous.filter((popup) => popup.id !== popupId));
-        }, 480);
+        }, scaleCombatAnimationMs(480));
     };
 
     const getSpellEnergyCost = (spell: { energy?: number }) => Math.max(0, spell.energy ?? 0);
@@ -368,7 +376,7 @@ function Fight() {
 
             enemySteamTimeoutRef.current = window.setTimeout(() => {
                 setIsEnemySteamVisible(false);
-            }, 520);
+            }, scaleCombatAnimationMs(520));
         });
     };
 
@@ -381,7 +389,7 @@ function Fight() {
 
             healFlashTimeoutRef.current = window.setTimeout(() => {
                 setIsPlayerHealingFlash(false);
-            }, 420);
+            }, scaleCombatAnimationMs(420));
         }
 
         previousPlayerHpRef.current = player.hp;
@@ -396,7 +404,7 @@ function Fight() {
 
             shieldFlashTimeoutRef.current = window.setTimeout(() => {
                 setIsPlayerShieldFlash(false);
-            }, 360);
+            }, scaleCombatAnimationMs(360));
         }
 
         previousPlayerShieldRef.current = playerShield;
@@ -407,10 +415,17 @@ function Fight() {
             hasResolvedVictory.current = true;
             const shuffled = [...elementPool].sort(() => Math.random() - 0.5);
             const chosen = shuffled.slice(0, Math.min(3, shuffled.length));
-            setRewardElements(chosen);
-            setShowRewardModal(true);
+            navigate("/game", {
+                replace: true,
+                state: {
+                    fightReward: {
+                        soulsGained: enemy.souls,
+                        rewardElements: chosen,
+                    },
+                } as GameLocationState,
+            });
         }
-    }, [elementPool, enemyHealth]);
+    }, [elementPool, enemy.souls, enemyHealth, navigate]);
 
     useEffect(() => {
         if (levels.length === 0 || enemyHealth <= 0 || player.hp > 0) {
@@ -445,7 +460,7 @@ function Fight() {
                 setIsReadyingNextAttack(true);
                 enemyIntentReadyingTimeoutRef.current = window.setTimeout(() => {
                     setIsReadyingNextAttack(false);
-                }, 560);
+                }, scaleCombatAnimationMs(560));
             });
         }
         // Re-seed intent whenever a new enemy enters the fight.
@@ -758,7 +773,7 @@ function Fight() {
             setIsPlayerHit(true);
             playerHitTimeoutRef.current = window.setTimeout(() => {
                 setIsPlayerHit(false);
-            }, 480);
+            }, scaleCombatAnimationMs(480));
         });
         if (screenFlashTimeoutRef.current !== null) {
             window.clearTimeout(screenFlashTimeoutRef.current);
@@ -768,7 +783,7 @@ function Fight() {
             setIsScreenFlashing(true);
             screenFlashTimeoutRef.current = window.setTimeout(() => {
                 setIsScreenFlashing(false);
-            }, 420);
+            }, scaleCombatAnimationMs(420));
         });
 
         const nextAttack = pickEnemyAttack();
@@ -842,6 +857,9 @@ function Fight() {
         const endX = toRect.left + toRect.width / 2;
         const endY = toRect.top + toRect.height / 2;
 
+        const scaledDelayStep = scaleCombatAnimationMs(delayStep);
+        const scaledStartDelay = scaleCombatAnimationMs(startDelay);
+
         const newProjectiles: Projectile[] = Array.from({ length: count }, (_, i) => ({
             id: projectileIdRef.current++,
             letter,
@@ -849,18 +867,18 @@ function Fight() {
             y: startY,
             dx: endX - startX,
             dy: endY - startY,
-            delay: startDelay + i * delayStep,
+            delay: scaledStartDelay + i * scaledDelayStep,
         }));
 
         setProjectiles((prev) => [...prev, ...newProjectiles]);
 
-        const maxDelay = startDelay + Math.max(0, count - 1) * delayStep;
+        const maxDelay = scaledStartDelay + Math.max(0, count - 1) * scaledDelayStep;
         window.setTimeout(() => {
             const ids = new Set(newProjectiles.map((p) => p.id));
             setProjectiles((prev) => prev.filter((p) => !ids.has(p.id)));
-        }, maxDelay + 600);
+        }, maxDelay + scaleCombatAnimationMs(600));
 
-        return startDelay + count * delayStep;
+        return scaledStartDelay + count * scaledDelayStep;
     };
 
     const launchProjectiles = (spell: { letter: string; effects?: SpellEffectConfig[] }, buttonEl: HTMLButtonElement | null) => {
@@ -893,7 +911,7 @@ function Fight() {
             }
             spellCastFlashTimeoutRef.current = window.setTimeout(() => {
                 setIsSpellCastFlashing(false);
-            }, 190);
+            }, scaleCombatAnimationMs(190));
         });
 
         setFlashingSlotId(spell.id);
@@ -972,8 +990,8 @@ function Fight() {
                 window.requestAnimationFrame(() => {
                     setIsCritFlashing(true);
                     setIsCritTextVisible(true);
-                    setTimeout(() => setIsCritFlashing(false), 320);
-                    setTimeout(() => setIsCritTextVisible(false), 520);
+                    setTimeout(() => setIsCritFlashing(false), scaleCombatAnimationMs(320));
+                    setTimeout(() => setIsCritTextVisible(false), scaleCombatAnimationMs(520));
                 });
             }
 
@@ -1185,14 +1203,6 @@ function Fight() {
         });
     };
 
-    const handleReturnHome = (selectedElement: RewardElement) => {
-        addExperience(enemy.experience);
-        addElement(selectedElement);
-        navigate("/game", {
-            replace: true,
-        });
-    };
-
     return (
         <div id="Fight" className={isScreenFlashing ? "is-screen-shaking" : undefined}>
             {isSpellCastFlashing ? (
@@ -1319,7 +1329,10 @@ function Fight() {
                             </div>
                         </div>
 
-                        <div className="enemy-meta-footer">Rewards {enemy.experience} XP</div>
+                        <div className="enemy-meta-footer">
+                            <img src={soulIcon} alt="" aria-hidden="true" className="enemy-meta-souls-icon" />
+                            <span>Rewards {enemy.souls} Souls</span>
+                        </div>
                     </div>
                 </div>
                 </div>{/* end .enemy-stage */}
@@ -1570,15 +1583,6 @@ function Fight() {
                         <button type="button" onClick={handlePlayAgain}>Play again</button>
                     </div>
                 </div>
-            ) : null}
-            {showRewardModal ? (
-                <RewardModal
-                    xpGained={enemy.experience}
-                    currentXp={preRewardXp.current}
-                    levels={levels}
-                    rewardElements={rewardElements}
-                    onConfirm={handleReturnHome}
-                />
             ) : null}
             {projectiles.length > 0
                 ? createPortal(

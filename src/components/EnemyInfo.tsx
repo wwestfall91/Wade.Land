@@ -4,11 +4,12 @@ import "./EnemyInfo.scss";
 import type { RewardElement } from "../context/PlayerContext";
 import ElementDetailsTooltip from "./ElementDetailsTooltip";
 import ElementIcon from "./ElementIcon";
+import soulIcon from "../assets/icons/Soul.png";
 
 type EnemyInfoProps = {
     enemyName: string;
     enemyHealth: number;
-    enemyExperience: number;
+    enemySouls: number;
     enemyDescription: string;
     enemyWeaknesses: string[];
     enemyElements: RewardElement[];
@@ -18,7 +19,7 @@ type EnemyInfoProps = {
 function EnemyInfo({
     enemyName,
     enemyHealth,
-    enemyExperience,
+    enemySouls,
     enemyDescription,
     enemyWeaknesses,
     enemyElements,
@@ -82,7 +83,10 @@ function EnemyInfo({
                         )}
                     </span>
                 </div>
-                <div className="enemy-xp-footer">Rewards {enemyExperience} XP</div>
+                <div className="enemy-souls-footer">
+                    <img src={soulIcon} alt="" aria-hidden="true" className="enemy-souls-icon" />
+                    <span>Rewards {enemySouls} Souls</span>
+                </div>
             </div>
             {hoveredEnemyElementIndex !== null ? (() => {
                 const hoveredElement = enemyElements[hoveredEnemyElementIndex];

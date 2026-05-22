@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import * as XLSX from "xlsx";
 import Draggable from "./Draggable";
 import StartMenuModal from "./StartMenuModal.tsx";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import PlayerStats from "../../components/PlayerStats";
 import EnemyInfo from "../../components/EnemyInfo";
 import ElementIcon from "../../components/ElementIcon";
@@ -10,6 +10,8 @@ import { parseSpellEffectsFromRow, type SpellEffectConfig } from "../../combat/s
 import { getEffectChipClass, getEffectSummaryLines } from "../../combat/effectSummary";
 import { type RewardElement, usePlayer } from "../../context/PlayerContext";
 import FloatingTooltip from "./FloatingTooltip";
+import RewardModal from "../Fight/RewardModal";
+import soulIcon from "../../assets/icons/Soul.png";
 import "./Game.scss";
 
 // TODO: Add special effects (Healing, burn, multi-hit)
@@ -72,8 +74,8 @@ type EnemyRow = {
     name?: string;
     HP?: number | string;
     hp?: number | string;
-    Experience?: number | string;
-    experience?: number | string;
+    Souls?: number | string;
+    souls?: number | string;
     Description?: string;
     description?: string;
     Sprite?: string;
@@ -93,7 +95,7 @@ type EnemyRow = {
 type Enemy = {
     name: string;
     hp: number;
-    experience: number;
+    souls: number;
     description: string;
     sprite: string;
     weaknesses: string[];
@@ -112,6 +114,15 @@ type PreviewCombination = {
     effects?: SpellEffectConfig[];
 };
 
+type FightRewardState = {
+    soulsGained: number;
+    rewardElements: RewardElement[];
+};
+
+type GameLocationState = {
+    fightReward?: FightRewardState;
+};
+
 const SPREAD_X = 200;
 const SPREAD_Y = 150;
 const DRAG_TUTORIAL_SEEN_KEY = "game.dragTutorialSeen";
@@ -120,6 +131,23 @@ const INTRO_TEXT_VISIBLE_MS = 1850;
 const INTRO_TEXT_FADE_GAP_MS = 850;
 const INTRO_INPUT_FADE_MS = 640;
 const INTRO_SCENE_FADEOUT_MS = 1600;
+const REWARD_CUE_MS = 260;
+const SOULS_PER_FLYING_ICON = 5;
+const SOUL_COLLECTION_TRAVEL_MS = 620;
+const SOUL_COLLECTION_STAGGER_MS = 82;
+const SOUL_COLLECTION_PULSE_MS = 500;
+const SOUL_COLLECTION_TEXT_EXTRA_MS = 500;
+
+type SoulFlightIcon = {
+    id: number;
+    startX: number;
+    startY: number;
+    midX: number;
+    midY: number;
+    toX: number;
+    toY: number;
+    delayMs: number;
+};
 
 const normalizeType = (value?: string): string => value?.trim().toLowerCase() ?? "";
 const normalizeElementName = (value?: string): string => value?.trim().toLowerCase() ?? "";
@@ -141,13 +169,14 @@ const getRandomUniqueElements = (elements: RewardElement[], count: number): Rewa
 
 function Game() {
     const navigate = useNavigate();
+    const location = useLocation();
     const {
         player: playerProgress,
         playerName,
         setPlayerName,
-        levelFillPercent,
         initializeElements,
         combineElements,
+        addSouls,
         addElement,
         selectedEnemy: nextEnemy,
         setSelectedEnemy: setNextEnemy,
@@ -193,12 +222,72 @@ function Game() {
     const [isIntroTextVisible, setIsIntroTextVisible] = useState(() => playerName.trim().length === 0);
     const [introNameInput, setIntroNameInput] = useState("");
     const [isIntroInputFadingOut, setIsIntroInputFadingOut] = useState(false);
+    const [fightReward, setFightReward] = useState<FightRewardState | null>(null);
+    const [isFightVictoryCueVisible, setIsFightVictoryCueVisible] = useState(false);
+    const [isSoulPulseVisible, setIsSoulPulseVisible] = useState(false);
+    const [soulPulseAmount, setSoulPulseAmount] = useState(0);
+    const [isSoulCounterPopping, setIsSoulCounterPopping] = useState(false);
+    const [soulFlightIcons, setSoulFlightIcons] = useState<SoulFlightIcon[]>([]);
     const previewPositionRef = useRef<Position | null>(null);
     const previewPointerClientRef = useRef<Position>({ x: 0, y: 0 });
     const introChosenNameRef = useRef("");
     const nextId = useRef(1);
+    const soulFlightIdRef = useRef(1);
     const elementCatalogRef = useRef<Map<string, RewardElement>>(new Map());
     const pendingDropSpawnByIdRef = useRef<Map<number, Position>>(new Map());
+    const rewardCueTimeoutRef = useRef<number | null>(null);
+    const soulAnimationTimeoutsRef = useRef<number[]>([]);
+    const soulCounterPopTimeoutRef = useRef<number | null>(null);
+
+    useEffect(() => () => {
+        if (rewardCueTimeoutRef.current !== null) {
+            window.clearTimeout(rewardCueTimeoutRef.current);
+        }
+        if (soulCounterPopTimeoutRef.current !== null) {
+            window.clearTimeout(soulCounterPopTimeoutRef.current);
+        }
+    }, []);
+
+    const clearSoulAnimationTimeouts = useCallback(() => {
+        soulAnimationTimeoutsRef.current.forEach((timeoutId) => {
+            window.clearTimeout(timeoutId);
+        });
+        soulAnimationTimeoutsRef.current = [];
+    }, []);
+
+    const triggerSoulCounterPop = useCallback(() => {
+        setIsSoulCounterPopping(false);
+        window.requestAnimationFrame(() => {
+            setIsSoulCounterPopping(true);
+            if (soulCounterPopTimeoutRef.current !== null) {
+                window.clearTimeout(soulCounterPopTimeoutRef.current);
+            }
+
+            soulCounterPopTimeoutRef.current = window.setTimeout(() => {
+                setIsSoulCounterPopping(false);
+            }, 240);
+        });
+    }, []);
+
+    useEffect(() => () => {
+        clearSoulAnimationTimeouts();
+    }, [clearSoulAnimationTimeouts]);
+
+    useEffect(() => {
+        const state = location.state as GameLocationState | null;
+        if (state?.fightReward) {
+            if (rewardCueTimeoutRef.current !== null) {
+                window.clearTimeout(rewardCueTimeoutRef.current);
+            }
+
+            setFightReward(null);
+            setIsFightVictoryCueVisible(true);
+            rewardCueTimeoutRef.current = window.setTimeout(() => {
+                setFightReward(state.fightReward ?? null);
+                setIsFightVictoryCueVisible(false);
+            }, REWARD_CUE_MS);
+        }
+    }, [location.state]);
 
     const activeDropZoneRefs = zoneOccupants.length === 3
         ? [dropZoneRefA, dropZoneRefB, dropZoneRefC]
@@ -463,7 +552,7 @@ function Game() {
                 .map((row) => ({
                     name: ((row.Name ?? row.name ?? "") as string).trim(),
                     hp: Number(row.HP ?? row.hp ?? 0) || 0,
-                    experience: Number(row.Experience ?? row.experience ?? 0) || 0,
+                    souls: Number(row.Souls ?? row.souls ?? 0) || 0,
                     description: ((row.Description ?? row.description ?? "") as string).trim(),
                     sprite: ((row.Sprite ?? row.sprite ?? "") as string).trim(),
                     weaknesses: [row.Weak1, row["Weak 1"], row.Weak2, row["Weak 2"]]
@@ -1028,6 +1117,98 @@ function Game() {
         setSelectedStarter(null);
     };
 
+    const startSoulCollectionAnimation = useCallback((soulsGained: number) => {
+        const normalizedSouls = Math.max(0, Math.floor(soulsGained));
+        if (normalizedSouls <= 0) {
+            return;
+        }
+
+        clearSoulAnimationTimeouts();
+        setSoulFlightIcons([]);
+
+        const soulsTarget = document.querySelector("#Game .player-stats-dock .player-souls-copy") as HTMLElement | null;
+        if (!soulsTarget) {
+            addSouls(normalizedSouls);
+            triggerSoulCounterPop();
+            return;
+        }
+
+        const targetRect = soulsTarget.getBoundingClientRect();
+        const startX = window.innerWidth / 2;
+        const startY = window.innerHeight / 2;
+        const targetX = targetRect.left + targetRect.width / 2;
+        const targetY = targetRect.top + targetRect.height / 2;
+        const iconCount = Math.max(1, Math.ceil(normalizedSouls / SOULS_PER_FLYING_ICON));
+        const baseAmount = Math.floor(normalizedSouls / iconCount);
+        const remainder = normalizedSouls - baseAmount * iconCount;
+        const gainsPerIcon = Array.from({ length: iconCount }, (_, index) => (
+            baseAmount + (index < remainder ? 1 : 0)
+        ));
+
+        const nextIcons: SoulFlightIcon[] = gainsPerIcon.map((_, index) => {
+            const delayMs = index * SOUL_COLLECTION_STAGGER_MS;
+            const horizontalJitter = (Math.random() - 0.5) * 170;
+            const verticalArcLift = -70 - Math.random() * 120;
+            return {
+                id: soulFlightIdRef.current++,
+                startX,
+                startY,
+                midX: (targetX - startX) * 0.56 + horizontalJitter,
+                midY: (targetY - startY) * 0.5 + verticalArcLift,
+                toX: targetX - startX,
+                toY: targetY - startY,
+                delayMs,
+            };
+        });
+
+        setSoulPulseAmount(normalizedSouls);
+        setIsSoulPulseVisible(true);
+
+        const pulseTimeoutId = window.setTimeout(() => {
+            setSoulFlightIcons(nextIcons);
+
+            gainsPerIcon.forEach((amount, index) => {
+                const hitTimeoutId = window.setTimeout(() => {
+                    addSouls(amount);
+                    triggerSoulCounterPop();
+                }, index * SOUL_COLLECTION_STAGGER_MS + SOUL_COLLECTION_TRAVEL_MS);
+                soulAnimationTimeoutsRef.current.push(hitTimeoutId);
+            });
+
+            const cleanupTimeoutId = window.setTimeout(() => {
+                setSoulFlightIcons([]);
+                soulAnimationTimeoutsRef.current = [];
+            }, (iconCount - 1) * SOUL_COLLECTION_STAGGER_MS + SOUL_COLLECTION_TRAVEL_MS + 140);
+            soulAnimationTimeoutsRef.current.push(cleanupTimeoutId);
+        }, SOUL_COLLECTION_PULSE_MS);
+        soulAnimationTimeoutsRef.current.push(pulseTimeoutId);
+
+        const textHideTimeoutId = window.setTimeout(() => {
+            setIsSoulPulseVisible(false);
+        }, SOUL_COLLECTION_PULSE_MS + SOUL_COLLECTION_TEXT_EXTRA_MS);
+        soulAnimationTimeoutsRef.current.push(textHideTimeoutId);
+    }, [addSouls, clearSoulAnimationTimeouts, triggerSoulCounterPop]);
+
+    const handleRewardConfirm = (selectedElement: RewardElement) => {
+        if (!fightReward) {
+            return;
+        }
+
+        if (rewardCueTimeoutRef.current !== null) {
+            window.clearTimeout(rewardCueTimeoutRef.current);
+            rewardCueTimeoutRef.current = null;
+        }
+
+        startSoulCollectionAnimation(fightReward.soulsGained);
+        addElement(selectedElement);
+        setFightReward(null);
+        setIsFightVictoryCueVisible(false);
+        navigate("/game", {
+            replace: true,
+            state: null,
+        });
+    };
+
     const isStartMenuOpen = playerProgress.elements.length === 0 && starterChoices.length > 0;
     const isIntroVisible = introPhase !== "hidden";
     const introDisplayName = introChosenNameRef.current || playerName || "Traveler";
@@ -1050,6 +1231,38 @@ function Game() {
             onDrop={handleGameDrop}
             style={{ position: "relative", width: "100%", height: "100%" }}
         >
+            {isSoulPulseVisible ? (
+                <div className="soul-pulse-cue" aria-hidden="true">
+                    <img src={soulIcon} alt="" className="soul-pulse-cue-icon" />
+                    <span className="soul-pulse-cue-text">+{soulPulseAmount} SOULS</span>
+                </div>
+            ) : null}
+            {soulFlightIcons.length > 0 ? (
+                <div className="soul-collection-layer" aria-hidden="true">
+                    {soulFlightIcons.map((icon) => (
+                        <img
+                            key={icon.id}
+                            src={soulIcon}
+                            alt=""
+                            className="soul-flight-icon"
+                            style={{
+                                left: `${icon.startX}px`,
+                                top: `${icon.startY}px`,
+                                animationDelay: `${icon.delayMs}ms`,
+                                ["--soul-mid-x" as string]: `${icon.midX}px`,
+                                ["--soul-mid-y" as string]: `${icon.midY}px`,
+                                ["--soul-fly-x" as string]: `${icon.toX}px`,
+                                ["--soul-fly-y" as string]: `${icon.toY}px`,
+                            }}
+                        />
+                    ))}
+                </div>
+            ) : null}
+            {isFightVictoryCueVisible ? (
+                <div className="fight-victory-cue" role="status" aria-live="polite">
+                    Victory! Claim your reward.
+                </div>
+            ) : null}
             {isIntroVisible ? (
                 <div className={`game-intro-overlay ${introPhase === "fadeout" ? "is-fading-out" : ""}`}>
                     {introPhase === "input" ? (
@@ -1202,16 +1415,15 @@ function Game() {
                         playerName={playerName}
                         level={playerProgress.level}
                         hp={playerProgress.hp}
-                        experience={playerProgress.experience}
-                        fillPercent={levelFillPercent}
-                        className="player-stats-dock"
+                        souls={playerProgress.souls}
+                        className={`player-stats-dock${isSoulCounterPopping ? " is-soul-counter-pop" : ""}`}
                     />
                 </div>
             </div>
             <EnemyInfo 
                 enemyName={nextEnemy?.name ?? "Unknown Enemy"} 
                 enemyHealth={nextEnemy?.hp ?? 0}
-                enemyExperience={nextEnemy?.experience ?? 0}
+                enemySouls={nextEnemy?.souls ?? 0}
                 enemyDescription={nextEnemy?.description ?? ""}
                 enemyWeaknesses={nextEnemy?.weaknesses ?? []}
                 enemyElements={nextEnemy?.elements ?? []}
@@ -1248,6 +1460,13 @@ function Game() {
                         ))}
                     </div>
                 </aside>
+            ) : null}
+            {fightReward ? (
+                <RewardModal
+                    soulsGained={fightReward.soulsGained}
+                    rewardElements={fightReward.rewardElements}
+                    onConfirm={handleRewardConfirm}
+                />
             ) : null}
         </div>
     );

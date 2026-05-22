@@ -2,6 +2,113 @@
     position: relative;
     isolation: isolate;
 
+    .soul-collection-layer {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 8800;
+    }
+
+    .soul-pulse-cue {
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        pointer-events: none;
+        z-index: 8850;
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.42rem;
+    }
+
+    .soul-pulse-cue-icon {
+        width: 4.1rem;
+        height: 4.1rem;
+        object-fit: contain;
+        image-rendering: auto;
+        filter: drop-shadow(0 0 0.36rem rgba(115, 255, 195, 0.78));
+        animation: soul-collection-pulse 500ms ease-out forwards;
+    }
+
+    .soul-pulse-cue-text {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.2rem 1.3rem;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        font-size: 1.22rem;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        color: #a8ffd6;
+        text-transform: uppercase;
+        background: linear-gradient(
+            90deg,
+            rgba(0, 0, 0, 0) 0%,
+            rgba(0, 0, 0, 0.72) 18%,
+            rgba(0, 0, 0, 0.84) 50%,
+            rgba(0, 0, 0, 0.72) 82%,
+            rgba(0, 0, 0, 0) 100%
+        );
+        text-shadow:
+            0 2px 0 rgba(0, 0, 0, 0.56),
+            0 0 14px rgba(95, 255, 186, 0.5);
+        animation: soul-collection-text-fade 1000ms ease-out forwards;
+    }
+
+    .soul-flight-icon {
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        width: 4.1rem;
+        height: 4.1rem;
+        object-fit: contain;
+        image-rendering: auto;
+        filter: drop-shadow(0 0 0.26rem rgba(115, 255, 195, 0.7));
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(1);
+        animation: soul-flight-to-hud 620ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+
+    .player-stats.player-stats-dock.is-soul-counter-pop {
+        .player-souls-panel {
+            animation: souls-counter-pop 220ms ease-out;
+            box-shadow:
+                inset 0 0 0 1px rgba(152, 255, 209, 0.14),
+                0 0 0.78rem rgba(89, 255, 187, 0.42);
+        }
+
+        .player-souls-value {
+            animation: souls-counter-value-pop 220ms ease-out;
+        }
+    }
+
+    .fight-victory-cue {
+        position: fixed;
+        top: 1rem;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 8600;
+        pointer-events: none;
+        padding: 0.55rem 0.95rem;
+        border: 2px solid #e8edff;
+        border-radius: 4px;
+        background: linear-gradient(180deg, rgba(96, 117, 245, 0.97) 0%, rgba(39, 56, 176, 0.98) 100%);
+        color: #fff3a8;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        font-size: 0.92rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.62);
+        box-shadow:
+            inset 0 0 0 1px #90a2ff,
+            inset 0 0 0 2px #121d68,
+            0 7px 0 rgba(0, 0, 0, 0.32);
+        animation: fight-victory-cue-in 220ms ease-out;
+    }
+
     .game-intro-overlay {
         position: fixed;
         inset: 0;
@@ -164,7 +271,7 @@
 
     .player-stats.player-stats-dock {
         display: flex;
-        width: min(15rem, 44vw);
+        width: min(20rem, 56vw);
         z-index: 30;
     }
 
@@ -472,6 +579,84 @@
     }
 }
 
+@keyframes soul-collection-pulse {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(2);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+@keyframes soul-flight-to-hud {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(1);
+    }
+
+    10% {
+        opacity: 1;
+    }
+
+    58% {
+        opacity: 0.52;
+        transform: translate(calc(-50% + var(--soul-mid-x)), calc(-50% + var(--soul-mid-y))) scale(0.56);
+    }
+
+    100% {
+        opacity: 0.06;
+        transform: translate(calc(-50% + var(--soul-fly-x)), calc(-50% + var(--soul-fly-y))) scale(0.25);
+    }
+}
+
+@keyframes souls-counter-pop {
+    0% {
+        transform: scale(1);
+    }
+
+    42% {
+        transform: scale(1.07);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+@keyframes souls-counter-value-pop {
+    0% {
+        transform: scale(1);
+        color: #00BD6F;
+    }
+
+    45% {
+        transform: scale(1.12);
+        color: #adffd8;
+    }
+
+    100% {
+        transform: scale(1);
+        color: #00BD6F;
+    }
+}
+
+@keyframes fight-victory-cue-in {
+    0% {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-10px) scale(0.96);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0) scale(1);
+    }
+}
+
 @keyframes drop-zone-discoverability-pulse {
     0% {
         opacity: 0;
@@ -509,5 +694,27 @@
             bottom: 0.75rem;
             width: min(15rem, calc(100vw - 1.5rem));
         }
+    }
+}
+
+@keyframes soul-collection-text-fade {
+    0% {
+        opacity: 0;
+        transform: translateY(0.28rem) scale(0.9);
+    }
+
+    18% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+
+    72% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translateY(-0.12rem) scale(0.96);
     }
 }

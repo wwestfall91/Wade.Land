@@ -36,15 +36,13 @@ const renderFight = (options: { playerElements: TestSpell[]; enemyHp: number }) 
         player: {
             level: 1,
             hp: 100,
-            experience: 0,
+            souls: 0,
             elements: options.playerElements,
         },
         playerName: "Tester",
-        levelFillPercent: 0,
-        levels: [{ level: 1, hp: 100, experience: 0 }],
+        levels: [{ level: 1, hp: 100 }],
         setPlayerName: vi.fn(),
-        setExperience: vi.fn(),
-        addExperience: vi.fn(),
+        addSouls: vi.fn(),
         initializeElements: vi.fn(),
         combineElements: vi.fn(),
         applyEnemyAttack: vi.fn(),
@@ -70,7 +68,7 @@ const renderFight = (options: { playerElements: TestSpell[]; enemyHp: number }) 
                         enemy: {
                             name: "Training Dummy",
                             hp: options.enemyHp,
-                            experience: 0,
+                            souls: 0,
                             sprite: "",
                             weaknesses: [],
                             elements: [

@@ -4,7 +4,6 @@ import {
     useContext,
     useEffect,
     useMemo,
-    useRef,
     useState,
     type ReactNode,
 } from "react";
@@ -16,14 +15,11 @@ type LevelRow = {
     level?: number | string;
     HP?: number | string;
     hp?: number | string;
-    Experience?: number | string;
-    experience?: number | string;
 };
 
 export type LevelDefinition = {
     level: number;
     hp: number;
-    experience: number;
 };
 
 
@@ -42,7 +38,7 @@ export type PlayerElement = {
 export type PlayerProgress = {
     level: number;
     hp: number;
-    experience: number;
+    souls: number;
     elements: PlayerElement[];
 };
 
@@ -51,7 +47,7 @@ export type RewardElement = Omit<PlayerElement, "id">;
 export type SelectedEnemy = {
     name: string;
     hp: number;
-    experience: number;
+    souls: number;
     description: string;
     sprite: string;
     weaknesses: string[];
@@ -61,11 +57,9 @@ export type SelectedEnemy = {
 type PlayerContextValue = {
     player: PlayerProgress;
     playerName: string;
-    levelFillPercent: number;
     levels: LevelDefinition[];
     setPlayerName: (name: string) => void;
-    setExperience: (experience: number) => void;
-    addExperience: (experience: number) => void;
+    addSouls: (souls: number) => void;
     initializeElements: (elements: PlayerElement[]) => void;
     combineElements: (consumedIds: number[], newElement: PlayerElement) => void;
     applyEnemyAttack: (power: number) => void;
@@ -79,7 +73,7 @@ type PlayerContextValue = {
 const DEFAULT_PLAYER_PROGRESS: PlayerProgress = {
     level: 1,
     hp: 0,
-    experience: 0,
+    souls: 0,
     elements: [],
 };
 
@@ -105,32 +99,30 @@ const readCookie = (cookieName: string): string => {
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
 
-const resolveLevelForExperience = (
-    experience: number,
+const resolveLevelForPlayer = (
+    playerLevel: number,
     levels: LevelDefinition[],
 ): LevelDefinition | null => {
     if (levels.length === 0) {
         return null;
     }
 
-    return levels.reduce(
-        (current, level) => (experience >= level.experience ? level : current),
-        levels[0],
-    );
+    return levels.find((level) => level.level === playerLevel) ?? levels[0];
 };
 
 const resolvePlayerProgress = (
-    experience: number,
+    souls: number,
+    playerLevel: number,
     levels: LevelDefinition[],
     elements: PlayerElement[],
     currentHp: number | null,
 ): PlayerProgress => {
-    const matchedLevel = resolveLevelForExperience(experience, levels);
+    const matchedLevel = resolveLevelForPlayer(playerLevel, levels);
 
     if (!matchedLevel) {
         return {
             ...DEFAULT_PLAYER_PROGRESS,
-            experience,
+            souls,
             elements,
         };
     }
@@ -140,35 +132,9 @@ const resolvePlayerProgress = (
     return {
         level: matchedLevel.level,
         hp: resolvedHp,
-        experience,
+        souls,
         elements,
     };
-};
-
-const resolveLevelFillPercent = (
-    player: PlayerProgress,
-    levels: LevelDefinition[],
-): number => {
-    if (levels.length === 0) {
-        return 0;
-    }
-
-    const currentLevel = levels.find((level) => level.level === player.level) ?? levels[0];
-    const nextLevel = levels.find((level) => level.level > player.level);
-
-    if (!nextLevel) {
-        return 100;
-    }
-
-    const requiredExperience = nextLevel.experience - currentLevel.experience;
-    if (requiredExperience <= 0) {
-        return 100;
-    }
-
-    const gainedExperience = player.experience - currentLevel.experience;
-    const normalizedProgress = Math.max(0, Math.min(1, gainedExperience / requiredExperience));
-
-    return Math.round(normalizedProgress * 100);
 };
 
 type PlayerProviderProps = {
@@ -176,13 +142,13 @@ type PlayerProviderProps = {
 };
 
 export function PlayerProvider({ children }: PlayerProviderProps) {
-    const [experience, setExperience] = useState(0);
+    const [souls, setSouls] = useState(0);
+    const [playerLevel] = useState(1);
     const [levels, setLevels] = useState<LevelDefinition[]>([]);
     const [elements, setElements] = useState<PlayerElement[]>([]);
     const [currentHp, setCurrentHp] = useState<number | null>(null);
     const [playerName, setPlayerNameState] = useState(() => readCookie(PLAYER_NAME_COOKIE));
     const [selectedEnemy, setSelectedEnemy] = useState<SelectedEnemy | null>(null);
-    const previousLevelRef = useRef<number | null>(null);
 
     useEffect(() => {
         fetch("/levels.xlsx")
@@ -195,7 +161,6 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
                     .map((row) => ({
                         level: Number(row.Level ?? row.level ?? 0) || 0,
                         hp: Number(row.HP ?? row.hp ?? 0) || 0,
-                        experience: Number(row.Experience ?? row.experience ?? 0) || 0,
                     }))
                     .filter((level) => level.level > 0)
                     .sort((left, right) => left.level - right.level);
@@ -204,27 +169,13 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
     }, []);
 
     const player = useMemo(
-        () => resolvePlayerProgress(experience, levels, elements, currentHp),
-        [currentHp, elements, experience, levels],
+        () => resolvePlayerProgress(souls, playerLevel, levels, elements, currentHp),
+        [currentHp, elements, levels, playerLevel, souls],
     );
 
-    const levelFillPercent = useMemo(
-        () => resolveLevelFillPercent(player, levels),
-        [levels, player],
-    );
-
-    useEffect(() => {
-        if (previousLevelRef.current !== null && player.level > previousLevelRef.current) {
-            const newLevelDef = levels.find((l) => l.level === player.level);
-            if (newLevelDef) {
-                setCurrentHp(newLevelDef.hp);
-            }
-        }
-        previousLevelRef.current = player.level;
-    }, [player.level, levels]);
-
-    const addExperience = useCallback((amount: number) => {
-        setExperience((previous) => previous + amount);
+    const addSouls = useCallback((amount: number) => {
+        const normalizedAmount = Math.max(0, amount);
+        setSouls((previous) => previous + normalizedAmount);
     }, []);
 
     const setPlayerName = useCallback((name: string) => {
@@ -257,25 +208,25 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
     const applyEnemyAttack = useCallback((power: number) => {
         const normalizedPower = Math.max(0, power);
         setCurrentHp((previousHp) => {
-            const matchedLevel = resolveLevelForExperience(experience, levels);
+            const matchedLevel = resolveLevelForPlayer(playerLevel, levels);
             const maxHp = matchedLevel?.hp ?? 0;
             const startingHp = previousHp ?? maxHp;
             return Math.max(0, startingHp - normalizedPower);
         });
-    }, [experience, levels]);
+    }, [levels, playerLevel]);
 
     const healPlayer = useCallback((amount: number) => {
         const normalizedAmount = Math.max(0, amount);
         setCurrentHp((previousHp) => {
-            const matchedLevel = resolveLevelForExperience(experience, levels);
+            const matchedLevel = resolveLevelForPlayer(playerLevel, levels);
             const maxHp = matchedLevel?.hp ?? 0;
             const startingHp = previousHp ?? maxHp;
             return Math.min(maxHp, startingHp + normalizedAmount);
         });
-    }, [experience, levels]);
+    }, [levels, playerLevel]);
 
     const resetGame = useCallback(() => {
-        setExperience(0);
+        setSouls(0);
         setElements([]);
         setCurrentHp(null);
         setSelectedEnemy(null);
@@ -292,11 +243,9 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
         () => ({
             player,
             playerName,
-            levelFillPercent,
             levels,
             setPlayerName,
-            setExperience,
-            addExperience,
+            addSouls,
             initializeElements,
             combineElements,
             applyEnemyAttack,
@@ -307,11 +256,10 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             setSelectedEnemy,
         }),
         [
-            addExperience,
+            addSouls,
             applyEnemyAttack,
             combineElements,
             initializeElements,
-            levelFillPercent,
             levels,
             playerName,
             player,

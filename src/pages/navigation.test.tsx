@@ -49,7 +49,7 @@ vi.mock("xlsx", () => {
                     {
                         Name: "Slime",
                         HP: 18,
-                        Experience: 4,
+                        Souls: 4,
                         Description: "A weak slime",
                         Sprite: "",
                         Element1: "Fire",
@@ -197,7 +197,7 @@ describe("Game/Fight navigation", () => {
                     enemy: {
                         name: "Defeated Slime",
                         hp: 0,
-                        experience: 10,
+                        souls: 10,
                         sprite: "",
                         weaknesses: [],
                         elements: [],
