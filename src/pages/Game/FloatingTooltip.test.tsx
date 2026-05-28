@@ -1,9 +1,14 @@
 import { useRef } from "react";
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import FloatingTooltip from "./FloatingTooltip";
 
-function TooltipHarness() {
+type TooltipHarnessProps = {
+    level?: number;
+    showDetails?: boolean;
+};
+
+function TooltipHarness({ level, showDetails = false }: TooltipHarnessProps) {
     const anchorRef = useRef<HTMLButtonElement | null>(null);
 
     return (
@@ -23,6 +28,12 @@ function TooltipHarness() {
                 anchorElement={anchorRef.current}
                 open
                 className="spell-hover-tooltip-shell"
+                elementDetails={showDetails ? {
+                    letter: "A",
+                    damage: 12,
+                    description: "Arc Burst",
+                    level,
+                } : undefined}
             >
                 <span>Damage: 12</span>
             </FloatingTooltip>
@@ -31,7 +42,17 @@ function TooltipHarness() {
 }
 
 describe("FloatingTooltip layering", () => {
+    it("shows SPELL for level 2 tooltips with a red badge", async () => {
+        cleanup();
+        render(<TooltipHarness level={2} showDetails />);
+
+        const spellBadge = await screen.findByText("SPELL");
+        expect(spellBadge).toBeTruthy();
+        expect((spellBadge as HTMLElement).className).toContain("tooltip-badge-spell");
+    });
+
     it("renders above other elements", async () => {
+        cleanup();
         render(<TooltipHarness />);
 
         const tooltipContent = await screen.findByText("Damage: 12");

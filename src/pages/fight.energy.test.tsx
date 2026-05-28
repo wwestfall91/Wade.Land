@@ -87,7 +87,7 @@ describe("Fight energy usage", () => {
                         id: 3,
                         letter: "Quake",
                         damage: 9,
-                        energy: 3,
+                        energy: 8,
                         level: 1,
                         description: "Expensive spell",
                         type1: "earth",
@@ -110,7 +110,7 @@ describe("Fight energy usage", () => {
 
         renderFight();
 
-        await screen.findByText("4/4");
+        await screen.findByText("9/9");
 
         const sparkButton = screen.getByRole("button", { name: /spark/i });
         const waveButton = screen.getByRole("button", { name: /wave/i });
@@ -123,7 +123,7 @@ describe("Fight energy usage", () => {
         fireEvent.click(sparkButton);
 
         await waitFor(() => {
-            expect(screen.getByText("2/4")).toBeTruthy();
+            expect(screen.getByText("7/9")).toBeTruthy();
         });
 
         await waitFor(() => {
@@ -137,7 +137,7 @@ describe("Fight energy usage", () => {
         fireEvent.click(screen.getByRole("button", { name: /wave/i }));
 
         await waitFor(() => {
-            expect(screen.getByText("0/4")).toBeTruthy();
+            expect(screen.getByText("5/9")).toBeTruthy();
         });
 
         await waitFor(() => {

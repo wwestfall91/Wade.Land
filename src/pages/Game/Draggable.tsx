@@ -183,7 +183,7 @@ function Draggable({
 		>
 			<FloatingTooltip
 				anchorElement={draggableRef.current}
-				open={isHovered && !isDragging && description.length > 0}
+			open={isHovered && !isDragging}
 				className="drag-description-popup"
 				clampHorizontal={false}
 				elementDetails={{

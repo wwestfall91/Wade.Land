@@ -48,7 +48,7 @@ const HIT_FLASH_MS = scaleCombatAnimationMs(190);
 const HIT_STEP_DELAY_MS = scaleCombatAnimationMs(120);
 const EFFECT_STEP_DELAY_MS = scaleCombatAnimationMs(95);
 const EVENT_LOG_MAX_ENTRIES = 60;
-const TURN_ENERGY = 4;
+const TURN_ENERGY = 9;
 
 const wait = (ms: number) => new Promise<void>((resolve) => {
     window.setTimeout(resolve, scaleCombatAnimationMs(ms));

@@ -155,6 +155,8 @@ function FloatingTooltip({
 
     const primaryBadgeType = elementDetails?.type1 ?? elementDetails?.type2;
     const primaryThemeType = elementDetails?.type1 ?? elementDetails?.type2;
+    const primaryBadgeLabel = elementDetails?.level === 2 ? "SPELL" : "ELEMENT";
+    const primaryBadgeClass = elementDetails?.level === 2 ? "tooltip-badge-spell" : "";
 
     return createPortal(
         <div
@@ -183,7 +185,7 @@ function FloatingTooltip({
                             <div className="description">{elementDetails.description}</div>
                         </div>
                         <div className="tooltip-header">
-                            <span className="element-info-badge">ELEMENT</span>
+                            <span className={`element-info-badge ${primaryBadgeClass}`}>{primaryBadgeLabel}</span>
                             <div className="element-types">
                                 {elementDetails.type1 ? (
                                     <span className={`element-info-badge ${toTypeBadgeClass(elementDetails.type1)}`}>{elementDetails.type1}</span>
@@ -193,6 +195,11 @@ function FloatingTooltip({
                                 ) : null}
                             </div>
                         </div>
+
+                        <span className="damage-details">
+                            <span className="damage-label">Damage:</span>
+                            <span className="damage-value">{elementDetails.damage}</span>
+                        </span>
 
                         {effectLines.length > 0 ? (
                             <span className="effects-details">Effects:
