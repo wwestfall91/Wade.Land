@@ -50,7 +50,7 @@
 
     .player-resource-group {
         display: inline-flex;
-        align-items: center;
+        align-items: stretch;
         gap: 0.34rem;
     }
 
@@ -71,7 +71,6 @@
         align-items: center;
         justify-content: center;
         gap: 0.22rem;
-        height: 1.48rem;
         padding: 0.22rem 0.44rem;
         border: 1px solid rgba(228, 234, 255, 0.58);
         border-radius: 8px;
@@ -113,14 +112,13 @@
     .player-potion-panel {
         display: inline-flex;
         align-items: center;
-        justify-content: center;
-        gap: 0.24rem;
-        height: 1.48rem;
-        padding: 0.18rem 0.32rem;
+        gap: 0.34rem;
+        padding: 0.22rem 0.44rem;
         border: 1px solid rgba(255, 200, 200, 0.6);
         border-radius: 8px;
         background: rgba(64, 14, 22, 0.56);
         color: #ffebeb;
+        text-shadow: none;
         line-height: 1;
         box-shadow: inset 0 0 0 1px rgba(255, 132, 132, 0.14);
         cursor: pointer;
@@ -147,18 +145,32 @@
 
     .player-potion-count {
         min-width: 0.9rem;
-        text-align: center;
-        font-size: 0.9rem;
+        text-align: left;
+        font-size: 0.98rem;
         font-weight: 800;
         font-variant-numeric: tabular-nums;
         color: #ffefef;
+    }
+
+    .player-potion-label {
+        font-size: 0.58rem;
+        font-weight: 700;
+        color: rgba(255, 200, 200, 0.82);
+        letter-spacing: 0.06em;
+    }
+
+    .player-potion-copy {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.08rem;
     }
 
     .player-potion-meter {
         position: relative;
         display: inline-flex;
         width: 0.38rem;
-        height: 1rem;
+        align-self: stretch;
         border-radius: 2px;
         border: 1px solid rgba(255, 210, 210, 0.52);
         background: rgba(18, 4, 6, 0.78);
@@ -176,9 +188,17 @@
         transition: height 180ms ease;
     }
 
+    .player-potion-icon {
+        width: 1.24rem;
+        height: 1.24rem;
+        display: block;
+        object-fit: contain;
+        image-rendering: auto;
+    }
+
     .player-souls-icon {
-        width: 1.04rem;
-        height: 1.04rem;
+        width: 1.24rem;
+        height: 1.24rem;
         display: block;
         object-fit: contain;
         image-rendering: auto;

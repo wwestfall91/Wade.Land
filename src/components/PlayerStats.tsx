@@ -2,6 +2,7 @@ import { type CSSProperties } from "react";
 import "./PlayerStats.scss";
 import { usePlayer } from "../context/PlayerContext";
 import soulIcon from "../assets/icons/Soul.png";
+import potionIcon from "../assets/icons/Potion.png";
 
 type PlayerStatsProps = {
     playerName?: string;
@@ -56,13 +57,17 @@ function PlayerStats({
                         title={potionCount > 0 ? "Use potion to restore full health" : "Create Water-type elements to brew a potion"}
                         onClick={onPotionClick}
                     >
-                        <span className="player-potion-count">{potionCount}</span>
                         <span className="player-potion-meter" aria-hidden="true">
                             <span
                                 className="player-potion-meter-fill"
                                 style={{ height: `${Math.max(0, Math.min(100, potionFillPercent))}%` }}
                             />
                         </span>
+                        <img src={potionIcon} alt="" aria-hidden="true" className="player-potion-icon" />
+                        <div className="player-potion-copy">
+                            <span className="player-potion-label">POTION</span>
+                            <span className="player-potion-count">{potionCount}</span>
+                        </div>
                     </button>
                     <div className="player-souls-panel" aria-label={`Souls ${souls}`} title="Souls are earned from victories and persist between battles.">
                         <img src={soulIcon} alt="" aria-hidden="true" className="player-souls-icon" />
