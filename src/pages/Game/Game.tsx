@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import Draggable from "./Draggable";
-import StartMenuModal from "./StartMenuModal.tsx";
 import { useLocation, useNavigate } from "react-router";
 import PlayerStats from "../../components/PlayerStats";
 import EnemyInfo from "../../components/EnemyInfo";
@@ -262,6 +261,7 @@ function Game() {
     const potionSparkleTimeoutsRef = useRef<number[]>([]);
     const soulAnimationTimeoutsRef = useRef<number[]>([]);
     const soulCounterPopTimeoutRef = useRef<number | null>(null);
+    const hasShownInitialRewardModalRef = useRef(false);
 
     useEffect(() => () => {
         if (rewardCueTimeoutRef.current !== null) {
@@ -543,12 +543,14 @@ function Game() {
                     element2: (row["Element 2"] ?? "").trim(),
                     damage: Number(row.damage ?? row.Damage ?? 0) || 0,
                     energy: Math.max(0, Number(row.energy ?? row.Energy ?? 0) || 0),
-                    level:
-                        Number(row.Level ?? row.level ?? 0) ||
-                        ((row["Element 1"] ?? "").trim().length === 0 ? 1 : 2),
+                    level: (() => {
+                            const raw = row.Level ?? row.level;
+                            if (raw !== undefined && raw !== null && String(raw).trim() !== "") return Number(raw);
+                            return (row["Element 1"] ?? "").trim().length === 0 ? 1 : 2;
+                        })(),
                     description: (row.Description ?? row.description ?? "").trim(),
-                    type1: normalizeType((row["Type 1"] ?? row.Type1 ?? "") as string),
-                    type2: normalizeType((row["Type 2"] ?? row.Type2 ?? "") as string),
+                    type1: normalizeType((row.Type1 || "") as string),
+                    type2: normalizeType((row.Type2 || "") as string),
                     effects: parseSpellEffectsFromRow(row),
                 }))
                 .filter((row) => row.name.length > 0);
@@ -657,15 +659,42 @@ function Game() {
 
     }, []);
 
+
+    // FORCE: Always set starterChoices on mount for debugging
     useEffect(() => {
-        if (playerProgress.elements.length > 0 || baseElements.length === 0 || starterChoices.length > 0) {
+        if (allElementOptions.length === 0) return;
+        const levelZero = allElementOptions.filter(e => e.level === 0);
+        const choices = getRandomUniqueElements(levelZero, 3);
+        setStarterChoices(choices);
+        setSelectedStarter(null);
+    }, [allElementOptions]);
+
+    useEffect(() => {
+        if (hasShownInitialRewardModalRef.current) {
             return;
         }
 
-        const choices = getRandomUniqueElements(baseElements, 3);
-        setStarterChoices(choices);
-        setSelectedStarter(null);
-    }, [baseElements, playerProgress.elements.length, starterChoices.length]);
+        if (allElementOptions.length === 0) {
+            return;
+        }
+
+        const state = location.state as GameLocationState | null;
+        if (state?.fightReward) {
+            return;
+        }
+
+        const rewardPool = allElementOptions.filter((element) => element.level === 0);
+        const rewardElements = getRandomUniqueElements(rewardPool, 3);
+        if (rewardElements.length === 0) {
+            return;
+        }
+
+        hasShownInitialRewardModalRef.current = true;
+        setFightReward({
+            soulsGained: 0,
+            rewardElements,
+        });
+    }, [allElementOptions, location.state]);
 
     useEffect(() => {
         setDraggables((previous) => {
@@ -1333,7 +1362,8 @@ function Game() {
         });
     };
 
-    const isStartMenuOpen = playerProgress.elements.length === 0 && starterChoices.length > 0;
+    // Always show the starter modal on page load for debugging
+    const isStartMenuOpen = starterChoices.length > 0;
     const isIntroVisible = introPhase !== "hidden";
     const introDisplayName = introChosenNameRef.current || playerName || "Traveler";
     const introText =
@@ -1577,14 +1607,6 @@ function Game() {
                 enemyElements={nextEnemy?.elements ?? []}
                 enemySpritePath={nextEnemy?.sprite ?? ""}
             />
-            {isStartMenuOpen ? (
-                <StartMenuModal
-                    choices={starterChoices}
-                    selected={selectedStarter}
-                    onSelect={setSelectedStarter}
-                    onConfirm={handleConfirmStarter}
-                />
-            ) : null}
             {isDevElementPanelOpen ? (
                 <aside className="dev-element-panel" aria-label="Developer element panel">
                     <div className="dev-element-panel__header">

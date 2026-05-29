@@ -54,12 +54,14 @@ function RewardModal({ soulsGained, rewardElements, onConfirm }: RewardModalProp
                 aria-label="Reward selection"
             >
                 <div className={`reward-menu${isClosing ? " is-closing" : ""}`}>
-                    <div className="reward-souls-section">
-                        <div className="reward-souls-gained">
-                            <img src={soulIcon} alt="" aria-hidden="true" className="reward-souls-icon" />
-                            <span>+{soulsGained} Souls</span>
+                    {soulsGained >  0 && 
+                        <div className="reward-souls-section">
+                            <div className="reward-souls-gained">
+                                <img src={soulIcon} alt="" aria-hidden="true" className="reward-souls-icon" />
+                                <span>+{soulsGained} Souls</span>
+                            </div>
                         </div>
-                    </div>
+                    }
                     <h2 className="reward-title">Pick 1 Element!</h2>
                     <div className="reward-elements">
                         {rewardElements.map((element) => (
@@ -81,32 +83,36 @@ function RewardModal({ soulsGained, rewardElements, onConfirm }: RewardModalProp
                             </button>
                         ))}
                     </div>
-                    <section className="reward-current-elements" aria-label="Current spells">
-                        <h3 className="reward-current-elements-title">Your Elements</h3>
-                        <div className="reward-current-elements-list">
-                            {player.elements.length > 0 ? (
-                                player.elements.map((element) => (
-                                    <div
-                                        key={element.id}
-                                        ref={(el) => {
-                                            currentElementRefs.current[element.id] = el;
-                                        }}
-                                        className="reward-current-element"
-                                        onMouseEnter={() => setHoveredCurrentElementId(element.id)}
-                                        onMouseLeave={() => {
-                                            setHoveredCurrentElementId((current) => (
-                                                current === element.id ? null : current
-                                            ));
-                                        }}
-                                    >
-                                        <span className="reward-current-element-letter"><ElementIcon name={element.letter} /></span>
-                                    </div>
-                                ))
-                            ) : (
-                                <p className="reward-current-empty">Nothing.</p>
-                            )}
-                        </div>
-                    </section>
+                    {player.elements.length > 0 && 
+                    <>
+                        <section className="reward-current-elements" aria-label="Current spells">
+                            <h3 className="reward-current-elements-title">Your Elements</h3>
+                            <div className="reward-current-elements-list">
+                                {player.elements.length > 0 ? (
+                                    player.elements.map((element) => (
+                                        <div
+                                            key={element.id}
+                                            ref={(el) => {
+                                                currentElementRefs.current[element.id] = el;
+                                            }}
+                                            className="reward-current-element"
+                                            onMouseEnter={() => setHoveredCurrentElementId(element.id)}
+                                            onMouseLeave={() => {
+                                                setHoveredCurrentElementId((current) => (
+                                                    current === element.id ? null : current
+                                                ));
+                                            }}
+                                        >
+                                            <span className="reward-current-element-letter"><ElementIcon name={element.letter} /></span>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <p className="reward-current-empty">Nothing.</p>
+                                )}
+                            </div>
+                        </section>
+                    </>
+                    }
                     
 
                     <button
