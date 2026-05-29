@@ -1,4 +1,4 @@
-import { type CSSProperties } from "react";
+import React, { type CSSProperties } from "react";
 import "./PlayerStats.scss";
 import { usePlayer } from "../context/PlayerContext";
 import soulIcon from "../assets/icons/Soul.png";
@@ -56,13 +56,8 @@ function PlayerStats({
                         aria-label={`Potions ${potionCount}. Potion charge ${Math.round(potionFillPercent)} percent`}
                         title={potionCount > 0 ? "Use potion to restore full health" : "Create Water-type elements to brew a potion"}
                         onClick={onPotionClick}
+                        style={{ "--potion-fill": `${Math.max(0, Math.min(100, potionFillPercent))}%` } as React.CSSProperties}
                     >
-                        <span className="player-potion-meter" aria-hidden="true">
-                            <span
-                                className="player-potion-meter-fill"
-                                style={{ height: `${Math.max(0, Math.min(100, potionFillPercent))}%` }}
-                            />
-                        </span>
                         <img src={potionIcon} alt="" aria-hidden="true" className="player-potion-icon" />
                         <div className="player-potion-copy">
                             <span className="player-potion-label">POTION</span>
