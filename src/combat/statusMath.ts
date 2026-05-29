@@ -1,3 +1,6 @@
+export const ENERGY_PER_TURN = 3;
+export const MAX_TURN_ENERGY = 9;
+
 export const BURN_DAMAGE_PER_STACK = 5;
 export const SOAK_LIGHTNING_BONUS_PER_STACK = 3;
 export const SOAK_FIRE_PENALTY_PER_STACK = 3;

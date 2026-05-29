@@ -6,13 +6,16 @@ import {
     getPerHitSpellEffects,
     getSpellHitCount,
     type ActiveBurnStatus,
+    type ActiveEnergizeStatus,
     type ActiveFreezeStatus,
     type ActiveSoakStatus,
     type SpellEffectConfig,
 } from "../../combat/spellEffects";
 import {
     BURN_DAMAGE_PER_STACK,
+    ENERGY_PER_TURN,
     FREEZE_FIRE_BONUS_PER_STACK,
+    MAX_TURN_ENERGY,
     SOAK_FIRE_PENALTY_PER_STACK,
     SOAK_LIGHTNING_BONUS_PER_STACK,
     getBurnTickDamage,
@@ -27,6 +30,8 @@ import FloatingTooltip from "../Game/FloatingTooltip";
 import ElementIcon from "../../components/ElementIcon";
 import shieldIcon from "../../assets/icons/Shield.png";
 import soulIcon from "../../assets/icons/Soul.png";
+import energizeIcon from "../../assets/icons/Energize.png";
+import leafIcon from "../../assets/spells/Leaf.png";
 
 type EnemyDamagePopup = {
     id: number;
@@ -42,13 +47,23 @@ type EventLogEntry = {
     isDetail?: boolean;
 };
 
+// TURN_ENERGY constant removed — use MAX_TURN_ENERGY and ENERGY_PER_TURN from statusMath
 const COMBAT_ANIMATION_SPEED_MULTIPLIER = 1.6;
 const scaleCombatAnimationMs = (ms: number) => Math.max(16, Math.round(ms / COMBAT_ANIMATION_SPEED_MULTIPLIER));
 const HIT_FLASH_MS = scaleCombatAnimationMs(190);
 const HIT_STEP_DELAY_MS = scaleCombatAnimationMs(120);
 const EFFECT_STEP_DELAY_MS = scaleCombatAnimationMs(95);
 const EVENT_LOG_MAX_ENTRIES = 60;
-const TURN_ENERGY = 9;
+
+type EnergyFlight = {
+    id: number;
+    x: number;
+    y: number;
+    dx: number;
+    dy: number;
+    delay: number;
+    duration: number;
+};
 
 const wait = (ms: number) => new Promise<void>((resolve) => {
     window.setTimeout(resolve, scaleCombatAnimationMs(ms));
@@ -113,8 +128,7 @@ function Fight() {
     const [hoveredSpellId, setHoveredSpellId] = useState<number | null>(null);
     const [hoveredEnemyAttack, setHoveredEnemyAttack] = useState(false);
     const [hoveredEnemyMetaElementIndex, setHoveredEnemyMetaElementIndex] = useState<number | null>(null);
-    const [usedSpellIds, setUsedSpellIds] = useState<number[]>([]);
-    const [remainingEnergy, setRemainingEnergy] = useState(TURN_ENERGY);
+    const [remainingEnergy, setRemainingEnergy] = useState(ENERGY_PER_TURN);
     const [eventLogEntries, setEventLogEntries] = useState<EventLogEntry[]>([]);
     const [isGameOver, setIsGameOver] = useState(false);
     const [isPlayerHit, setIsPlayerHit] = useState(false);
@@ -151,6 +165,9 @@ function Fight() {
     const [enemyDamagePopups, setEnemyDamagePopups] = useState<EnemyDamagePopup[]>([]);
     const [isPlayerHealingFlash, setIsPlayerHealingFlash] = useState(false);
     const [isPlayerShieldFlash, setIsPlayerShieldFlash] = useState(false);
+    const [playerEnergizeStatus, setPlayerEnergizeStatus] = useState<ActiveEnergizeStatus | null>(null);
+    const [energizeFlights, setEnergizeFlights] = useState<EnergyFlight[]>([]);
+    const [leafFlights, setLeafFlights] = useState<EnergyFlight[]>([]);
     const hasResolvedVictory = useRef(false);
     const previousPlayerHpRef = useRef(player.hp);
     const previousPlayerShieldRef = useRef(playerShield);
@@ -164,6 +181,11 @@ function Fight() {
     const playerHpBarRef = useRef<HTMLDivElement | null>(null);
     const playerStatusStripRef = useRef<HTMLDivElement | null>(null);
     const projectileIdRef = useRef(1);
+    const pipRefs = useRef<(HTMLSpanElement | null)[]>([]);
+    const energizeDisplayRef = useRef<HTMLSpanElement | null>(null);
+    const energizeFlyIdRef = useRef(1);
+    const leafFlyIdRef = useRef(1);
+    const remainingEnergyRef = useRef(ENERGY_PER_TURN);
     const enemyMetaElementRefs = useRef<Record<number, HTMLSpanElement | null>>({});
     const healFlashTimeoutRef = useRef<number | null>(null);
     const shieldFlashTimeoutRef = useRef<number | null>(null);
@@ -804,6 +826,8 @@ function Fight() {
         setIsResolvingTurn(true);
 
         const burnAtTurnEnd = enemyBurnStatus;
+        const energizeAtTurnEnd = playerEnergizeStatus;
+        const energyAtTurnStart = remainingEnergy;
         let nextEnemyHealth = enemyHealth;
         if (burnAtTurnEnd && nextEnemyHealth > 0) {
             const burnDamage = getBurnTickDamage(burnAtTurnEnd.stacks);
@@ -826,15 +850,27 @@ function Fight() {
 
         if (nextEnemyHealth <= 0) {
             setQueuedEnemyAttack(null);
-            setUsedSpellIds([]);
-            setRemainingEnergy(TURN_ENERGY);
+            if (energizeAtTurnEnd) {
+                launchEnergyFlights(energizeDisplayRef.current, energyAtTurnStart, energizeAtTurnEnd.stacks);
+                await wait(300);
+            }
+            setRemainingEnergy((prev) => Math.min(MAX_TURN_ENERGY, prev + ENERGY_PER_TURN + (energizeAtTurnEnd?.stacks ?? 0)));
+            if (energizeAtTurnEnd) {
+                setPlayerEnergizeStatus(null);
+            }
             setIsResolvingTurn(false);
             return;
         }
 
         await triggerEnemyAttack();
-        setUsedSpellIds([]);
-        setRemainingEnergy(TURN_ENERGY);
+        if (energizeAtTurnEnd) {
+            launchEnergyFlights(energizeDisplayRef.current, energyAtTurnStart, energizeAtTurnEnd.stacks);
+            await wait(300);
+        }
+        setRemainingEnergy((prev) => Math.min(MAX_TURN_ENERGY, prev + ENERGY_PER_TURN + (energizeAtTurnEnd?.stacks ?? 0)));
+        if (energizeAtTurnEnd) {
+            setPlayerEnergizeStatus(null);
+        }
         setIsResolvingTurn(false);
     };
 
@@ -881,6 +917,70 @@ function Fight() {
         return scaledStartDelay + count * scaledDelayStep;
     };
 
+    const launchEnergyFlights = (fromElement: HTMLElement | null, energyBefore: number, stacks: number) => {
+        if (!fromElement || stacks <= 0) return;
+
+        const fromRect = fromElement.getBoundingClientRect();
+        const startX = fromRect.left + fromRect.width / 2;
+        const startY = fromRect.top + fromRect.height / 2;
+
+        const flightDuration = scaleCombatAnimationMs(280);
+        const delayStep = scaleCombatAnimationMs(100);
+
+        // Energize stacks fill pips beyond what ENERGY_PER_TURN would fill
+        const normalFillEnd = Math.min(MAX_TURN_ENERGY, energyBefore + ENERGY_PER_TURN);
+
+        const newFlights: EnergyFlight[] = [];
+        for (let i = 0; i < stacks; i++) {
+            const pipIndex = normalFillEnd + i;
+            if (pipIndex >= MAX_TURN_ENERGY) break;
+            const pipEl = pipRefs.current[pipIndex];
+            if (!pipEl) continue;
+
+            const pipRect = pipEl.getBoundingClientRect();
+            newFlights.push({
+                id: energizeFlyIdRef.current++,
+                x: startX,
+                y: startY,
+                dx: pipRect.left + pipRect.width / 2 - startX,
+                dy: pipRect.top + pipRect.height / 2 - startY,
+                delay: i * delayStep,
+                duration: flightDuration,
+            });
+        }
+
+        if (newFlights.length === 0) return;
+
+        setEnergizeFlights((prev) => [...prev, ...newFlights]);
+        const maxDelay = Math.max(0, newFlights.length - 1) * delayStep;
+        window.setTimeout(() => {
+            const ids = new Set(newFlights.map((f) => f.id));
+            setEnergizeFlights((prev) => prev.filter((f) => !ids.has(f.id)));
+        }, maxDelay + flightDuration + 200);
+    };
+
+    const launchLeafFlight = (fromElement: HTMLElement | null, toElement: HTMLElement | null) => {
+        if (!fromElement || !toElement) return;
+
+        const fromRect = fromElement.getBoundingClientRect();
+        const toRect = toElement.getBoundingClientRect();
+        const flightDuration = scaleCombatAnimationMs(320);
+        const flight: EnergyFlight = {
+            id: leafFlyIdRef.current++,
+            x: fromRect.left + fromRect.width / 2,
+            y: fromRect.top + fromRect.height / 2,
+            dx: toRect.left + toRect.width / 2 - (fromRect.left + fromRect.width / 2),
+            dy: toRect.top + toRect.height / 2 - (fromRect.top + fromRect.height / 2),
+            delay: 0,
+            duration: flightDuration,
+        };
+
+        setLeafFlights((prev) => [...prev, flight]);
+        window.setTimeout(() => {
+            setLeafFlights((prev) => prev.filter((f) => f.id !== flight.id));
+        }, flightDuration + 200);
+    };
+
     const launchProjectiles = (spell: { letter: string; effects?: SpellEffectConfig[] }, buttonEl: HTMLButtonElement | null) => {
         const hitCount = getSpellHitCount(spell.effects);
         launchProjectileBurst(spell.letter, buttonEl, enemySpriteRef.current, hitCount, 180);
@@ -889,7 +989,6 @@ function Fight() {
     const handleSlotClick = async (spell: CastableSpell) => {
         const spellEnergyCost = getSpellEnergyCost(spell);
         if (
-            usedSpellIds.includes(spell.id) ||
             enemyHealth <= 0 ||
             isGameOver ||
             isResolvingTurn ||
@@ -943,6 +1042,7 @@ function Fight() {
         let convertedFreezeStacks = 0;
         let freezeWasConsumed = false;
         let consumedFreezeStacks = 0;
+        let totalEnergizeApplied = 0;
 
         for (let hitIndex = 0; hitIndex < hitCount; hitIndex += 1) {
             if (nextEnemyHealth <= 0) {
@@ -1053,6 +1153,14 @@ function Fight() {
                         totalSoakApplied += Math.max(1, effect.amount ?? 1);
                         break;
                     }
+                    case "energize": {
+                        if (effect.target === "enemy") {
+                            return;
+                        }
+
+                        totalEnergizeApplied += Math.max(1, effect.amount ?? 1);
+                        break;
+                    }
                     default:
                         break;
                 }
@@ -1131,6 +1239,17 @@ function Fight() {
             await wait(EFFECT_STEP_DELAY_MS);
         }
 
+        if (totalEnergizeApplied > 0) {
+            setPlayerEnergizeStatus((previous) => {
+                if (!previous) {
+                    return { kind: "energize", stacks: totalEnergizeApplied };
+                }
+
+                return { kind: "energize", stacks: previous.stacks + totalEnergizeApplied };
+            });
+            await wait(EFFECT_STEP_DELAY_MS);
+        }
+
         pushEventLog(`${abilityName} deals ${totalDamage} damage`, "player");
 
         const effectMessages: string[] = [];
@@ -1149,6 +1268,9 @@ function Fight() {
         if (totalSoakApplied > 0 && nextEnemyHealth > 0) {
             effectMessages.push(`Soak +${totalSoakApplied}`);
         }
+        if (totalEnergizeApplied > 0) {
+            effectMessages.push(`Energize +${totalEnergizeApplied}`);
+        }
         if (soakWasConsumed) {
             effectMessages.push("Soak evaporates");
         }
@@ -1165,23 +1287,7 @@ function Fight() {
             effectMessages.push("Critical hit");
         }
 
-        let isTurnOver = false;
-        setUsedSpellIds((previous) => {
-            if (previous.includes(spell.id)) {
-                return previous;
-            }
-
-            const next = [...previous, spell.id];
-            isTurnOver = next.length >= player.elements.length;
-
-            return next;
-        });
-
-        if (isTurnOver) {
-            if (nextEnemyHealth > 0) {
-                pushEventLog("All spell slots used", "status");
-            }
-        } else if (effectMessages.length > 0) {
+        if (effectMessages.length > 0) {
             effectMessages.forEach((message) => {
                 pushEventLog(message, inferEventKind(message), { isDetail: true });
             });
@@ -1380,18 +1486,19 @@ function Fight() {
             </div>{/* end .enemy-zone */}
 
             {/* ─── Energy Row ─── */}
-            <div className="energy-row" aria-live="polite" aria-label={`Turn energy ${remainingEnergy} out of ${TURN_ENERGY}`}>
+            <div className="energy-row" aria-live="polite" aria-label={`Turn energy ${remainingEnergy} out of ${MAX_TURN_ENERGY}`}>
                 <span className="energy-row-label">{isResolvingTurn ? "ENEMY TURN" : "YOUR TURN"}</span>
                 <div className="energy-pips">
-                    {Array.from({ length: TURN_ENERGY }).map((_, i) => (
+                    {Array.from({ length: MAX_TURN_ENERGY }).map((_, i) => (
                         <span
                             key={i}
+                            ref={(el) => { pipRefs.current[i] = el; }}
                             className={`energy-pip ${i < remainingEnergy ? "is-active" : "is-spent"}`}
                             aria-hidden="true"
                         />
                     ))}
                 </div>
-                <span className="energy-row-count">{remainingEnergy}/{TURN_ENERGY}</span>
+                <span className="energy-row-count">{remainingEnergy}/{MAX_TURN_ENERGY}</span>
             </div>
 
             {/* ─── Spell Hand ─── */}
@@ -1404,9 +1511,8 @@ function Fight() {
                                 spellSlotRefs.current[spell.id] = element;
                             }}
                             type="button"
-                            className={`spell-card ${flashingSlotId === spell.id ? "is-flashing" : ""} ${usedSpellIds.includes(spell.id) ? "is-used" : ""} ${(!usedSpellIds.includes(spell.id) && !isGameOver && !isResolvingTurn && remainingEnergy < getSpellEnergyCost(spell)) ? "is-unaffordable" : ""}`}
+                            className={`spell-card ${flashingSlotId === spell.id ? "is-flashing" : ""} ${(!isGameOver && !isResolvingTurn && remainingEnergy < getSpellEnergyCost(spell)) ? "is-unaffordable" : ""}`}
                             disabled={
-                                usedSpellIds.includes(spell.id) ||
                                 isGameOver ||
                                 isResolvingTurn ||
                                 remainingEnergy <= 0 ||
@@ -1416,10 +1522,14 @@ function Fight() {
                             onMouseEnter={() => setHoveredSpellId(spell.id)}
                             onMouseLeave={() => setHoveredSpellId((current) => (current === spell.id ? null : current))}
                             onClick={(e) => {
+                                const btn = e.currentTarget as HTMLButtonElement;
                                 launchProjectiles(
                                     { letter: spell.letter, effects: spell.effects },
-                                    e.currentTarget as HTMLButtonElement,
+                                    btn,
                                 );
+                                if ([spell.type1, spell.type2].map(normalizeType).includes("leaf")) {
+                                    launchLeafFlight(btn, energizeDisplayRef.current);
+                                }
                                 handleSlotClick({
                                     id: spell.id,
                                     letter: spell.letter,
@@ -1500,6 +1610,19 @@ function Fight() {
                         <span className="player-status-tooltip">
                             <span>Freeze Stacks: {playerFreezeStatus?.stacks ?? 0}</span>
                             <span>Fire gains +{(playerFreezeStatus?.stacks ?? 0) * FREEZE_FIRE_BONUS_PER_STACK} damage</span>
+                        </span>
+                    </span>
+                    <span
+                        ref={energizeDisplayRef}
+                        className={`player-status-badge player-status-badge--energize ${playerEnergizeStatus ? "" : "is-hidden"}`}
+                        aria-label={playerEnergizeStatus ? `Energize ${playerEnergizeStatus.stacks}` : undefined}
+                        aria-hidden={!playerEnergizeStatus}
+                    >
+                        <span className="player-status-icon" aria-hidden="true"><img src={energizeIcon} alt="" style={{ width: "0.85rem", height: "0.85rem", objectFit: "contain" }} /></span>
+                        <span className="player-status-count">{playerEnergizeStatus?.stacks ?? ""}</span>
+                        <span className="player-status-tooltip">
+                            <span>Energize Stacks: {playerEnergizeStatus?.stacks ?? 0}</span>
+                            <span>Next turn: +{playerEnergizeStatus?.stacks ?? 0} energy</span>
                         </span>
                     </span>
                     </div>
@@ -1601,6 +1724,53 @@ function Fight() {
                                 }}
                             >
                                 <ElementIcon name={proj.letter} />
+                            </span>
+                        ))}
+                    </>,
+                    document.body,
+                )
+                : null}
+            {energizeFlights.length > 0
+                ? createPortal(
+                    <>
+                        {energizeFlights.map((flight) => (
+                            <span
+                                key={flight.id}
+                                className="energize-flight"
+                                aria-hidden="true"
+                                style={{
+                                    left: flight.x,
+                                    top: flight.y,
+                                    ["--proj-dx" as string]: `${flight.dx}px`,
+                                    ["--proj-dy" as string]: `${flight.dy}px`,
+                                    animationDelay: `${flight.delay}ms`,
+                                    animationDuration: `${flight.duration}ms`,
+                                }}
+                            >
+                                <img src={energizeIcon} alt="" />
+                            </span>
+                        ))}
+                    </>,
+                    document.body,
+                )
+                : null}
+            {leafFlights.length > 0
+                ? createPortal(
+                    <>
+                        {leafFlights.map((flight) => (
+                            <span
+                                key={flight.id}
+                                className="leaf-flight"
+                                aria-hidden="true"
+                                style={{
+                                    left: flight.x,
+                                    top: flight.y,
+                                    ["--proj-dx" as string]: `${flight.dx}px`,
+                                    ["--proj-dy" as string]: `${flight.dy}px`,
+                                    animationDuration: `${flight.duration}ms`,
+                                }}
+                            >
+                                <img src={leafIcon} alt="" />
                             </span>
                         ))}
                     </>,

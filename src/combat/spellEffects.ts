@@ -1,4 +1,4 @@
-export type SpellEffectKind = "heal" | "multi_hit" | "burn" | "shield" | "lifesteal" | "soak";
+export type SpellEffectKind = "heal" | "multi_hit" | "burn" | "shield" | "lifesteal" | "soak" | "energize";
 
 export type SpellEffectTarget = "self" | "enemy";
 
@@ -23,6 +23,11 @@ export type ActiveSoakStatus = {
 
 export type ActiveFreezeStatus = {
     kind: "freeze";
+    stacks: number;
+};
+
+export type ActiveEnergizeStatus = {
+    kind: "energize";
     stacks: number;
 };
 
@@ -56,6 +61,8 @@ const normalizeEffectKind = (value: string): SpellEffectKind | null => {
             return "lifesteal";
         case "soak":
             return "soak";
+        case "energize":
+            return "energize";
         default:
             return null;
     }
@@ -103,7 +110,7 @@ export const parseSpellEffectsFromRow = (
         const amount = safeNumber(readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Amount")));
         const hits = safeNumber(readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Hits")));
         const duration = safeNumber(readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Duration")));
-        const defaultTarget: SpellEffectTarget = ["heal", "shield", "lifesteal"].includes(kind)
+        const defaultTarget: SpellEffectTarget = ["heal", "shield", "lifesteal", "energize"].includes(kind)
             ? "self"
             : "enemy";
         const target = normalizeTarget(

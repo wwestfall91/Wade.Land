@@ -47,6 +47,11 @@ export const getEffectSummaryLines = (effects?: SpellEffectConfig[] | null): str
                 lines.push(`Soak: +${amount}`);
                 break;
             }
+            case "energize": {
+                const amount = Math.max(1, effect.amount ?? 1);
+                lines.push(`Energize: +${amount}`);
+                break;
+            }
             default:
                 break;
         }
@@ -107,6 +112,11 @@ export const getEffectSummaryLinesForTarget = (
                 lines.push(`Soak: +${amount}`);
                 break;
             }
+            case "energize": {
+                const amount = Math.max(1, effect.amount ?? 1);
+                lines.push(`Energize: +${amount}`);
+                break;
+            }
             default:
                 break;
         }
@@ -130,6 +140,9 @@ export const getEffectChipClass = (line: string): string => {
     }
     if (line.startsWith("Soak:")) {
         return "effect-soak";
+    }
+    if (line.startsWith("Energize:")) {
+        return "effect-energize";
     }
     if (line.startsWith("Hits:")) {
         return "effect-multi-hit";
