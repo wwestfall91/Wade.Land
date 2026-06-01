@@ -728,6 +728,10 @@ function Game() {
     }, [allElementOptions]);
 
     useEffect(() => {
+        if (introPhase !== "hidden") {
+            return;
+        }
+
         if (hasShownInitialRewardModalRef.current) {
             return;
         }
@@ -752,7 +756,7 @@ function Game() {
             soulsGained: 0,
             rewardElements,
         });
-    }, [allElementOptions, location.state]);
+    }, [allElementOptions, introPhase, location.state]);
 
     useEffect(() => {
         levelZeroElementsRef.current = allElementOptions.filter((e) => e.level === 0);
