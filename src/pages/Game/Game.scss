@@ -195,6 +195,48 @@
         }
     }
 
+    .game-intro-eyes {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 9rem;
+        margin-top: -8rem;
+        pointer-events: none;
+    }
+
+    .game-intro-eye {
+        position: relative;
+        width: 5rem;
+        height: 3.2rem;
+        background: radial-gradient(ellipse at center, #ff4444 0%, #bb0000 55%, transparent 100%);
+        border-radius: 50%;
+        opacity: 0.28;
+        box-shadow:
+            0 0 18px 6px rgba(200, 0, 0, 0.45),
+            0 0 55px 18px rgba(130, 0, 0, 0.2);
+        animation: monster-eye-blink 5.2s ease-in-out infinite;
+
+
+        &::after {
+            content: "";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 22%;
+            height: 80%;
+            background: rgba(0, 0, 0, 0.75);
+            border-radius: 50%;
+        }
+    }
+
+    @keyframes monster-eye-blink {
+        0%, 85%, 100% { transform: scaleY(1); }
+        89%, 93%      { transform: scaleY(0.05); }
+    }
+
     .game-intro-line {
         color: #fff;
         font-family: "Trebuchet MS", "Segoe UI", sans-serif;

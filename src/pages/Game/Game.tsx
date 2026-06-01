@@ -1517,13 +1517,13 @@ function Game() {
     const introDisplayName = introChosenNameRef.current || playerName || "Traveler";
     const introText =
         introPhase === "line1"
-            ? "Oh - It's you!"
+            ? "..."
             : introPhase === "line2"
-                ? "Remind me what your name was again?"
+                ? "... ?"
                 : introPhase === "line3"
-                    ? `You are the boss of this dungeon, ${introDisplayName}`
+                    ? `${introDisplayName}... Feed...`
                     : introPhase === "line4"
-                        ? "Defend this sanctuary with your life!"
+                        ? "Feed... Me..."
                         : "";
 
     return (
@@ -1614,6 +1614,10 @@ function Game() {
             ) : null}
             {isIntroVisible ? (
                 <div className={`game-intro-overlay ${introPhase === "fadeout" ? "is-fading-out" : ""}`}>
+                    <div className="game-intro-eyes" aria-hidden="true">
+                        <span className="game-intro-eye game-intro-eye--left" />
+                        <span className="game-intro-eye game-intro-eye--right" />
+                    </div>
                     {introPhase === "input" ? (
                         <form
                             className={`game-intro-input-shell ${isIntroInputFadingOut ? "is-fading-out" : ""}`}
