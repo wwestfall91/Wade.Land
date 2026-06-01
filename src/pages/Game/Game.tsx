@@ -1884,9 +1884,11 @@ function Game() {
                     onClick={handleFeedOverlayClose}
                     aria-hidden="true"
                 >
-                    <div key={eyesFlashRevision} className={`feed-overlay-eyes${eyesFlashRevision > 0 ? " is-soul-flash" : ""}`}>
-                        <span className="game-intro-eye game-intro-eye--left" />
-                        <span className="game-intro-eye game-intro-eye--right" />
+                    <div className="feed-overlay-eyes">
+                        <div key={eyesFlashRevision} className={`feed-eyes-inner${eyesFlashRevision > 0 ? " is-soul-flash" : ""}`}>
+                            <span className="game-intro-eye game-intro-eye--left" />
+                            <span className="game-intro-eye game-intro-eye--right" />
+                        </div>
                     </div>
                     {feedAnimations.map((id) => (
                         <img
