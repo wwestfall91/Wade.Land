@@ -2,6 +2,52 @@
     position: relative;
     isolation: isolate;
 
+    .chest-reveal-overlay {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+        z-index: 8860;
+        animation: chest-reveal-in 280ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+
+        &.is-fading-out {
+            animation: chest-reveal-out 320ms ease-in forwards;
+        }
+    }
+
+    .chest-reveal-icon {
+        width: 9rem;
+        height: 9rem;
+        object-fit: contain;
+        image-rendering: pixelated;
+        filter:
+            drop-shadow(0 0 1.2rem rgba(230, 190, 80, 0.72))
+            drop-shadow(0 4px 0 rgba(0, 0, 0, 0.5));
+    }
+
+    .element-flight-layer {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 8900;
+    }
+
+    .element-flight-icon {
+        position: fixed;
+        width: 2rem;
+        height: 2rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        transform: translate(-50%, -50%);
+        animation: element-flight-to-game 520ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        pointer-events: none;
+        filter: drop-shadow(0 0 0.35rem rgba(180, 210, 255, 0.82));
+    }
+
     .soul-collection-layer {
         position: fixed;
         inset: 0;
@@ -759,5 +805,57 @@
     100% {
         opacity: 0;
         transform: translateY(-0.12rem) scale(0.96);
+    }
+}
+
+@keyframes element-flight-to-game {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.45);
+    }
+
+    14% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1.12);
+    }
+
+    82% {
+        opacity: 0.88;
+        transform: translate(
+            calc(-50% + var(--elem-fly-x) * 0.82),
+            calc(-50% + var(--elem-fly-y) * 0.82)
+        ) scale(0.78);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translate(
+            calc(-50% + var(--elem-fly-x)),
+            calc(-50% + var(--elem-fly-y))
+        ) scale(0.38);
+    }
+}
+
+@keyframes chest-reveal-in {
+    0% {
+        opacity: 0;
+        transform: scale(0.72);
+    }
+
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes chest-reveal-out {
+    0% {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    100% {
+        opacity: 0;
+        transform: scale(0.82);
     }
 }

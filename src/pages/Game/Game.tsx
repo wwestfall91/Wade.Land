@@ -11,6 +11,7 @@ import { type RewardElement, usePlayer } from "../../context/PlayerContext";
 import FloatingTooltip from "./FloatingTooltip";
 import RewardModal from "../Fight/RewardModal";
 import soulIcon from "../../assets/icons/Soul.png";
+import chestIcon from "../../assets/icons/Chest.png";
 import "./Game.scss";
 
 // TODO: Add special effects (Healing, burn, multi-hit)
@@ -113,9 +114,17 @@ type PreviewCombination = {
     effects?: SpellEffectConfig[];
 };
 
+type ChestDefinition = {
+    elements: RewardElement[];
+    bonusSoulsMultiplier?: number;
+    tooltip: string;
+};
+
 type FightRewardState = {
     soulsGained: number;
     rewardElements: RewardElement[];
+    isChestReward?: boolean;
+    chests?: ChestDefinition[];
 };
 
 type GameLocationState = {
@@ -140,6 +149,9 @@ const SOUL_COLLECTION_TRAVEL_MS = 620;
 const SOUL_COLLECTION_STAGGER_MS = 82;
 const SOUL_COLLECTION_PULSE_MS = 500;
 const SOUL_COLLECTION_TEXT_EXTRA_MS = 500;
+const ELEMENT_FLIGHT_TRAVEL_MS = 520;
+const ELEMENT_FLIGHT_STAGGER_MS = 130;
+const CHEST_REVEAL_FADEOUT_MS = 320;
 
 type SoulFlightIcon = {
     id: number;
@@ -149,6 +161,16 @@ type SoulFlightIcon = {
     midY: number;
     toX: number;
     toY: number;
+    delayMs: number;
+};
+
+type ElementFlightIcon = {
+    id: number;
+    startX: number;
+    startY: number;
+    toX: number;
+    toY: number;
+    letter: string;
     delayMs: number;
 };
 
@@ -247,6 +269,9 @@ function Game() {
     const [soulPulseAmount, setSoulPulseAmount] = useState(0);
     const [isSoulCounterPopping, setIsSoulCounterPopping] = useState(false);
     const [soulFlightIcons, setSoulFlightIcons] = useState<SoulFlightIcon[]>([]);
+    const [elementFlightIcons, setElementFlightIcons] = useState<ElementFlightIcon[]>([]);
+    const [isChestRevealVisible, setIsChestRevealVisible] = useState(false);
+    const [isChestRevealFadingOut, setIsChestRevealFadingOut] = useState(false);
     const previewPositionRef = useRef<Position | null>(null);
     const previewPointerClientRef = useRef<Position>({ x: 0, y: 0 });
     const introChosenNameRef = useRef("");
@@ -261,7 +286,10 @@ function Game() {
     const potionSparkleTimeoutsRef = useRef<number[]>([]);
     const soulAnimationTimeoutsRef = useRef<number[]>([]);
     const soulCounterPopTimeoutRef = useRef<number | null>(null);
+    const elementFlightIdRef = useRef(1);
+    const elementFlightTimeoutsRef = useRef<number[]>([]);
     const hasShownInitialRewardModalRef = useRef(false);
+    const levelZeroElementsRef = useRef<RewardElement[]>([]);
 
     useEffect(() => () => {
         if (rewardCueTimeoutRef.current !== null) {
@@ -279,6 +307,9 @@ function Game() {
         if (soulCounterPopTimeoutRef.current !== null) {
             window.clearTimeout(soulCounterPopTimeoutRef.current);
         }
+        elementFlightTimeoutsRef.current.forEach((timeoutId) => {
+            window.clearTimeout(timeoutId);
+        });
     }, []);
 
     const clearSoulAnimationTimeouts = useCallback(() => {
@@ -363,7 +394,27 @@ function Game() {
             setFightReward(null);
             setIsFightVictoryCueVisible(true);
             rewardCueTimeoutRef.current = window.setTimeout(() => {
-                setFightReward(state.fightReward ?? null);
+                const reward = state.fightReward;
+                const soulsGained = reward?.soulsGained ?? 0;
+                const levelZero = levelZeroElementsRef.current;
+                const bonusSoulsCount = Math.floor(soulsGained * 0.5);
+                const mysteryCount = Math.floor(Math.random() * 10) + 1;
+                const chests: ChestDefinition[] = [
+                    {
+                        elements: getRandomUniqueElements(levelZero, 5),
+                        tooltip: "5 random elements",
+                    },
+                    {
+                        elements: getRandomUniqueElements(levelZero, 3),
+                        bonusSoulsMultiplier: 0.5,
+                        tooltip: `3 random elements \r + ${bonusSoulsCount} souls`,
+                    },
+                    {
+                        elements: getRandomUniqueElements(levelZero, mysteryCount),
+                        tooltip: "???",
+                    },
+                ];
+                setFightReward(reward ? { ...reward, isChestReward: true, chests } : null);
                 setIsFightVictoryCueVisible(false);
             }, REWARD_CUE_MS);
         }
@@ -695,6 +746,10 @@ function Game() {
             rewardElements,
         });
     }, [allElementOptions, location.state]);
+
+    useEffect(() => {
+        levelZeroElementsRef.current = allElementOptions.filter((e) => e.level === 0);
+    }, [allElementOptions]);
 
     useEffect(() => {
         setDraggables((previous) => {
@@ -1235,7 +1290,7 @@ function Game() {
         navigate("/fight", {
             state: {
                 enemy: fullEnemy,
-                elementPool: baseElements,
+                elementPool: allElementOptions,
             },
         });
     };
@@ -1342,7 +1397,7 @@ function Game() {
         soulAnimationTimeoutsRef.current.push(textHideTimeoutId);
     }, [addSouls, clearSoulAnimationTimeouts, triggerSoulCounterPop]);
 
-    const handleRewardConfirm = (selectedElement: RewardElement) => {
+    const handleRewardConfirm = ({ elements, bonusSoulsMultiplier }: { elements: RewardElement[]; bonusSoulsMultiplier?: number; sourceRect?: DOMRect }) => {
         if (!fightReward) {
             return;
         }
@@ -1352,14 +1407,67 @@ function Game() {
             rewardCueTimeoutRef.current = null;
         }
 
-        startSoulCollectionAnimation(fightReward.soulsGained);
-        addElement(selectedElement);
+        const bonusSouls = bonusSoulsMultiplier ? Math.floor(fightReward.soulsGained * bonusSoulsMultiplier) : 0;
+        const totalSouls = fightReward.soulsGained + bonusSouls;
+        const isChestRewardPath = (fightReward.isChestReward ?? false) && elements.length > 0;
+        hasShownInitialRewardModalRef.current = true;
         setFightReward(null);
         setIsFightVictoryCueVisible(false);
         navigate("/game", {
             replace: true,
             state: null,
         });
+
+        if (isChestRewardPath) {
+            setIsChestRevealVisible(true);
+            setIsChestRevealFadingOut(false);
+            const currentCount = playerProgress.elements.length;
+            const containerRect = gameRef.current?.getBoundingClientRect();
+            const centerX = window.innerWidth / 2;
+            const centerY = window.innerHeight / 2;
+
+            const flightIcons: ElementFlightIcon[] = elements.map((el, i) => {
+                const targetPos = getSpawnPosition(currentCount + i);
+                const targetX = (containerRect?.left ?? 0) + targetPos.x + 16;
+                const targetY = (containerRect?.top ?? 0) + targetPos.y + 16;
+                return {
+                    id: elementFlightIdRef.current++,
+                    startX: centerX,
+                    startY: centerY,
+                    toX: targetX - centerX,
+                    toY: targetY - centerY,
+                    letter: el.letter,
+                    delayMs: 150 + i * ELEMENT_FLIGHT_STAGGER_MS,
+                };
+            });
+
+            setElementFlightIcons(flightIcons);
+
+            elements.forEach((el, i) => {
+                const landTimeoutId = window.setTimeout(() => {
+                    addElement(el);
+                }, flightIcons[i].delayMs + ELEMENT_FLIGHT_TRAVEL_MS);
+                elementFlightTimeoutsRef.current.push(landTimeoutId);
+            });
+
+            const lastLandMs = 150 + (elements.length - 1) * ELEMENT_FLIGHT_STAGGER_MS + ELEMENT_FLIGHT_TRAVEL_MS;
+            const fadeOutTimeoutId = window.setTimeout(() => {
+                setElementFlightIcons([]);
+                setIsChestRevealFadingOut(true);
+            }, lastLandMs + 100);
+            elementFlightTimeoutsRef.current.push(fadeOutTimeoutId);
+
+            const cleanupTimeoutId = window.setTimeout(() => {
+                elementFlightTimeoutsRef.current = [];
+                setIsChestRevealVisible(false);
+                setIsChestRevealFadingOut(false);
+                startSoulCollectionAnimation(totalSouls);
+            }, lastLandMs + 100 + CHEST_REVEAL_FADEOUT_MS);
+            elementFlightTimeoutsRef.current.push(cleanupTimeoutId);
+        } else {
+            elements.forEach((el) => addElement(el));
+            startSoulCollectionAnimation(totalSouls);
+        }
     };
 
     // Always show the starter modal on page load for debugging
@@ -1408,6 +1516,33 @@ function Game() {
                 <div className="soul-pulse-cue" aria-hidden="true">
                     <img src={soulIcon} alt="" className="soul-pulse-cue-icon" />
                     <span className="soul-pulse-cue-text">+{soulPulseAmount} SOULS</span>
+                </div>
+            ) : null}
+            {isChestRevealVisible ? (
+                <div
+                    className={`chest-reveal-overlay${isChestRevealFadingOut ? " is-fading-out" : ""}`}
+                    aria-hidden="true"
+                >
+                    <img src={chestIcon} alt="" className="chest-reveal-icon" />
+                </div>
+            ) : null}
+            {elementFlightIcons.length > 0 ? (
+                <div className="element-flight-layer" aria-hidden="true">
+                    {elementFlightIcons.map((icon) => (
+                        <span
+                            key={icon.id}
+                            className="element-flight-icon"
+                            style={{
+                                left: `${icon.startX}px`,
+                                top: `${icon.startY}px`,
+                                animationDelay: `${icon.delayMs}ms`,
+                                ["--elem-fly-x" as string]: `${icon.toX}px`,
+                                ["--elem-fly-y" as string]: `${icon.toY}px`,
+                            }}
+                        >
+                            <ElementIcon name={icon.letter} />
+                        </span>
+                    ))}
                 </div>
             ) : null}
             {soulFlightIcons.length > 0 ? (
@@ -1635,6 +1770,8 @@ function Game() {
                 <RewardModal
                     soulsGained={fightReward.soulsGained}
                     rewardElements={fightReward.rewardElements}
+                    isChestReward={fightReward.isChestReward}
+                    chests={fightReward.chests}
                     onConfirm={handleRewardConfirm}
                 />
             ) : null}

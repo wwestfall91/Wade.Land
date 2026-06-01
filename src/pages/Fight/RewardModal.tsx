@@ -4,20 +4,31 @@ import { usePlayer, type RewardElement } from "../../context/PlayerContext";
 import ElementIcon from "../../components/ElementIcon";
 import ElementDetailsTooltip from "../../components/ElementDetailsTooltip";
 import soulIcon from "../../assets/icons/Soul.png";
+import chestIcon from "../../assets/icons/Chest.png";
 import "./RewardModal.scss";
+
+type ChestDefinition = {
+    elements: RewardElement[];
+    bonusSoulsMultiplier?: number;
+    tooltip: string;
+};
 
 type RewardModalProps = {
     soulsGained: number;
     rewardElements: RewardElement[];
-    onConfirm: (element: RewardElement) => void;
+    isChestReward?: boolean;
+    chests?: ChestDefinition[];
+    onConfirm: (result: { elements: RewardElement[]; bonusSoulsMultiplier?: number; sourceRect?: DOMRect }) => void;
 };
 
-function RewardModal({ soulsGained, rewardElements, onConfirm }: RewardModalProps) {
+function RewardModal({ soulsGained, rewardElements, isChestReward = false, chests, onConfirm }: RewardModalProps) {
     const { player } = usePlayer();
     const [selectedElement, setSelectedElement] = useState<RewardElement | null>(null);
+    const [selectedChestIndex, setSelectedChestIndex] = useState<number | null>(null);
     const [hoveredLetter, setHoveredLetter] = useState<string | null>(null);
     const [hoveredCurrentElementId, setHoveredCurrentElementId] = useState<number | null>(null);
     const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+    const chestButtonRefs = useRef<(HTMLButtonElement | null)[]>([]);
     const currentElementRefs = useRef<Record<number, HTMLDivElement | null>>({});
     const [isClosing, setIsClosing] = useState(false);
     const closeTimeoutRef = useRef<number | null>(null);
@@ -35,14 +46,23 @@ function RewardModal({ soulsGained, rewardElements, onConfirm }: RewardModalProp
     }, []);
 
     const handleConfirm = () => {
-        if (!selectedElement || isClosing) {
-            return;
-        }
+        if (isClosing) return;
 
-        setIsClosing(true);
-        closeTimeoutRef.current = window.setTimeout(() => {
-            onConfirm(selectedElement);
-        }, 180);
+        if (isChestReward) {
+            if (selectedChestIndex === null || !chests) return;
+            const chest = chests[selectedChestIndex];
+            const sourceRect = chestButtonRefs.current[selectedChestIndex]?.getBoundingClientRect();
+            setIsClosing(true);
+            closeTimeoutRef.current = window.setTimeout(() => {
+                onConfirm({ elements: chest.elements, bonusSoulsMultiplier: chest.bonusSoulsMultiplier, sourceRect });
+            }, 180);
+        } else {
+            if (!selectedElement) return;
+            setIsClosing(true);
+            closeTimeoutRef.current = window.setTimeout(() => {
+                onConfirm({ elements: [selectedElement] });
+            }, 180);
+        }
     };
 
     const modal = (
@@ -62,26 +82,39 @@ function RewardModal({ soulsGained, rewardElements, onConfirm }: RewardModalProp
                             </div>
                         </div>
                     }
-                    <h2 className="reward-title">Pick 1 Element!</h2>
+                    <h2 className="reward-title">{isChestReward ? "Pick a Chest!" : "Pick 1 Element!"}</h2>
                     <div className="reward-elements">
-                        {rewardElements.map((element) => (
-                            <button
-                                key={element.letter}
-                                ref={el => (buttonRefs.current[element.letter] = el)}
-                                type="button"
-                                className={`reward-element${selectedElement?.letter === element.letter ? " is-selected" : ""}`}
-                                onClick={() => setSelectedElement(element)}
-                                onMouseEnter={e => {
-                                    setHoveredLetter(element.letter);
-                                }}
-                                onMouseLeave={() => {
-                                    setHoveredLetter(current => (current === element.letter ? null : current));
-                                }}
-                            >
-                                <span className="reward-element-letter"><ElementIcon name={element.letter} /></span>
-                                <span className="reward-element-damage">{element.damage} DMG</span>
-                            </button>
-                        ))}
+                        {isChestReward && chests ? (
+                            chests.map((chest, index) => (
+                                <button
+                                    key={index}
+                                    ref={el => { chestButtonRefs.current[index] = el; }}
+                                    type="button"
+                                    className={`reward-element${selectedChestIndex === index ? " is-selected" : ""}`}
+                                    onClick={() => setSelectedChestIndex(index)}
+                                >
+                                    <span className="reward-element-letter">
+                                        <img src={chestIcon} alt="Chest" className="reward-chest-icon" />
+                                    </span>
+                                    <span className="chest-inline-tooltip">{chest.tooltip}</span>
+                                </button>
+                            ))
+                        ) : (
+                            rewardElements.map((element) => (
+                                <button
+                                    key={element.letter}
+                                    ref={el => (buttonRefs.current[element.letter] = el)}
+                                    type="button"
+                                    className={`reward-element${selectedElement?.letter === element.letter ? " is-selected" : ""}`}
+                                    onClick={() => setSelectedElement(element)}
+                                    onMouseEnter={() => setHoveredLetter(element.letter)}
+                                    onMouseLeave={() => setHoveredLetter(current => (current === element.letter ? null : current))}
+                                >
+                                    <span className="reward-element-letter"><ElementIcon name={element.letter} /></span>
+                                    <span className="reward-element-damage">{element.damage} DMG</span>
+                                </button>
+                            ))
+                        )}
                     </div>
                     {player.elements.length > 0 && 
                     <>
@@ -118,14 +151,14 @@ function RewardModal({ soulsGained, rewardElements, onConfirm }: RewardModalProp
                     <button
                         type="button"
                         className="reward-return-button"
-                        disabled={!selectedElement || isClosing}
+                        disabled={isChestReward ? (selectedChestIndex === null || isClosing) : (!selectedElement || isClosing)}
                         onClick={handleConfirm}
                     >
                         CONTINUE
                     </button>
                 </div>
             </div>
-            {hoveredLetter ? (() => {
+            {!isChestReward && hoveredLetter ? (() => {
                 const element = rewardElements.find(e => e.letter === hoveredLetter);
                 if (!element) return null;
                 return (

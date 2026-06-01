@@ -157,6 +157,7 @@ function Fight() {
     const [playerShield, setPlayerShield] = useState(0);
     const [enemyShield, setEnemyShield] = useState(0);
     const [isResolvingTurn, setIsResolvingTurn] = useState(false);
+    const [isEnemyTurnActive, setIsEnemyTurnActive] = useState(false);
     const [queuedEnemyAttack, setQueuedEnemyAttack] = useState<RewardElement | null>(null);
     const [isReadyingNextAttack, setIsReadyingNextAttack] = useState(false);
     const [isEnemySpriteFlashing, setIsEnemySpriteFlashing] = useState(false);
@@ -165,12 +166,14 @@ function Fight() {
     const [enemyDamagePopups, setEnemyDamagePopups] = useState<EnemyDamagePopup[]>([]);
     const [isPlayerHealingFlash, setIsPlayerHealingFlash] = useState(false);
     const [isPlayerShieldFlash, setIsPlayerShieldFlash] = useState(false);
+    const [isShieldExpiring, setIsShieldExpiring] = useState(false);
     const [playerEnergizeStatus, setPlayerEnergizeStatus] = useState<ActiveEnergizeStatus | null>(null);
     const [energizeFlights, setEnergizeFlights] = useState<EnergyFlight[]>([]);
     const [leafFlights, setLeafFlights] = useState<EnergyFlight[]>([]);
     const hasResolvedVictory = useRef(false);
     const previousPlayerHpRef = useRef(player.hp);
     const previousPlayerShieldRef = useRef(playerShield);
+    const playerShieldRef = useRef(playerShield);
     const enemyDamagePopupIdRef = useRef(1);
     const eventLogIdRef = useRef(1);
     const eventLogContainerRef = useRef<HTMLDivElement | null>(null);
@@ -418,6 +421,7 @@ function Fight() {
     }, [player.hp]);
 
     useEffect(() => {
+        playerShieldRef.current = playerShield;
         if (playerShield > previousPlayerShieldRef.current) {
             setIsPlayerShieldFlash(true);
             if (shieldFlashTimeoutRef.current !== null) {
@@ -824,6 +828,7 @@ function Fight() {
         }
 
         setIsResolvingTurn(true);
+        setIsEnemyTurnActive(true);
 
         const burnAtTurnEnd = enemyBurnStatus;
         const energizeAtTurnEnd = playerEnergizeStatus;
@@ -858,11 +863,21 @@ function Fight() {
             if (energizeAtTurnEnd) {
                 setPlayerEnergizeStatus(null);
             }
+            setPlayerShield(0);
+            setIsEnemyTurnActive(false);
             setIsResolvingTurn(false);
             return;
         }
 
         await triggerEnemyAttack();
+        const shieldAfterAttack = playerShieldRef.current;
+        if (shieldAfterAttack > 0) {
+            setIsShieldExpiring(true);
+            await wait(360);
+            setIsShieldExpiring(false);
+            pushEventLog("Shield expired", "player");
+        }
+        setPlayerShield(0);
         if (energizeAtTurnEnd) {
             launchEnergyFlights(energizeDisplayRef.current, energyAtTurnStart, energizeAtTurnEnd.stacks);
             await wait(300);
@@ -871,6 +886,7 @@ function Fight() {
         if (energizeAtTurnEnd) {
             setPlayerEnergizeStatus(null);
         }
+        setIsEnemyTurnActive(false);
         setIsResolvingTurn(false);
     };
 
@@ -1487,7 +1503,7 @@ function Fight() {
 
             {/* ─── Energy Row ─── */}
             <div className="energy-row" aria-live="polite" aria-label={`Turn energy ${remainingEnergy} out of ${MAX_TURN_ENERGY}`}>
-                <span className="energy-row-label">{isResolvingTurn ? "ENEMY TURN" : "YOUR TURN"}</span>
+                <span className="energy-row-label">{isEnemyTurnActive ? "ENEMY TURN" : "YOUR TURN"}</span>
                 <div className="energy-pips">
                     {Array.from({ length: MAX_TURN_ENERGY }).map((_, i) => (
                         <span
@@ -1631,7 +1647,7 @@ function Fight() {
                     <div className="player-hp-row">
                         {playerShield > 0 ? (
                             <span
-                                className="player-shield-badge"
+                                className={`player-shield-badge${isShieldExpiring ? " is-expiring" : ""}`}
                                 style={{ backgroundImage: `url(${shieldIcon})` }}
                                 aria-label={`Shield ${playerShield}`}
                             >
