@@ -15,6 +15,35 @@
                 -webkit-user-drag: none;
             }
 
+        .element-glisten-shell {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            &.is-new-from-chest {
+                position: relative;
+                overflow: hidden;
+                width:100%;
+                height:100%;
+                border-radius: 10px;
+
+                &::after {
+                    content: "";
+                    position: absolute;
+                    inset: 0;
+                    background: linear-gradient(
+                        110deg,
+                        transparent 20%,
+                        rgba(255, 255, 255, 0.7) 50%,
+                        transparent 80%
+                    );
+                    transform: translateX(-180%) skewX(-8deg);
+                    animation: elementGlistenSweep 8s linear infinite;
+                    pointer-events: none;
+                }
+            }
+        }
+
         border-radius: 16px;
         border: 2px solid #dce3ff;
         background: linear-gradient(180deg, #5f76ee 0%, #354ebf 100%);
@@ -117,6 +146,43 @@
     @media (prefers-reduced-motion: reduce) {
         .drag.is-discoverable:not(.drag-preview)::after {
             animation: none;
+        }
+
+        .drag .element-glisten-shell.is-new-from-chest,
+        .drag .element-glisten-shell.is-new-from-chest::after {
+            animation: none;
+        }
+    }
+
+    @keyframes elementGlistenPulse {
+        0%, 22.5% {
+            filter: none;
+        }
+
+        25.5% {
+            filter: brightness(1.5);
+        }
+
+        28% {
+            filter: brightness(1.85);
+        }
+
+        31% {
+            filter: brightness(1.4);
+        }
+
+        34%, 100% {
+            filter: none;
+        }
+    }
+
+    @keyframes elementGlistenSweep {
+        0%, 23% {
+            transform: translateX(-180%) skewX(-8deg);
+        }
+
+        30%, 100% {
+            transform: translateX(220%) skewX(-8deg);
         }
     }
 }

@@ -272,6 +272,7 @@ function Game() {
     const [elementFlightIcons, setElementFlightIcons] = useState<ElementFlightIcon[]>([]);
     const [isChestRevealVisible, setIsChestRevealVisible] = useState(false);
     const [isChestRevealFadingOut, setIsChestRevealFadingOut] = useState(false);
+    const [newChestElementIds, setNewChestElementIds] = useState<Set<number>>(new Set());
     const previewPositionRef = useRef<Position | null>(null);
     const previewPointerClientRef = useRef<Position>({ x: 0, y: 0 });
     const introChosenNameRef = useRef("");
@@ -1208,6 +1209,14 @@ function Game() {
     };
 
     const handleSnapChange = (draggableId: number, zoneIndex: number | null) => {
+        if (newChestElementIds.has(draggableId)) {
+            setNewChestElementIds((prev) => {
+                const next = new Set(prev);
+                next.delete(draggableId);
+                return next;
+            });
+        }
+
         if (zoneIndex === null && !hasStartedDraggingElement) {
             setHasStartedDraggingElement(true);
         }
@@ -1279,6 +1288,8 @@ function Game() {
 
     const handleFight = () => {
         if (!nextEnemy) return;
+
+        setNewChestElementIds(new Set());
 
         // Fight the currently selected enemy and preselect the next row in order.
         const currentIndex = enemies.findIndex((enemy) => enemy.name === nextEnemy.name);
@@ -1421,6 +1432,13 @@ function Game() {
         if (isChestRewardPath) {
             setIsChestRevealVisible(true);
             setIsChestRevealFadingOut(false);
+            const currentMaxId = playerProgress.elements.reduce((max, e) => Math.max(max, e.id), 0);
+            const predictedNewIds = elements.map((_, i) => currentMaxId + 1 + i);
+            setNewChestElementIds((prev) => {
+                const next = new Set(prev);
+                predictedNewIds.forEach((id) => next.add(id));
+                return next;
+            });
             const currentCount = playerProgress.elements.length;
             const containerRect = gameRef.current?.getBoundingClientRect();
             const centerX = window.innerWidth / 2;
@@ -1616,6 +1634,7 @@ function Game() {
                     initialPosition={draggable.initialPosition}
                     onSnapChange={handleSnapChange}
                     canSnapToZone={canSnapToZone}
+                    isNewFromChest={newChestElementIds.has(draggable.id)}
                 />
             ))}
 

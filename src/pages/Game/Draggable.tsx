@@ -26,6 +26,7 @@ type Props = {
 	initialPosition: Position;
 	onSnapChange: (draggableId: number, zoneIndex: number | null) => void;
 	canSnapToZone: (draggableId: number, zoneIndex: number) => boolean;
+	isNewFromChest?: boolean;
 };
 
 function Draggable({
@@ -45,6 +46,7 @@ function Draggable({
 	initialPosition,
 	onSnapChange,
 	canSnapToZone,
+	isNewFromChest = false,
 }: Props) {
 	const [isDragging, setIsDragging] = useState(false);
 	const [hasBeenDragged, setHasBeenDragged] = useState(false);
@@ -197,7 +199,9 @@ function Draggable({
 					level,
 				}}
 			/>
-			<ElementIcon name={letter} />
+			<div className={`element-glisten-shell${isNewFromChest ? " is-new-from-chest" : ""}`}>
+				<ElementIcon name={letter} />
+			</div>
 		</div>
 	);
 }
