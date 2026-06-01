@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { SpellEffectConfig } from "../../combat/spellEffects";
 import FloatingTooltip from "./FloatingTooltip";
 import ElementIcon from "../../components/ElementIcon";
@@ -27,6 +27,7 @@ type Props = {
 	onSnapChange: (draggableId: number, zoneIndex: number | null) => void;
 	canSnapToZone: (draggableId: number, zoneIndex: number) => boolean;
 	isNewFromChest?: boolean;
+	forcedSnapZone?: { zone: number; version: number } | null;
 };
 
 function Draggable({
@@ -47,6 +48,7 @@ function Draggable({
 	onSnapChange,
 	canSnapToZone,
 	isNewFromChest = false,
+	forcedSnapZone = null,
 }: Props) {
 	const [isDragging, setIsDragging] = useState(false);
 	const [hasBeenDragged, setHasBeenDragged] = useState(false);
@@ -143,6 +145,24 @@ function Draggable({
 		mouseOffset.y,
 		onSnapChange,
 	]);
+
+	// When Game.tsx needs to reposition this element to a specific zone (e.g. plasma
+	// dropped on slot 1 but should appear in the middle after the 3-slot layout expands),
+	// it passes a new forcedSnapZone object. The version field changing triggers this effect.
+	useLayoutEffect(() => {
+		if (forcedSnapZone == null) return;
+		const containerRect = containerRef.current?.getBoundingClientRect();
+		const dropZoneRect = dropZoneRefs[forcedSnapZone.zone]?.current?.getBoundingClientRect();
+		const dragWidth = draggableRef.current?.offsetWidth ?? 32;
+		const dragHeight = draggableRef.current?.offsetHeight ?? 32;
+		if (containerRect && dropZoneRect) {
+			setPosition({
+				x: Math.round(dropZoneRect.left - containerRect.left + (dropZoneRect.width - dragWidth) / 2),
+				y: Math.round(dropZoneRect.top - containerRect.top + (dropZoneRect.height - dragHeight) / 2),
+			});
+		}
+	// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [forcedSnapZone]);
 
 	const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
 		e.stopPropagation();

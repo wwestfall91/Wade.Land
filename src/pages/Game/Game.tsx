@@ -249,6 +249,7 @@ function Game() {
     });
     const [hasStartedDraggingElement, setHasStartedDraggingElement] = useState(false);
     const [zoneOccupants, setZoneOccupants] = useState<Array<number | null>>([null, null]);
+    const [plasmaForcedSnap, setPlasmaForcedSnap] = useState<{ zone: number; version: number } | null>(null);
     const [isPreviewDragging, setIsPreviewDragging] = useState(false);
     const [isPreviewHovered, setIsPreviewHovered] = useState(false);
     const [previewHomePosition, setPreviewHomePosition] = useState<Position | null>(null);
@@ -1242,6 +1243,19 @@ function Game() {
                 next[zoneIndex] = draggableId;
             }
 
+            // When plasma drops to slot 0 in 2-slot mode, the layout will expand to 3
+            // slots with plasma normalised to the middle (index 1). Schedule a forced
+            // visual reposition so the tile moves to drop zone B (the middle slot).
+            const droppedItem = draggables.find((item) => item.id === draggableId);
+            if (
+                zoneIndex === 0 &&
+                previous.length < 3 &&
+                droppedItem &&
+                isPlasmaName(droppedItem.letter)
+            ) {
+                setPlasmaForcedSnap((prev) => ({ zone: 1, version: (prev?.version ?? 0) + 1 }));
+            }
+
             return normalizeZoneOccupants(next);
         });
     };
@@ -1640,6 +1654,7 @@ function Game() {
                     onSnapChange={handleSnapChange}
                     canSnapToZone={canSnapToZone}
                     isNewFromChest={newChestElementIds.has(draggable.id)}
+                    forcedSnapZone={isPlasmaName(draggable.letter) ? plasmaForcedSnap : null}
                 />
             ))}
 
