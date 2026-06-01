@@ -204,6 +204,12 @@
         gap: 9rem;
         margin-top: -8rem;
         pointer-events: none;
+        transition: opacity 1.4s ease, transform 1.4s ease;
+
+        &.is-dismissing {
+            opacity: 0;
+            transform: scale(0.35);
+        }
     }
 
     .game-intro-eye {
@@ -235,6 +241,23 @@
     @keyframes monster-eye-blink {
         0%, 85%, 100% { transform: scaleY(1); }
         89%, 93%      { transform: scaleY(0.05); }
+    }
+
+    .game-intro-smile {
+        position: absolute;
+        top: calc(50% + 2.5rem);
+        left: 50%;
+        transform: translateX(-50%);
+        opacity: 0;
+        animation: intro-smile-appear 0.7s ease forwards;
+        animation-delay: 0.75s;
+        filter: drop-shadow(0 0 12px rgba(180, 0, 0, 0.5));
+        pointer-events: none;
+    }
+
+    @keyframes intro-smile-appear {
+        from { opacity: 0; transform: translateX(-50%) scale(0.88); }
+        to   { opacity: 0.88; transform: translateX(-50%) scale(1); }
     }
 
     .game-intro-line {

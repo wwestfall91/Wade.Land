@@ -1614,7 +1614,7 @@ function Game() {
             ) : null}
             {isIntroVisible ? (
                 <div className={`game-intro-overlay ${introPhase === "fadeout" ? "is-fading-out" : ""}`}>
-                    <div className="game-intro-eyes" aria-hidden="true">
+                    <div className={`game-intro-eyes${introPhase === "line4" || introPhase === "fadeout" ? " is-dismissing" : ""}`} aria-hidden="true">
                         <span className="game-intro-eye game-intro-eye--left" />
                         <span className="game-intro-eye game-intro-eye--right" />
                     </div>
