@@ -859,3 +859,105 @@
         transform: scale(0.82);
     }
 }
+
+.game-enemy-card {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    bottom: 44%;
+    right: 26%;
+    margin: 1rem;
+    width: 14rem;
+    border-radius: 4px;
+    border: 2px solid #e4e9ff;
+    background:
+        radial-gradient(circle at 18% 16%, rgba(122, 138, 255, 0.24), transparent 34%),
+        linear-gradient(180deg, #3144c9 0%, #17277f 100%);
+    box-shadow:
+        inset 0 0 0 1px #7f91ff,
+        inset 0 0 0 2px #0d1552,
+        0 8px 0 rgba(0, 0, 0, 0.34);
+    font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+    color: #f5f5ff;
+    text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.7);
+
+    &::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: 4px;
+        pointer-events: none;
+        background: repeating-linear-gradient(
+            0deg,
+            rgba(255, 255, 255, 0.04) 0,
+            rgba(255, 255, 255, 0.04) 1px,
+            transparent 1px,
+            transparent 4px
+        );
+        opacity: 0.36;
+        z-index: 0;
+    }
+
+    > * {
+        position: relative;
+        z-index: 1;
+    }
+
+    .next-enemy-text {
+        text-align: center;
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #c4ccff;
+        padding: 0.3rem 0.5rem 0.1rem;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+    }
+
+    .game-enemy-card-header {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        border-bottom: 2px solid rgba(228, 234, 255, 0.64);
+        background: linear-gradient(180deg, rgba(85, 103, 230, 0.95) 0%, rgba(36, 50, 164, 0.95) 100%);
+        box-shadow:
+            inset 0 0 0 1px #8ea0ff,
+            inset 0 0 0 2px #101964;
+        padding: 0.2rem 0.4rem;
+
+        .game-enemy-card-name {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #ffffff;
+            text-transform: uppercase;
+            text-align: center;
+        }
+    }
+
+    .game-enemy-stage {
+        flex-grow: 1;
+        justify-content: center;
+        background: radial-gradient(circle at 38% 30%, rgba(156, 180, 255, 0.25), rgba(20, 30, 104, 0.94));
+        padding: 0.6rem;
+
+        .enemy-sprite-card {
+            border: none;
+            box-shadow: none;
+            background: none;
+        }
+    }
+
+    .game-enemy-card-footer {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+        border-top: 1px solid rgba(228, 234, 255, 0.58);
+        background-color: #0d1557;
+        color: #ffffff;
+        font-size: 0.75rem;
+        padding: 0.25rem 0;
+        text-shadow: 0 1px 1px rgba(0, 0, 0, 0.82);
+    }
+}

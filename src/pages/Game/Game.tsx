@@ -3,7 +3,7 @@ import * as XLSX from "xlsx";
 import Draggable from "./Draggable";
 import { useLocation, useNavigate } from "react-router";
 import PlayerStats from "../../components/PlayerStats";
-import EnemyInfo from "../../components/EnemyInfo";
+import EnemyStage from "../../components/EnemyStage";
 import ElementIcon from "../../components/ElementIcon";
 import { parseSpellEffectsFromRow, type SpellEffectConfig } from "../../combat/spellEffects";
 import { getEffectChipClass, getEffectSummaryLines } from "../../combat/effectSummary";
@@ -1752,15 +1752,23 @@ function Game() {
                     />
                 </div>
             </div>
-            <EnemyInfo 
-                enemyName={nextEnemy?.name ?? "Unknown Enemy"} 
-                enemyHealth={nextEnemy?.hp ?? 0}
-                enemySouls={nextEnemy?.souls ?? 0}
-                enemyDescription={nextEnemy?.description ?? ""}
-                enemyWeaknesses={nextEnemy?.weaknesses ?? []}
-                enemyElements={nextEnemy?.elements ?? []}
-                enemySpritePath={nextEnemy?.sprite ?? ""}
-            />
+            <div className="game-enemy-card">
+                <div className="next-enemy-text">Next Enemy</div>
+                <div className="game-enemy-card-header">
+                    <div className="game-enemy-card-name">{nextEnemy?.name ?? "Unknown Enemy"}</div>
+                </div>
+                <EnemyStage
+                    className="game-enemy-stage"
+                    enemyName={nextEnemy?.name ?? "Unknown Enemy"}
+                    spritePath={nextEnemy?.sprite ?? ""}
+                    enemyHealth={nextEnemy?.hp ?? 0}
+                    enemyMaxHp={nextEnemy?.hp ?? 0}
+                    weaknesses={nextEnemy?.weaknesses ?? []}
+                    elements={nextEnemy?.elements ?? []}
+                    souls={nextEnemy?.souls ?? 0}
+                />
+                <div className="game-enemy-card-footer">Hover for details</div>
+            </div>
             {isDevElementPanelOpen ? (
                 <aside className="dev-element-panel" aria-label="Developer element panel">
                     <div className="dev-element-panel__header">

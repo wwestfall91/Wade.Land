@@ -23,7 +23,7 @@ import {
     getSoakFirePenalty,
     getSoakLightningBonus,
 } from "../../combat/statusMath";
-import EnemyInfoSprite from "../../components/EnemyInfoSprite";
+import EnemyStage, { type EnemyDamagePopup } from "../../components/EnemyStage";
 import ElementDetailsTooltip from "../../components/ElementDetailsTooltip";
 import { usePlayer, type RewardElement } from "../../context/PlayerContext";
 import FloatingTooltip from "../Game/FloatingTooltip";
@@ -32,13 +32,6 @@ import shieldIcon from "../../assets/icons/Shield.png";
 import soulIcon from "../../assets/icons/Soul.png";
 import energizeIcon from "../../assets/icons/Energize.png";
 import leafIcon from "../../assets/spells/Leaf.png";
-
-type EnemyDamagePopup = {
-    id: number;
-    text: string;
-    color: string;
-    kind?: "default" | "burn";
-};
 
 type EventLogEntry = {
     id: number;
@@ -127,7 +120,6 @@ function Fight() {
     const [flashingSlotId, setFlashingSlotId] = useState<number | null>(null);
     const [hoveredSpellId, setHoveredSpellId] = useState<number | null>(null);
     const [hoveredEnemyAttack, setHoveredEnemyAttack] = useState(false);
-    const [hoveredEnemyMetaElementIndex, setHoveredEnemyMetaElementIndex] = useState<number | null>(null);
     const [remainingEnergy, setRemainingEnergy] = useState(ENERGY_PER_TURN);
     const [eventLogEntries, setEventLogEntries] = useState<EventLogEntry[]>([]);
     const [isGameOver, setIsGameOver] = useState(false);
@@ -189,7 +181,6 @@ function Fight() {
     const energizeFlyIdRef = useRef(1);
     const leafFlyIdRef = useRef(1);
     const remainingEnergyRef = useRef(ENERGY_PER_TURN);
-    const enemyMetaElementRefs = useRef<Record<number, HTMLSpanElement | null>>({});
     const healFlashTimeoutRef = useRef<number | null>(null);
     const shieldFlashTimeoutRef = useRef<number | null>(null);
     const playerHitTimeoutRef = useRef<number | null>(null);
@@ -1349,129 +1340,23 @@ function Fight() {
                     <div className="enemy-hp-fill" style={{ width: `${enemyHpFillPercent}%` }} />
                     <span className="enemy-hp-label">{enemyHealth} / {enemyMaxHp} HP</span>
                 </div>
-                <div className="enemy-stage">
-                <div
-                    ref={enemySpriteRef}
-                    className={`enemy-sprite-card ${isEnemySpriteFlashing ? "is-hit-flash" : ""}`}
-                    style={{ ["--enemy-hit-flash" as string]: enemySpriteFlashColor }}
-                >
-                    <span className="enemy-sprite-hitbox">
-                        <EnemyInfoSprite enemyName={enemy.name} spritePath={enemy.sprite ?? ""} />
-                    </span>
-                    {isEnemySteamVisible ? (
-                        <span className="enemy-steam-pop" aria-hidden="true">
-                            <span className="steam-cloud steam-cloud-one" />
-                            <span className="steam-cloud steam-cloud-two" />
-                            <span className="steam-cloud steam-cloud-three" />
-                        </span>
-                    ) : null}
-                    {enemyDamagePopups.map((popup) => (
-                        <span
-                            key={popup.id}
-                            className={`enemy-damage-popup ${popup.kind === "burn" ? "enemy-damage-popup--burn" : ""}`}
-                            style={{ ["--popup-color" as string]: popup.color }}
-                        >
-                            {popup.text}
-                        </span>
-                    ))}
-                    {enemyBurnStatus ? (
-                        <span className="enemy-burn-indicator" aria-label={`Burn ${enemyBurnStatus.stacks}`}>
-                            <span className="burn-icon" role="img" aria-hidden="true">🔥</span>
-                            <span className="burn-stacks">{enemyBurnStatus.stacks}</span>
-                            <span className="burn-tooltip">
-                                <span>Burn Stacks: {enemyBurnStatus.stacks}</span>
-                                <span>Expires in: {enemyBurnStatus.remainingTurns} turns</span>
-                                <span>Damage: {enemyBurnStatus.stacks * BURN_DAMAGE_PER_STACK}</span>
-                                <span>Triggers at the end of each turn</span>
-                                
-                            </span>
-                        </span>
-                    ) : null}
-                    {enemySoakStatus ? (
-                        <span className="enemy-soak-indicator" aria-label={`Soak ${enemySoakStatus.stacks}`}>
-                            <span className="soak-icon" role="img" aria-hidden="true">💧</span>
-                            <span className="soak-stacks">{enemySoakStatus.stacks}</span>
-                            <span className="soak-tooltip">
-                                Lightning +{enemySoakStatus.stacks * SOAK_LIGHTNING_BONUS_PER_STACK}. Fire -{enemySoakStatus.stacks * SOAK_FIRE_PENALTY_PER_STACK}
-                            </span>
-                        </span>
-                    ) : null}
-                    {enemyFreezeStatus ? (
-                        <span className="enemy-freeze-indicator" aria-label={`Freeze ${enemyFreezeStatus.stacks}`}>
-                            <span className="freeze-icon" role="img" aria-hidden="true">❄</span>
-                            <span className="freeze-stacks">{enemyFreezeStatus.stacks}</span>
-                            <span className="freeze-tooltip">
-                                Fire gains +{enemyFreezeStatus.stacks * FREEZE_FIRE_BONUS_PER_STACK} damage
-                            </span>
-                        </span>
-                    ) : null}
-                    <div className="enemy-meta-tooltip" aria-hidden="true">
-                        <div className="enemy-meta-section">
-                            <span className="enemy-meta-label">HP</span>
-                            <span className="enemy-meta-value">{enemyHealth} / {enemyMaxHp}</span>
-                        </div>
-
-                        <div className="enemy-meta-section">
-                            <span className="enemy-meta-label">Weaknesses</span>
-                            <div className="enemy-meta-chip-list">
-                                {enemyWeaknesses.length > 0 ? (
-                                    enemyWeaknesses.map((weakness) => (
-                                        <span key={weakness} className={`enemy-meta-chip ${toTypeClass(weakness)}`}>
-                                            {weakness}
-                                        </span>
-                                    ))
-                                ) : (
-                                    <span className="enemy-meta-chip enemy-meta-chip-muted">None</span>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="enemy-meta-section">
-                            <span className="enemy-meta-label">Elements</span>
-                            <div className="enemy-meta-chip-list">
-                                {enemy.elements.length > 0 ? (
-                                    enemy.elements.map((element, index) => (
-                                        <span
-                                            key={`${element.letter}-${element.damage}-${index}`}
-                                            ref={(entry) => {
-                                                enemyMetaElementRefs.current[index] = entry;
-                                            }}
-                                            className="enemy-meta-chip enemy-meta-chip-attack"
-                                            onMouseEnter={() => setHoveredEnemyMetaElementIndex(index)}
-                                            onMouseLeave={() => {
-                                                setHoveredEnemyMetaElementIndex((current) => (current === index ? null : current));
-                                            }}
-                                        >
-                                            <ElementIcon name={element.letter} /> ({element.damage})
-                                        </span>
-                                    ))
-                                ) : (
-                                    <span className="enemy-meta-chip enemy-meta-chip-muted">None</span>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="enemy-meta-footer">
-                            <img src={soulIcon} alt="" aria-hidden="true" className="enemy-meta-souls-icon" />
-                            <span>Rewards {enemy.souls} Souls</span>
-                        </div>
-                    </div>
-                </div>
-                </div>{/* end .enemy-stage */}
-                {hoveredEnemyMetaElementIndex !== null ? (() => {
-                    const hoveredElement = enemy.elements[hoveredEnemyMetaElementIndex];
-                    if (!hoveredElement) {
-                        return null;
-                    }
-                    return (
-                        <ElementDetailsTooltip
-                            element={hoveredElement}
-                            anchorElement={enemyMetaElementRefs.current[hoveredEnemyMetaElementIndex]}
-                            open
-                            className="reward-element-tooltip-shell"
-                        />
-                    );
-                })() : null}
+                <EnemyStage
+                    spriteRef={enemySpriteRef}
+                    enemyName={enemy.name}
+                    spritePath={enemy.sprite ?? ""}
+                    enemyHealth={enemyHealth}
+                    enemyMaxHp={enemyMaxHp}
+                    weaknesses={enemyWeaknesses}
+                    elements={enemy.elements}
+                    souls={enemy.souls}
+                    isHitFlashing={isEnemySpriteFlashing}
+                    hitFlashColor={enemySpriteFlashColor}
+                    isSteamVisible={isEnemySteamVisible}
+                    damagePopups={enemyDamagePopups}
+                    burnStatus={enemyBurnStatus}
+                    soakStatus={enemySoakStatus}
+                    freezeStatus={enemyFreezeStatus}
+                />
                 {queuedEnemyAttack ? (
                     <ElementDetailsTooltip
                         element={queuedEnemyAttack}

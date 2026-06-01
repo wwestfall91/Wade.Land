@@ -216,6 +216,13 @@
                 border-color: #ffd3d3;
                 color: #ffefc9;
                 cursor: pointer;
+
+                .element-icon {
+                    width: 0.78rem;
+                    height: 0.78rem;
+                    margin-right: 0.14rem;
+                    flex-shrink: 0;
+                }
             }
         }
 
