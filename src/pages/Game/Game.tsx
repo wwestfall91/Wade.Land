@@ -211,6 +211,7 @@ function Game() {
         initializeElements,
         combineElements,
         addSouls,
+        spendSouls,
         addElement,
         healPlayer,
         levels,
@@ -224,6 +225,8 @@ function Game() {
     const dropZoneRefC = useRef<HTMLDivElement | null>(null);
     const outputRef = useRef<HTMLDivElement | null>(null);
     const previewRef = useRef<HTMLDivElement | null>(null);
+    const feedAnimCounterRef = useRef(0);
+    const eyesFlashTimerRef = useRef<number | null>(null);
 
     const [draggables, setDraggables] = useState<DraggableItem[]>([]);
     const [recipes, setRecipes] = useState<CombinationRecipe[]>([]);
@@ -233,6 +236,11 @@ function Game() {
     const [starterChoices, setStarterChoices] = useState<RewardElement[]>([]);
     const [selectedStarter, setSelectedStarter] = useState<RewardElement | null>(null);
     const [isDevElementPanelOpen, setIsDevElementPanelOpen] = useState(false);
+    const [isFeedOverlayOpen, setIsFeedOverlayOpen] = useState(false);
+    const [isFeedOverlayFadingOut, setIsFeedOverlayFadingOut] = useState(false);
+    const [isSoulsPanelFlashing, setIsSoulsPanelFlashing] = useState(false);
+    const [feedAnimations, setFeedAnimations] = useState<number[]>([]);
+    const [eyesFlashRevision, setEyesFlashRevision] = useState(0);
     const [hasSeenDragTutorial, setHasSeenDragTutorial] = useState(() => {
         if (typeof window === "undefined") {
             return false;
@@ -1329,6 +1337,43 @@ function Game() {
         });
     };
 
+    const handleFeedClick = () => {
+        setIsFeedOverlayFadingOut(false);
+        setIsFeedOverlayOpen(true);
+    };
+
+    const handleFeedOverlayClose = () => {
+        if (isFeedOverlayFadingOut) return;
+        setIsFeedOverlayFadingOut(true);
+        window.setTimeout(() => {
+            setIsFeedOverlayOpen(false);
+            setIsFeedOverlayFadingOut(false);
+        }, 1000);
+    };
+
+    const handleFeedSpend = () => {
+        if (playerProgress.souls <= 0) {
+            if (isSoulsPanelFlashing) return;
+            setIsSoulsPanelFlashing(true);
+            window.setTimeout(() => setIsSoulsPanelFlashing(false), 600);
+            return;
+        }
+        spendSouls(1);
+        const id = ++feedAnimCounterRef.current;
+        setFeedAnimations((prev) => [...prev, id]);
+        window.setTimeout(() => {
+            setFeedAnimations((prev) => prev.filter((x) => x !== id));
+            setEyesFlashRevision((r) => r + 1);
+            if (eyesFlashTimerRef.current !== null) {
+                window.clearTimeout(eyesFlashTimerRef.current);
+            }
+            eyesFlashTimerRef.current = window.setTimeout(() => {
+                setEyesFlashRevision(0);
+                eyesFlashTimerRef.current = null;
+            }, 450);
+        }, 280);
+    };
+
     const handleIntroNameSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         const trimmedName = introNameInput.trim().slice(0, 28);
@@ -1766,6 +1811,9 @@ function Game() {
                     <button className="fight-button" onClick={handleFight}>
                         FIGHT!
                     </button>
+                    <button className="feed-button" onClick={handleFeedClick}>
+                        FEED
+                    </button>
                     <PlayerStats
                         playerName={playerName}
                         level={playerProgress.level}
@@ -1829,6 +1877,42 @@ function Game() {
                     chests={fightReward.chests}
                     onConfirm={handleRewardConfirm}
                 />
+            ) : null}
+            {isFeedOverlayOpen ? (
+                <div
+                    className={`feed-overlay${isFeedOverlayFadingOut ? " is-fading-out" : ""}`}
+                    onClick={handleFeedOverlayClose}
+                    aria-hidden="true"
+                >
+                    <div key={eyesFlashRevision} className={`feed-overlay-eyes${eyesFlashRevision > 0 ? " is-soul-flash" : ""}`}>
+                        <span className="game-intro-eye game-intro-eye--left" />
+                        <span className="game-intro-eye game-intro-eye--right" />
+                    </div>
+                    {feedAnimations.map((id) => (
+                        <img
+                            key={id}
+                            src={soulIcon}
+                            alt=""
+                            aria-hidden="true"
+                            className="feed-soul-fly"
+                        />
+                    ))}
+                    <div className="feed-overlay-actions" onClick={(e) => e.stopPropagation()}>
+                        <div className={`player-souls-panel${isSoulsPanelFlashing ? " player-souls-panel--flash" : ""}`} aria-label={`Souls ${playerProgress.souls}`} title="Souls are earned from victories and persist between battles.">
+                            <img src={soulIcon} alt="" aria-hidden="true" className="player-souls-icon" />
+                            <div className="player-souls-copy">
+                                <span className="player-souls-label">SOULS</span>
+                                <span className="player-souls-value">{playerProgress.souls}</span>
+                            </div>
+                        </div>
+                        <button className="feed-button" onClick={handleFeedSpend}>
+                            FEED
+                        </button>
+                        <button className="feed-overlay-return-button" onClick={handleFeedOverlayClose}>
+                            RETURN
+                        </button>
+                    </div>
+                </div>
             ) : null}
         </div>
     );

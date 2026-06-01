@@ -1,3 +1,5 @@
+@use "../../styles/colors" as *;
+
 #Game{
     position: relative;
     isolation: isolate;
@@ -258,6 +260,146 @@
     @keyframes intro-smile-appear {
         from { opacity: 0; transform: translateX(-50%) scale(0.88); }
         to   { opacity: 0.88; transform: translateX(-50%) scale(1); }
+    }
+
+    .feed-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 9000;
+        background: #000;
+        cursor: pointer;
+        opacity: 1;
+        transition: opacity 1s ease;
+
+        &.is-fading-out {
+            opacity: 0;
+            pointer-events: none;
+        }
+    }
+
+    .feed-overlay-eyes {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 9rem;
+        margin-top: -8rem;
+        pointer-events: none;
+
+        &.is-soul-flash .game-intro-eye {
+            animation: eye-soul-flash 450ms ease-out;
+        }
+    }
+
+    .feed-soul-fly {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 2rem;
+        height: 2rem;
+        object-fit: contain;
+        pointer-events: none;
+        z-index: 9001;
+        animation: soul-fly-to-eyes 300ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+
+    .feed-overlay-actions {
+        position: absolute;
+        bottom: 22%;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.75rem;
+
+        .player-souls-panel {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.34rem;
+            padding: 0.22rem 0.44rem;
+            border: 1px solid rgba(105, 255, 187, 0.58);
+            border-radius: 8px;
+            background: rgba(4, 58, 37, 0.58);
+            color: #00bd6f;
+            text-shadow: none;
+            line-height: 1;
+            box-shadow: inset 0 0 0 1px rgba(152, 255, 209, 0.08);
+            width: 12rem;
+            box-sizing: border-box;
+
+            &.player-souls-panel--flash {
+                animation: souls-panel-flash 600ms ease-out;
+            }
+        }
+
+        .player-souls-icon {
+            width: 1.24rem;
+            height: 1.24rem;
+            display: block;
+            object-fit: contain;
+            flex-shrink: 0;
+        }
+
+        .player-souls-copy {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.08rem;
+        }
+
+        .player-souls-label {
+            font-size: 0.58rem;
+            font-weight: 700;
+            color: rgba(155, 255, 206, 0.82);
+            letter-spacing: 0.06em;
+        }
+
+        .player-souls-value {
+            font-size: 0.98rem;
+            font-weight: 800;
+            font-variant-numeric: tabular-nums;
+            color: #00bd6f;
+            letter-spacing: 0;
+        }
+    }
+
+    .feed-overlay-return-button {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 2.9rem;
+        min-width: 12rem;
+        padding: 0 1.15rem;
+        border-radius: 4px;
+        border: 2px solid #a8c8ff;
+        background: linear-gradient(180deg, #4888d4 0%, #2d5fa8 100%);
+        color: #eef4ff;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        font-size: 1.1rem;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        cursor: pointer;
+        transition: transform 110ms ease, box-shadow 110ms ease, border-color 110ms ease;
+        box-shadow:
+            inset 0 0 0 1px #7ab0f0,
+            inset 0 0 0 2px #1a3870,
+            0 5px 0 rgba(0, 0, 0, 0.32);
+
+        &:hover {
+            transform: translateY(-1px);
+            border-color: #cce0ff;
+            box-shadow:
+                inset 0 0 0 1px #9ec8ff,
+                inset 0 0 0 2px #1a3870,
+                0 8px 0 rgba(0, 0, 0, 0.36);
+        }
+
+        &:active {
+            transform: translateY(0);
+        }
     }
 
     .game-intro-line {
@@ -627,6 +769,43 @@
         }
     }
 
+    .feed-button {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 2.9rem;
+        min-width: 12rem;
+        padding: 0 1.15rem;
+        border-radius: 4px;
+        border: 2px solid #a3ffe0;
+        background: linear-gradient(180deg, #00cc78 0%, #00964f 100%);
+        color: #efffef;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        font-size: 1.1rem;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        cursor: pointer;
+        transition: transform 110ms ease, box-shadow 110ms ease, border-color 110ms ease;
+        box-shadow:
+            inset 0 0 0 1px #40e897,
+            inset 0 0 0 2px #005535,
+            0 5px 0 rgba(0, 0, 0, 0.32);
+
+        &:hover {
+            transform: translateY(-1px);
+            border-color: #c8ffec;
+            box-shadow:
+                inset 0 0 0 1px #6ef0ab,
+                inset 0 0 0 2px #005535,
+                0 8px 0 rgba(0, 0, 0, 0.36);
+        }
+
+        &:active {
+            transform: translateY(0);
+        }
+    }
+
     .dev-element-panel {
         position: fixed;
         top: 0.9rem;
@@ -768,6 +947,61 @@
     }
 }
 
+@keyframes soul-fly-to-eyes {
+    0% {
+        transform: translate(-50%, 28vh) scale(0.6);
+        opacity: 0;
+        filter: drop-shadow(0 0 4px #00bd6f);
+    }
+
+    12% {
+        opacity: 1;
+        transform: translate(-50%, 26vh) scale(1.1);
+    }
+
+    78% {
+        transform: translate(-50%, -8rem) scale(1);
+        opacity: 1;
+        filter: drop-shadow(0 0 10px #00ff8a);
+    }
+
+    90% {
+        transform: translate(-50%, -8rem) scale(1.4);
+        opacity: 1;
+    }
+
+    100% {
+        transform: translate(-50%, -8rem) scale(0);
+        opacity: 0;
+    }
+}
+
+@keyframes eye-soul-flash {
+    0% {
+        background: radial-gradient(ellipse at center, #ff4444 0%, #bb0000 55%, transparent 100%);
+        opacity: 0.28;
+        box-shadow: 0 0 18px 6px rgba(200, 0, 0, 0.45), 0 0 55px 18px rgba(130, 0, 0, 0.2);
+    }
+
+    25% {
+        background: radial-gradient(ellipse at center, #00ff8a 0%, #00bd6f 55%, transparent 100%);
+        opacity: 0.92;
+        box-shadow: 0 0 28px 10px rgba(0, 189, 111, 0.75), 0 0 80px 26px rgba(0, 120, 70, 0.45);
+    }
+
+    65% {
+        background: radial-gradient(ellipse at center, #00ff8a 0%, #00bd6f 55%, transparent 100%);
+        opacity: 0.72;
+        box-shadow: 0 0 22px 8px rgba(0, 189, 111, 0.55), 0 0 65px 20px rgba(0, 120, 70, 0.28);
+    }
+
+    100% {
+        background: radial-gradient(ellipse at center, #ff4444 0%, #bb0000 55%, transparent 100%);
+        opacity: 0.28;
+        box-shadow: 0 0 18px 6px rgba(200, 0, 0, 0.45), 0 0 55px 18px rgba(130, 0, 0, 0.2);
+    }
+}
+
 @keyframes souls-counter-pop {
     0% {
         transform: scale(1);
@@ -796,6 +1030,31 @@
     100% {
         transform: scale(1);
         color: #00BD6F;
+    }
+}
+
+@keyframes souls-panel-flash {
+    0% {
+        border-color: rgba(105, 255, 187, 0.58);
+        background: rgba(4, 58, 37, 0.58);
+        box-shadow: inset 0 0 0 1px rgba(152, 255, 209, 0.08);
+    }
+
+    18% {
+        border-color: rgba(255, 80, 80, 0.9);
+        background: rgba(80, 8, 8, 0.82);
+        box-shadow: inset 0 0 0 1px rgba(255, 120, 120, 0.3), 0 0 0.6rem rgba(255, 60, 60, 0.5);
+    }
+
+    50% {
+        border-color: rgba(255, 80, 80, 0.7);
+        background: rgba(64, 6, 6, 0.7);
+    }
+
+    100% {
+        border-color: rgba(105, 255, 187, 0.58);
+        background: rgba(4, 58, 37, 0.58);
+        box-shadow: inset 0 0 0 1px rgba(152, 255, 209, 0.08);
     }
 }
 

@@ -60,6 +60,7 @@ type PlayerContextValue = {
     levels: LevelDefinition[];
     setPlayerName: (name: string) => void;
     addSouls: (souls: number) => void;
+    spendSouls: (amount: number) => void;
     initializeElements: (elements: PlayerElement[]) => void;
     combineElements: (consumedIds: number[], newElement: PlayerElement) => void;
     applyEnemyAttack: (power: number) => void;
@@ -178,6 +179,10 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
         setSouls((previous) => previous + normalizedAmount);
     }, []);
 
+    const spendSouls = useCallback((amount: number) => {
+        setSouls((previous) => Math.max(0, previous - amount));
+    }, []);
+
     const setPlayerName = useCallback((name: string) => {
         const trimmedName = name.trim().slice(0, 28);
         setPlayerNameState(trimmedName);
@@ -246,6 +251,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             levels,
             setPlayerName,
             addSouls,
+            spendSouls,
             initializeElements,
             combineElements,
             applyEnemyAttack,
@@ -257,6 +263,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
         }),
         [
             addSouls,
+            spendSouls,
             applyEnemyAttack,
             combineElements,
             initializeElements,
