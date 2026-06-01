@@ -441,6 +441,11 @@ function Game() {
         }) ?? null;
 
         if (plasmaId === null) {
+            if (sanitized.length <= 2) {
+                // 2-slot case: preserve element positions so either slot can be filled independently
+                return [sanitized[0] ?? null, sanitized[1] ?? null];
+            }
+            // Collapsing from 3-slot (plasma removed): pack remaining elements into the 2 slots
             const nonPlasma = sanitized.filter((id): id is number => id !== null).slice(0, 2);
             return [nonPlasma[0] ?? null, nonPlasma[1] ?? null];
         }
