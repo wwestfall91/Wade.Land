@@ -116,7 +116,7 @@ type CastableSpell = {
 function Fight() {
     const location = useLocation();
     const navigate = useNavigate();
-    const { player, playerName, levels, applyEnemyAttack, healPlayer, resetGame, typeMultipliers } = usePlayer();
+    const { player, playerName, levels, applyEnemyAttack, healPlayer, resetGame, typeMultipliers, playerStatuses, setPlayerStatuses } = usePlayer();
     const [flashingSlotId, setFlashingSlotId] = useState<number | null>(null);
     const [hoveredSpellId, setHoveredSpellId] = useState<number | null>(null);
     const [hoveredEnemyAttack, setHoveredEnemyAttack] = useState(false);
@@ -143,10 +143,10 @@ function Fight() {
     const [enemyBurnStatus, setEnemyBurnStatus] = useState<ActiveBurnStatus | null>(null);
     const [enemySoakStatus, setEnemySoakStatus] = useState<ActiveSoakStatus | null>(null);
     const [enemyFreezeStatus, setEnemyFreezeStatus] = useState<ActiveFreezeStatus | null>(null);
-    const [playerBurnStatus, setPlayerBurnStatus] = useState<ActiveBurnStatus | null>(null);
-    const [playerSoakStatus, setPlayerSoakStatus] = useState<ActiveSoakStatus | null>(null);
-    const [playerFreezeStatus, setPlayerFreezeStatus] = useState<ActiveFreezeStatus | null>(null);
-    const [playerShield, setPlayerShield] = useState(0);
+    const [playerBurnStatus, setPlayerBurnStatus] = useState<ActiveBurnStatus | null>(playerStatuses.burn);
+    const [playerSoakStatus, setPlayerSoakStatus] = useState<ActiveSoakStatus | null>(playerStatuses.soak);
+    const [playerFreezeStatus, setPlayerFreezeStatus] = useState<ActiveFreezeStatus | null>(playerStatuses.freeze);
+    const [playerShield, setPlayerShield] = useState(playerStatuses.shield);
     const [enemyShield, setEnemyShield] = useState(0);
     const [isResolvingTurn, setIsResolvingTurn] = useState(false);
     const [isEnemyTurnActive, setIsEnemyTurnActive] = useState(false);
@@ -159,7 +159,7 @@ function Fight() {
     const [isPlayerHealingFlash, setIsPlayerHealingFlash] = useState(false);
     const [isPlayerShieldFlash, setIsPlayerShieldFlash] = useState(false);
     const [isShieldExpiring, setIsShieldExpiring] = useState(false);
-    const [playerEnergizeStatus, setPlayerEnergizeStatus] = useState<ActiveEnergizeStatus | null>(null);
+    const [playerEnergizeStatus, setPlayerEnergizeStatus] = useState<ActiveEnergizeStatus | null>(playerStatuses.energize);
     const [energizeFlights, setEnergizeFlights] = useState<EnergyFlight[]>([]);
     const [leafFlights, setLeafFlights] = useState<EnergyFlight[]>([]);
     const hasResolvedVictory = useRef(false);
@@ -432,6 +432,13 @@ function Fight() {
             hasResolvedVictory.current = true;
             const shuffled = [...elementPool].sort(() => Math.random() - 0.5);
             const chosen = shuffled.slice(0, Math.min(3, shuffled.length));
+            setPlayerStatuses({
+                burn: playerBurnStatus,
+                soak: playerSoakStatus,
+                freeze: playerFreezeStatus,
+                energize: playerEnergizeStatus,
+                shield: 0,
+            });
             navigate("/game", {
                 replace: true,
                 state: {
@@ -442,7 +449,7 @@ function Fight() {
                 } as GameLocationState,
             });
         }
-    }, [elementPool, enemy.souls, enemyHealth, navigate]);
+    }, [elementPool, enemy.souls, enemyHealth, navigate, playerBurnStatus, playerSoakStatus, playerFreezeStatus, playerEnergizeStatus, setPlayerStatuses]);
 
     useEffect(() => {
         if (levels.length === 0 || enemyHealth <= 0 || player.hp > 0) {

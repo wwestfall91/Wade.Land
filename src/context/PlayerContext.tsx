@@ -1,4 +1,4 @@
-import {
+import React, {
     createContext,
     useCallback,
     useContext,
@@ -9,6 +9,7 @@ import {
 } from "react";
 import * as XLSX from "xlsx";
 import type { SpellEffectConfig } from "../combat/spellEffects";
+import type { ActiveBurnStatus, ActiveSoakStatus, ActiveFreezeStatus, ActiveEnergizeStatus } from "../combat/spellEffects";
 
 type LevelRow = {
     Level?: number | string;
@@ -54,6 +55,22 @@ export type SelectedEnemy = {
     elements: RewardElement[];
 };
 
+export type PlayerStatuses = {
+    burn: ActiveBurnStatus | null;
+    soak: ActiveSoakStatus | null;
+    freeze: ActiveFreezeStatus | null;
+    energize: ActiveEnergizeStatus | null;
+    shield: number;
+};
+
+const DEFAULT_PLAYER_STATUSES: PlayerStatuses = {
+    burn: null,
+    soak: null,
+    freeze: null,
+    energize: null,
+    shield: 0,
+};
+
 type PlayerContextValue = {
     player: PlayerProgress;
     playerName: string;
@@ -73,6 +90,12 @@ type PlayerContextValue = {
     applyTypeMultiplier: (type: string, multiplier: number) => void;
     monsterSoulsFed: number;
     setMonsterSoulsFed: (amount: number) => void;
+    playerStatuses: PlayerStatuses;
+    setPlayerStatuses: (statuses: PlayerStatuses) => void;
+    potionCount: number;
+    setPotionCount: React.Dispatch<React.SetStateAction<number>>;
+    potionFillPercent: number;
+    setPotionFillPercent: React.Dispatch<React.SetStateAction<number>>;
 };
 
 const DEFAULT_PLAYER_PROGRESS: PlayerProgress = {
@@ -156,6 +179,9 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
     const [selectedEnemy, setSelectedEnemy] = useState<SelectedEnemy | null>(null);
     const [typeMultipliers, setTypeMultipliers] = useState<Record<string, number>>({});
     const [monsterSoulsFed, setMonsterSoulsFed] = useState(0);
+    const [playerStatuses, setPlayerStatuses] = useState<PlayerStatuses>(DEFAULT_PLAYER_STATUSES);
+    const [potionCount, setPotionCount] = useState(0);
+    const [potionFillPercent, setPotionFillPercent] = useState(0);
 
     useEffect(() => {
         fetch("/levels.xlsx")
@@ -251,6 +277,9 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
         setSelectedEnemy(null);
         setTypeMultipliers({});
         setMonsterSoulsFed(0);
+        setPlayerStatuses(DEFAULT_PLAYER_STATUSES);
+        setPotionCount(0);
+        setPotionFillPercent(0);
     }, []);
 
     const addElement = useCallback((element: RewardElement) => {
@@ -280,6 +309,12 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             applyTypeMultiplier,
             monsterSoulsFed,
             setMonsterSoulsFed,
+            playerStatuses,
+            setPlayerStatuses,
+            potionCount,
+            setPotionCount,
+            potionFillPercent,
+            setPotionFillPercent,
         }),
         [
             addSouls,
@@ -299,6 +334,12 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             applyTypeMultiplier,
             monsterSoulsFed,
             setMonsterSoulsFed,
+            playerStatuses,
+            setPlayerStatuses,
+            potionCount,
+            setPotionCount,
+            potionFillPercent,
+            setPotionFillPercent,
         ],
     );
 

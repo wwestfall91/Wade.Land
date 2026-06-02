@@ -58,9 +58,10 @@ function RewardModal({ soulsGained, rewardElements, isChestReward = false, chest
             }, 180);
         } else {
             if (!selectedElement) return;
+            const sourceRect = buttonRefs.current[selectedElement.letter]?.getBoundingClientRect();
             setIsClosing(true);
             closeTimeoutRef.current = window.setTimeout(() => {
-                onConfirm({ elements: [selectedElement] });
+                onConfirm({ elements: [selectedElement], sourceRect });
             }, 180);
         }
     };

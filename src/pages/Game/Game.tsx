@@ -194,6 +194,8 @@ type PotionSparkle = {
     id: number;
     startX: number;
     startY: number;
+    midX: number;
+    midY: number;
     toX: number;
     toY: number;
     delayMs: number;
@@ -237,6 +239,11 @@ function Game() {
         typeMultipliers,
         monsterSoulsFed: soulsFed,
         setMonsterSoulsFed: setSoulsFed,
+        playerStatuses,
+        potionCount,
+        setPotionCount,
+        potionFillPercent,
+        setPotionFillPercent,
     } = usePlayer();
     const gameRef = useRef<HTMLDivElement | null>(null);
     const elementStartRef = useRef<HTMLDivElement | null>(null);
@@ -293,8 +300,6 @@ function Game() {
     const [isIntroInputFadingOut, setIsIntroInputFadingOut] = useState(false);
     const [fightReward, setFightReward] = useState<FightRewardState | null>(null);
     const [isFightVictoryCueVisible, setIsFightVictoryCueVisible] = useState(false);
-    const [potionCount, setPotionCount] = useState(0);
-    const [potionFillPercent, setPotionFillPercent] = useState(0);
     const [isPotionUnavailableFeedback, setIsPotionUnavailableFeedback] = useState(false);
     const [isPotionBrewedFlash, setIsPotionBrewedFlash] = useState(false);
     const [potionSparkles, setPotionSparkles] = useState<PotionSparkle[]>([]);
@@ -393,16 +398,24 @@ function Game() {
         const targetRect = potionTarget.getBoundingClientRect();
         const targetX = targetRect.left + targetRect.width / 2;
         const targetY = targetRect.top + targetRect.height / 2;
-        const burstSparkles: PotionSparkle[] = Array.from({ length: 3 }, (_, index) => {
-            const delayMs = index * 65;
-            const jitterX = (Math.random() - 0.5) * 14;
-            const jitterY = (Math.random() - 0.5) * 14;
+        const burstSparkles: PotionSparkle[] = Array.from({ length: 6 }, (_, index) => {
+            const delayMs = index * 55;
+            const jitterX = (Math.random() - 0.5) * 16;
+            const jitterY = (Math.random() - 0.5) * 16;
+            const startX = spawnViewportPosition.x + jitterX;
+            const startY = spawnViewportPosition.y + jitterY;
+            const angle = (Math.PI * 2 * index) / 6 + (Math.random() - 0.5) * 0.8;
+            const blastRadius = 55 + Math.random() * 45;
+            const midX = Math.cos(angle) * blastRadius;
+            const midY = Math.sin(angle) * blastRadius;
             return {
                 id: potionSparkleIdRef.current++,
-                startX: spawnViewportPosition.x + jitterX,
-                startY: spawnViewportPosition.y + jitterY,
-                toX: targetX - (spawnViewportPosition.x + jitterX),
-                toY: targetY - (spawnViewportPosition.y + jitterY),
+                startX,
+                startY,
+                midX,
+                midY,
+                toX: targetX - startX,
+                toY: targetY - startY,
                 delayMs,
             };
         });
@@ -1547,7 +1560,7 @@ function Game() {
         soulAnimationTimeoutsRef.current.push(textHideTimeoutId);
     }, [addSouls, clearSoulAnimationTimeouts, triggerSoulCounterPop]);
 
-    const handleRewardConfirm = ({ elements, bonusSoulsMultiplier }: { elements: RewardElement[]; bonusSoulsMultiplier?: number; sourceRect?: DOMRect }) => {
+    const handleRewardConfirm = ({ elements, bonusSoulsMultiplier, sourceRect }: { elements: RewardElement[]; bonusSoulsMultiplier?: number; sourceRect?: DOMRect }) => {
         if (!fightReward) {
             return;
         }
@@ -1567,6 +1580,27 @@ function Game() {
             replace: true,
             state: null,
         });
+
+        const waterCount = elements.filter(
+            (el) => normalizeType(el.type1) === "water" || normalizeType(el.type2) === "water",
+        ).length;
+        if (waterCount > 0) {
+            if (sourceRect) {
+                launchPotionSparkle({
+                    x: sourceRect.left + sourceRect.width / 2,
+                    y: sourceRect.top + sourceRect.height / 2,
+                });
+            }
+            setPotionFillPercent((previousFill) => {
+                const totalFill = previousFill + POTION_FILL_PER_WATER_CREATE * waterCount;
+                const createdPotions = Math.floor(totalFill / POTION_FILL_CAP);
+                if (createdPotions > 0) {
+                    setPotionCount((previousPotions) => previousPotions + createdPotions);
+                    triggerPotionBrewFlash();
+                }
+                return totalFill % POTION_FILL_CAP;
+            });
+        }
 
         if (isChestRewardPath) {
             setIsChestRevealVisible(true);
@@ -1622,7 +1656,37 @@ function Game() {
             }, lastLandMs + 100 + CHEST_REVEAL_FADEOUT_MS);
             elementFlightTimeoutsRef.current.push(cleanupTimeoutId);
         } else {
-            elements.forEach((el) => addElement(el));
+            const el = elements[0];
+            const isWater = el && (normalizeType(el.type1) === "water" || normalizeType(el.type2) === "water");
+            if (isWater && sourceRect) {
+                const containerRect = gameRef.current?.getBoundingClientRect();
+                const currentCount = playerProgress.elements.length;
+                const startX = sourceRect.left + sourceRect.width / 2;
+                const startY = sourceRect.top + sourceRect.height / 2;
+                const targetPos = getSpawnPosition(currentCount);
+                const targetX = (containerRect?.left ?? 0) + targetPos.x + 16;
+                const targetY = (containerRect?.top ?? 0) + targetPos.y + 16;
+                const flightIcon: ElementFlightIcon = {
+                    id: elementFlightIdRef.current++,
+                    startX,
+                    startY,
+                    toX: targetX - startX,
+                    toY: targetY - startY,
+                    letter: el.letter,
+                    delayMs: 0,
+                };
+                setElementFlightIcons([flightIcon]);
+                const landTimeoutId = window.setTimeout(() => {
+                    addElement(el);
+                }, ELEMENT_FLIGHT_TRAVEL_MS);
+                const clearTimeoutId = window.setTimeout(() => {
+                    setElementFlightIcons([]);
+                    elementFlightTimeoutsRef.current = [];
+                }, ELEMENT_FLIGHT_TRAVEL_MS + 120);
+                elementFlightTimeoutsRef.current.push(landTimeoutId, clearTimeoutId);
+            } else {
+                elements.forEach((e) => addElement(e));
+            }
             startSoulCollectionAnimation(totalSouls);
         }
     };
@@ -1660,6 +1724,8 @@ function Game() {
                                 left: `${sparkle.startX}px`,
                                 top: `${sparkle.startY}px`,
                                 animationDelay: `${sparkle.delayMs}ms`,
+                                ["--potion-sparkle-mid-x" as string]: `${sparkle.midX}px`,
+                                ["--potion-sparkle-mid-y" as string]: `${sparkle.midY}px`,
                                 ["--potion-sparkle-x" as string]: `${sparkle.toX}px`,
                                 ["--potion-sparkle-y" as string]: `${sparkle.toY}px`,
                             }}
@@ -1911,6 +1977,7 @@ function Game() {
                             isPotionUnavailableFeedback={isPotionUnavailableFeedback}
                             isPotionBrewedFlash={isPotionBrewedFlash}
                             souls={playerProgress.souls}
+                            statuses={playerStatuses}
                             className={`player-stats-dock${isSoulCounterPopping ? " is-soul-counter-pop" : ""}`}
                         />
                     </div>

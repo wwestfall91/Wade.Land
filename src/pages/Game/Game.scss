@@ -1059,20 +1059,25 @@
 @keyframes potion-sparkle-fly {
     0% {
         opacity: 0;
-        transform: translate(-50%, -50%) scale(0.75);
+        transform: translate(-50%, -50%) scale(0.6);
     }
 
-    16% {
+    12% {
         opacity: 1;
+        transform: translate(-50%, -50%) scale(1.15);
     }
 
-    60% {
-        opacity: 0.88;
+    50% {
+        opacity: 0.9;
+        transform: translate(
+            calc(-50% + var(--potion-sparkle-mid-x)),
+            calc(-50% + var(--potion-sparkle-mid-y))
+        ) scale(0.85);
     }
 
     100% {
-        opacity: 0.08;
-        transform: translate(calc(-50% + var(--potion-sparkle-x)), calc(-50% + var(--potion-sparkle-y))) scale(0.36);
+        opacity: 0.06;
+        transform: translate(calc(-50% + var(--potion-sparkle-x)), calc(-50% + var(--potion-sparkle-y))) scale(0.28);
     }
 }
 
