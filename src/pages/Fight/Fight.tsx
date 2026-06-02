@@ -116,7 +116,7 @@ type CastableSpell = {
 function Fight() {
     const location = useLocation();
     const navigate = useNavigate();
-    const { player, playerName, levels, applyEnemyAttack, healPlayer, resetGame } = usePlayer();
+    const { player, playerName, levels, applyEnemyAttack, healPlayer, resetGame, typeMultipliers } = usePlayer();
     const [flashingSlotId, setFlashingSlotId] = useState<number | null>(null);
     const [hoveredSpellId, setHoveredSpellId] = useState<number | null>(null);
     const [hoveredEnemyAttack, setHoveredEnemyAttack] = useState(false);
@@ -1061,7 +1061,12 @@ function Fight() {
             const soakBonus = isLightningSpell ? getSoakLightningBonus(remainingSoakStacks) : 0;
             const soakPenalty = isFireSpell ? getSoakFirePenalty(remainingSoakStacks) : 0;
             const freezeBonus = isFireSpell ? getFreezeFireBonus(remainingFreezeStacks) : 0;
-            const baseHitDamage = Math.max(0, spell.damage + soakBonus - soakPenalty + freezeBonus);
+            const spellTypeMultiplier = Math.max(
+                ...spellTypes.map((t) => typeMultipliers[t] ?? 1),
+                1,
+            );
+            const scaledSpellDamage = Math.round(spell.damage * spellTypeMultiplier);
+            const baseHitDamage = Math.max(0, scaledSpellDamage + soakBonus - soakPenalty + freezeBonus);
             const hitDamage = isCritical ? baseHitDamage * 2 : baseHitDamage;
             hitDamageBreakdown.push(hitDamage);
             totalDamage += hitDamage;

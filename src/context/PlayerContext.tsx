@@ -69,6 +69,8 @@ type PlayerContextValue = {
     addElement: (element: RewardElement) => void;
     selectedEnemy: SelectedEnemy | null;
     setSelectedEnemy: (enemy: SelectedEnemy | null) => void;
+    typeMultipliers: Record<string, number>;
+    applyTypeMultiplier: (type: string, multiplier: number) => void;
 };
 
 const DEFAULT_PLAYER_PROGRESS: PlayerProgress = {
@@ -150,6 +152,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
     const [currentHp, setCurrentHp] = useState<number | null>(null);
     const [playerName, setPlayerNameState] = useState(() => readCookie(PLAYER_NAME_COOKIE));
     const [selectedEnemy, setSelectedEnemy] = useState<SelectedEnemy | null>(null);
+    const [typeMultipliers, setTypeMultipliers] = useState<Record<string, number>>({});
 
     useEffect(() => {
         fetch("/levels.xlsx")
@@ -230,11 +233,20 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
         });
     }, [levels, playerLevel]);
 
+    const applyTypeMultiplier = useCallback((type: string, multiplier: number) => {
+        const normalized = type.trim().toLowerCase();
+        setTypeMultipliers((previous) => ({
+            ...previous,
+            [normalized]: Math.max(multiplier, previous[normalized] ?? 1),
+        }));
+    }, []);
+
     const resetGame = useCallback(() => {
         setSouls(0);
         setElements([]);
         setCurrentHp(null);
         setSelectedEnemy(null);
+        setTypeMultipliers({});
     }, []);
 
     const addElement = useCallback((element: RewardElement) => {
@@ -260,6 +272,8 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             addElement,
             selectedEnemy,
             setSelectedEnemy,
+            typeMultipliers,
+            applyTypeMultiplier,
         }),
         [
             addSouls,
@@ -275,6 +289,8 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             addElement,
             selectedEnemy,
             setPlayerName,
+            typeMultipliers,
+            applyTypeMultiplier,
         ],
     );
 

@@ -8,8 +8,10 @@ import ElementIcon from "../../components/ElementIcon";
 import { parseSpellEffectsFromRow, type SpellEffectConfig } from "../../combat/spellEffects";
 import { getEffectChipClass, getEffectSummaryLines } from "../../combat/effectSummary";
 import { type RewardElement, usePlayer } from "../../context/PlayerContext";
+import { RewardFactory, type MonsterReward } from "../../combat/rewardFactory";
 import FloatingTooltip from "./FloatingTooltip";
 import RewardModal from "../Fight/RewardModal";
+import MonsterUpgradeModal from "./MonsterUpgradeModal";
 import soulIcon from "../../assets/icons/Soul.png";
 import chestIcon from "../../assets/icons/Chest.png";
 import "./Game.scss";
@@ -90,6 +92,20 @@ type EnemyRow = {
     Weak2?: string;
     ["Weak 1"]?: string;
     ["Weak 2"]?: string;
+};
+
+type MonsterRewardRow = {
+    Level?: number | string;
+    level?: number | string;
+    Souls?: number | string;
+    souls?: number | string;
+    Experience?: number | string;
+    experience?: number | string;
+};
+
+type MonsterRewardThreshold = {
+    level: number;
+    souls: number;
 };
 
 type Enemy = {
@@ -217,6 +233,8 @@ function Game() {
         levels,
         selectedEnemy: nextEnemy,
         setSelectedEnemy: setNextEnemy,
+        applyTypeMultiplier,
+        typeMultipliers,
     } = usePlayer();
     const gameRef = useRef<HTMLDivElement | null>(null);
     const elementStartRef = useRef<HTMLDivElement | null>(null);
@@ -227,6 +245,7 @@ function Game() {
     const previewRef = useRef<HTMLDivElement | null>(null);
     const feedAnimCounterRef = useRef(0);
     const eyesFlashTimerRef = useRef<number | null>(null);
+    const rewardGlowTimerRef = useRef<number | null>(null);
 
     const [draggables, setDraggables] = useState<DraggableItem[]>([]);
     const [recipes, setRecipes] = useState<CombinationRecipe[]>([]);
@@ -241,6 +260,10 @@ function Game() {
     const [isSoulsPanelFlashing, setIsSoulsPanelFlashing] = useState(false);
     const [feedAnimations, setFeedAnimations] = useState<number[]>([]);
     const [eyesFlashRevision, setEyesFlashRevision] = useState(0);
+    const [monsterThresholds, setMonsterThresholds] = useState<MonsterRewardThreshold[]>([]);
+    const [soulsFed, setSoulsFed] = useState(0);
+    const [rewardGlowRevision, setRewardGlowRevision] = useState(0);
+    const [pendingUpgradeRewards, setPendingUpgradeRewards] = useState<MonsterReward[] | null>(null);
     const [hasSeenDragTutorial, setHasSeenDragTutorial] = useState(() => {
         if (typeof window === "undefined") {
             return false;
@@ -320,6 +343,9 @@ function Game() {
         elementFlightTimeoutsRef.current.forEach((timeoutId) => {
             window.clearTimeout(timeoutId);
         });
+        if (rewardGlowTimerRef.current !== null) {
+            window.clearTimeout(rewardGlowTimerRef.current);
+        }
     }, []);
 
     const clearSoulAnimationTimeouts = useCallback(() => {
@@ -715,6 +741,25 @@ function Game() {
                 }))
                 .filter((e) => e.name.length > 0);
             setEnemies(parsed);
+
+            const monsterRewardsBuffer = await fetch("/monster_rewards.xlsx")
+                .then((res) => (res.ok ? res.arrayBuffer() : null))
+                .catch(() => null);
+            if (isCancelled) return;
+
+            if (monsterRewardsBuffer) {
+                const monsterWb = XLSX.read(monsterRewardsBuffer, { type: "array" });
+                const monsterWs = monsterWb.Sheets[monsterWb.SheetNames[0]];
+                const monsterRows = XLSX.utils.sheet_to_json<MonsterRewardRow>(monsterWs);
+                const parsed: MonsterRewardThreshold[] = monsterRows
+                    .map((row) => ({
+                        level: Number(row.Level ?? row.level ?? 0) || 0,
+                        souls: Number(row.Souls ?? row.souls ?? row.Experience ?? row.experience ?? 0) || 0,
+                    }))
+                    .filter((row) => row.level > 0 && row.souls > 0)
+                    .sort((a, b) => a.souls - b.souls);
+                setMonsterThresholds(parsed);
+            }
         };
 
         void loadGameData();
@@ -840,13 +885,17 @@ function Game() {
                 event.preventDefault();
                 setIsDevElementPanelOpen((previous) => !previous);
             }
+            if (event.ctrlKey && event.key === ".") {
+                event.preventDefault();
+                addSouls(10);
+            }
         };
 
         window.addEventListener("keydown", handleKeyDown);
         return () => {
             window.removeEventListener("keydown", handleKeyDown);
         };
-    }, []);
+    }, [addSouls]);
 
     const handleDevElementDragStart = (event: React.DragEvent<HTMLButtonElement>, element: RewardElement) => {
         event.dataTransfer.effectAllowed = "copy";
@@ -1359,10 +1408,30 @@ function Game() {
             return;
         }
         spendSouls(1);
+
+        const prevFed = soulsFed;
+        const nextFed = prevFed + 1;
+        setSoulsFed(nextFed);
+
+        const crossed = monsterThresholds.find((t) => nextFed >= t.souls && prevFed < t.souls);
+        if (crossed) {
+            const choices = RewardFactory.getRandom(2);
+            setPendingUpgradeRewards(choices);
+            if (rewardGlowTimerRef.current !== null) {
+                window.clearTimeout(rewardGlowTimerRef.current);
+            }
+            setRewardGlowRevision((r) => r + 1);
+            rewardGlowTimerRef.current = window.setTimeout(() => {
+                setRewardGlowRevision(0);
+                rewardGlowTimerRef.current = null;
+            }, 3500);
+        }
+
         const id = ++feedAnimCounterRef.current;
         setFeedAnimations((prev) => [...prev, id]);
         window.setTimeout(() => {
             setFeedAnimations((prev) => prev.filter((x) => x !== id));
+            if (crossed) return;
             setEyesFlashRevision((r) => r + 1);
             if (eyesFlashTimerRef.current !== null) {
                 window.clearTimeout(eyesFlashTimerRef.current);
@@ -1828,6 +1897,19 @@ function Game() {
                     />
                 </div>
             </div>
+            {Object.keys(typeMultipliers).length > 0 ? (
+                <div className="upgrades-panel" aria-label="Active upgrades">
+                    <div className="upgrades-panel-title">Upgrades</div>
+                    <ul className="upgrades-panel-list">
+                        {Object.entries(typeMultipliers).map(([type, mult]) => (
+                            <li key={type} className={`upgrades-panel-item type-${type}`}>
+                                <span className="upgrades-item-type">{type}</span>
+                                <span className="upgrades-item-value">×{mult.toFixed(1)}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            ) : null}
             <div className="game-enemy-card">
                 <div className="next-enemy-text">Next Enemy</div>
                 <div className="game-enemy-card-header">
@@ -1878,6 +1960,13 @@ function Game() {
                     onConfirm={handleRewardConfirm}
                 />
             ) : null}
+            {pendingUpgradeRewards ? (
+                <MonsterUpgradeModal
+                    rewards={pendingUpgradeRewards}
+                    applyContext={{ applyTypeMultiplier }}
+                    onConfirm={() => setPendingUpgradeRewards(null)}
+                />
+            ) : null}
             {isFeedOverlayOpen ? (
                 <div
                     className={`feed-overlay${isFeedOverlayFadingOut ? " is-fading-out" : ""}`}
@@ -1885,7 +1974,10 @@ function Game() {
                     aria-hidden="true"
                 >
                     <div className="feed-overlay-eyes">
-                        <div key={eyesFlashRevision} className={`feed-eyes-inner${eyesFlashRevision > 0 ? " is-soul-flash" : ""}`}>
+                        <div
+                            key={rewardGlowRevision > 0 ? rewardGlowRevision : eyesFlashRevision}
+                            className={`feed-eyes-inner${rewardGlowRevision > 0 ? " is-reward-glow" : eyesFlashRevision > 0 ? " is-soul-flash" : ""}`}
+                        >
                             <span className="game-intro-eye game-intro-eye--left" />
                             <span className="game-intro-eye game-intro-eye--right" />
                         </div>

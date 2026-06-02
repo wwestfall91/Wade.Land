@@ -1,0 +1,202 @@
+.upgrade-modal-overlay {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+    box-sizing: border-box;
+    background: rgba(3, 6, 28, 0.86);
+    backdrop-filter: blur(2px);
+    z-index: 9100;
+    isolation: isolate;
+    animation: upgradeOverlayIn 180ms ease-out;
+
+    &.is-closing {
+        animation: upgradeOverlayOut 180ms ease-in forwards;
+    }
+}
+
+.upgrade-modal {
+    position: relative;
+    width: min(96vw, 38rem);
+    padding: 1.35rem 1.4rem 1.2rem;
+    box-sizing: border-box;
+    border-radius: 4px;
+    border: 2px solid #ffe97a;
+    background: linear-gradient(180deg, #2a2000 0%, #1a1500 100%);
+    color: #f5f5f5;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+    z-index: 9101;
+    box-shadow:
+        inset 0 0 0 1px #d4a800,
+        inset 0 0 0 2px #0d0a00,
+        0 10px 0 rgba(0, 0, 0, 0.5),
+        0 0 40px 8px rgba(255, 200, 0, 0.18);
+    font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+    text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.72);
+    animation: upgradeModalIn 200ms cubic-bezier(0.16, 1, 0.3, 1);
+
+    &.is-closing {
+        animation: upgradeModalOut 180ms ease-in forwards;
+    }
+}
+
+.upgrade-modal-title {
+    margin: 0;
+    font-size: 1.55rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: #ffd700;
+    text-align: center;
+    text-transform: uppercase;
+    border: 2px solid rgba(255, 215, 0, 0.45);
+    background: linear-gradient(180deg, rgba(90, 68, 0, 0.95) 0%, rgba(50, 36, 0, 0.95) 100%);
+    padding: 0.45rem 0.6rem;
+    box-shadow:
+        inset 0 0 0 1px #c49a00,
+        inset 0 0 0 2px #0d0800;
+}
+
+.upgrade-modal-choices {
+    display: flex;
+    width: 100%;
+    box-sizing: border-box;
+    justify-content: center;
+    align-items: stretch;
+    gap: 0.95rem;
+    padding: 0.65rem;
+    border: 2px solid rgba(255, 215, 0, 0.3);
+    background: linear-gradient(180deg, rgba(60, 44, 0, 0.87) 0%, rgba(30, 22, 0, 0.9) 100%);
+    box-shadow:
+        inset 0 0 0 1px #a07800,
+        inset 0 0 0 2px #0a0600;
+}
+
+.upgrade-choice {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1 1 0;
+    min-height: 7rem;
+    padding: 0.75rem 0.6rem;
+    border-radius: 4px;
+    border: 2px solid rgba(255, 215, 0, 0.45);
+    background: linear-gradient(180deg, rgba(80, 60, 0, 0.95) 0%, rgba(44, 32, 0, 0.96) 100%);
+    color: #f5f5f5;
+    cursor: pointer;
+    gap: 0.45rem;
+    transition: transform 130ms ease, border-color 120ms ease, box-shadow 130ms ease, background 120ms ease;
+    box-shadow:
+        inset 0 0 0 1px #c49600,
+        inset 0 0 0 2px #0d0800,
+        0 4px 0 rgba(0, 0, 0, 0.36);
+
+    &:hover:not(.is-selected) {
+        border-color: rgba(255, 235, 80, 0.9);
+        background: linear-gradient(180deg, rgba(105, 80, 0, 0.96) 0%, rgba(60, 44, 0, 0.96) 100%);
+        transform: translateY(-2px) scale(1.02);
+        box-shadow:
+            inset 0 0 0 1px #d4a800,
+            inset 0 0 0 2px #0d0800,
+            0 7px 0 rgba(0, 0, 0, 0.4);
+    }
+
+    &:focus,
+    &:focus-visible {
+        outline: none;
+    }
+
+    &.is-selected {
+        border-color: #ffd700 !important;
+        background: linear-gradient(180deg, rgba(140, 100, 0, 0.92) 0%, rgba(90, 62, 0, 0.96) 100%);
+        transform: translateY(-1px) scale(1.04);
+        box-shadow:
+            inset 0 0 0 1px #ffe040,
+            inset 0 0 0 2px #0d0800,
+            0 6px 0 rgba(0, 0, 0, 0.42),
+            0 0 18px 4px rgba(255, 200, 0, 0.28);
+    }
+}
+
+.upgrade-choice-name {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #ffd700;
+    text-align: center;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    text-shadow: 0 0 8px rgba(255, 200, 0, 0.5), 1px 1px 0 rgba(0, 0, 0, 0.8);
+}
+
+.upgrade-choice-description {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #ffe97a;
+    text-align: center;
+    opacity: 0.92;
+}
+
+.upgrade-modal-confirm {
+    align-self: center;
+    min-width: 12rem;
+    height: 2.95rem;
+    border-radius: 4px;
+    border: 2px solid #ffe066;
+    background: linear-gradient(180deg, #8a6400 0%, #4d3800 100%);
+    color: #fff7a0;
+    font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+    font-weight: 700;
+    cursor: pointer;
+    font-size: 1.1rem;
+    letter-spacing: 0.03em;
+    transition: background 120ms ease, opacity 120ms ease;
+    box-shadow:
+        inset 0 0 0 1px #c49600,
+        inset 0 0 0 2px #1a1000,
+        0 5px 0 rgba(0, 0, 0, 0.4);
+
+    &:hover:enabled {
+        background: linear-gradient(180deg, #a87800 0%, #5e4400 100%);
+    }
+
+    &:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+    }
+}
+
+@keyframes upgradeOverlayIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+@keyframes upgradeOverlayOut {
+    from { opacity: 1; }
+    to   { opacity: 0; }
+}
+
+@keyframes upgradeModalIn {
+    from {
+        opacity: 0;
+        transform: translateY(12px) scale(0.96);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes upgradeModalOut {
+    from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(8px) scale(0.98);
+    }
+}
