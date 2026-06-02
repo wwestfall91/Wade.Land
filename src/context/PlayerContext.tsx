@@ -96,6 +96,12 @@ type PlayerContextValue = {
     setPotionCount: React.Dispatch<React.SetStateAction<number>>;
     potionFillPercent: number;
     setPotionFillPercent: React.Dispatch<React.SetStateAction<number>>;
+    shieldMultiplier: number;
+    applyShieldMultiplier: (multiplier: number) => void;
+    soakMultiplier: number;
+    applySoakMultiplier: (multiplier: number) => void;
+    burnMultiplier: number;
+    applyBurnMultiplier: (multiplier: number) => void;
 };
 
 const DEFAULT_PLAYER_PROGRESS: PlayerProgress = {
@@ -182,6 +188,9 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
     const [playerStatuses, setPlayerStatuses] = useState<PlayerStatuses>(DEFAULT_PLAYER_STATUSES);
     const [potionCount, setPotionCount] = useState(0);
     const [potionFillPercent, setPotionFillPercent] = useState(0);
+    const [shieldMultiplier, setShieldMultiplier] = useState(1);
+    const [soakMultiplier, setSoakMultiplier] = useState(1);
+    const [burnMultiplier, setBurnMultiplier] = useState(1);
 
     useEffect(() => {
         fetch("/levels.xlsx")
@@ -270,6 +279,18 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
         }));
     }, []);
 
+    const applyShieldMultiplier = useCallback((multiplier: number) => {
+        setShieldMultiplier((previous) => previous + (multiplier - 1));
+    }, []);
+
+    const applySoakMultiplier = useCallback((multiplier: number) => {
+        setSoakMultiplier((previous) => previous + (multiplier - 1));
+    }, []);
+
+    const applyBurnMultiplier = useCallback((multiplier: number) => {
+        setBurnMultiplier((previous) => previous + (multiplier - 1));
+    }, []);
+
     const resetGame = useCallback(() => {
         setSouls(0);
         setElements([]);
@@ -280,6 +301,9 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
         setPlayerStatuses(DEFAULT_PLAYER_STATUSES);
         setPotionCount(0);
         setPotionFillPercent(0);
+        setShieldMultiplier(1);
+        setSoakMultiplier(1);
+        setBurnMultiplier(1);
     }, []);
 
     const addElement = useCallback((element: RewardElement) => {
@@ -315,6 +339,12 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             setPotionCount,
             potionFillPercent,
             setPotionFillPercent,
+            shieldMultiplier,
+            applyShieldMultiplier,
+            soakMultiplier,
+            applySoakMultiplier,
+            burnMultiplier,
+            applyBurnMultiplier,
         }),
         [
             addSouls,
@@ -340,6 +370,12 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             setPotionCount,
             potionFillPercent,
             setPotionFillPercent,
+            shieldMultiplier,
+            applyShieldMultiplier,
+            soakMultiplier,
+            applySoakMultiplier,
+            burnMultiplier,
+            applyBurnMultiplier,
         ],
     );
 

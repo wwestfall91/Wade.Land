@@ -116,7 +116,7 @@ type CastableSpell = {
 function Fight() {
     const location = useLocation();
     const navigate = useNavigate();
-    const { player, playerName, levels, applyEnemyAttack, healPlayer, resetGame, typeMultipliers, playerStatuses, setPlayerStatuses } = usePlayer();
+    const { player, playerName, levels, applyEnemyAttack, healPlayer, resetGame, typeMultipliers, playerStatuses, setPlayerStatuses, shieldMultiplier, soakMultiplier, burnMultiplier } = usePlayer();
     const [flashingSlotId, setFlashingSlotId] = useState<number | null>(null);
     const [hoveredSpellId, setHoveredSpellId] = useState<number | null>(null);
     const [hoveredEnemyAttack, setHoveredEnemyAttack] = useState(false);
@@ -702,6 +702,9 @@ function Fight() {
             await wait(EFFECT_STEP_DELAY_MS);
         }
 
+        totalPlayerBurnApplied = Math.round(totalPlayerBurnApplied * burnMultiplier);
+        totalPlayerSoakApplied = Math.round(totalPlayerSoakApplied * soakMultiplier);
+
         if (totalPlayerBurnApplied > 0 && simulatedPlayerHp > 0) {
             setPlayerBurnStatus((previous) => {
                 if (!previous) {
@@ -1254,7 +1257,7 @@ function Fight() {
         }
 
         if (totalShieldGranted > 0) {
-            setPlayerShield((previous) => previous + totalShieldGranted);
+            setPlayerShield((previous) => previous + Math.round(totalShieldGranted * shieldMultiplier));
             await wait(EFFECT_STEP_DELAY_MS);
         }
 

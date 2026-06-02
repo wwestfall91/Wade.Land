@@ -244,6 +244,12 @@ function Game() {
         setPotionCount,
         potionFillPercent,
         setPotionFillPercent,
+        applyShieldMultiplier,
+        applySoakMultiplier,
+        applyBurnMultiplier,
+        shieldMultiplier,
+        soakMultiplier,
+        burnMultiplier,
     } = usePlayer();
     const gameRef = useRef<HTMLDivElement | null>(null);
     const elementStartRef = useRef<HTMLDivElement | null>(null);
@@ -1430,7 +1436,7 @@ function Game() {
 
         const crossed = monsterThresholds.find((t) => nextFed >= t.souls && prevFed < t.souls);
         if (crossed) {
-            const choices = RewardFactory.getRandom(2);
+            const choices = RewardFactory.getRandom(3);
             setPendingUpgradeRewards(choices);
             if (rewardGlowTimerRef.current !== null) {
                 window.clearTimeout(rewardGlowTimerRef.current);
@@ -1872,52 +1878,23 @@ function Game() {
                         anchorElement={previewRef.current}
                         open={isPreviewHovered && !isPreviewDragging}
                         className="drag-description-popup"
-                    >
-                        {previewCombination.description.length > 0 ? (
-                            <div className="drag-description-text">{previewCombination.description}</div>
-                        ) : null}
-                        <div className="drag-damage-text">Damage: {previewCombination.damage}</div>
-                        <div className="drag-type-text">
-                            <span className="drag-type-label">Types:</span>
-                            <span className="drag-type-list">
-                                {[previewCombination.type1, previewCombination.type2].filter(
-                                    (value): value is string => Boolean(value && value.trim().length > 0),
-                                ).length > 0 ? (
-                                    [previewCombination.type1, previewCombination.type2]
-                                        .filter((value): value is string => Boolean(value && value.trim().length > 0))
-                                        .map((type) => (
-                                            <span
-                                                key={type}
-                                                className={`type-chip type-${type
-                                                    .trim()
-                                                    .toLowerCase()
-                                                    .replace(/[^a-z0-9]+/g, "-")}`}
-                                            >
-                                                {type}
-                                            </span>
-                                        ))
-                                ) : (
-                                    <span className="type-chip type-none">None</span>
-                                )}
-                            </span>
-                        </div>
-                        {getEffectSummaryLines(previewCombination.effects).length > 0 ? (
-                            <div className="drag-effect-text">
-                                <span className="drag-effect-label">Effects:</span>
-                                <span className="drag-effect-list">
-                                    {getEffectSummaryLines(previewCombination.effects).map((line) => (
-                                        <span key={line} className={`effect-chip ${getEffectChipClass(line)}`}>{line}</span>
-                                    ))}
-                                </span>
-                            </div>
-                        ) : null}
-                    </FloatingTooltip>
+                        clampHorizontal={false}
+                        typeMultipliers={typeMultipliers}
+                        elementDetails={{
+                            letter: previewCombination.letter,
+                            damage: previewCombination.damage,
+                            description: previewCombination.description,
+                            type1: previewCombination.type1,
+                            type2: previewCombination.type2,
+                            effects: previewCombination.effects,
+                        }}
+                    />
                 </>
             ) : null}
 
             <div className="game-scene-row">
                 <div className="game-scene-col game-scene-col--left">
-                    {Object.keys(typeMultipliers).length > 0 ? (
+                    {(Object.keys(typeMultipliers).length > 0 || shieldMultiplier > 1 || soakMultiplier > 1 || burnMultiplier > 1) ? (
                         <div className="upgrades-panel" aria-label="Active upgrades">
                             <div className="upgrades-panel-title">Upgrades</div>
                             <ul className="upgrades-panel-list">
@@ -1927,6 +1904,24 @@ function Game() {
                                         <span className="upgrades-item-value">×{mult.toFixed(1)}</span>
                                     </li>
                                 ))}
+                                {shieldMultiplier > 1 ? (
+                                    <li className="upgrades-panel-item type-shield">
+                                        <span className="upgrades-item-type">shield gain</span>
+                                        <span className="upgrades-item-value">×{shieldMultiplier.toFixed(1)}</span>
+                                    </li>
+                                ) : null}
+                                {soakMultiplier > 1 ? (
+                                    <li className="upgrades-panel-item type-soak">
+                                        <span className="upgrades-item-type">soak stacks</span>
+                                        <span className="upgrades-item-value">×{soakMultiplier.toFixed(1)}</span>
+                                    </li>
+                                ) : null}
+                                {burnMultiplier > 1 ? (
+                                    <li className="upgrades-panel-item type-burn">
+                                        <span className="upgrades-item-type">burn stacks</span>
+                                        <span className="upgrades-item-value">×{burnMultiplier.toFixed(1)}</span>
+                                    </li>
+                                ) : null}
                             </ul>
                         </div>
                     ) : null}
@@ -2038,7 +2033,7 @@ function Game() {
             {pendingUpgradeRewards ? (
                 <MonsterUpgradeModal
                     rewards={pendingUpgradeRewards}
-                    applyContext={{ applyTypeMultiplier }}
+                    applyContext={{ applyTypeMultiplier, applyShieldMultiplier, applySoakMultiplier, applyBurnMultiplier }}
                     onConfirm={() => setPendingUpgradeRewards(null)}
                 />
             ) : null}
