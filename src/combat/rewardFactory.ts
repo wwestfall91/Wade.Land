@@ -3,6 +3,7 @@ export type RewardApplyContext = {
     applyShieldMultiplier: (multiplier: number) => void;
     applySoakMultiplier: (multiplier: number) => void;
     applyBurnMultiplier: (multiplier: number) => void;
+    applyPotionBrewMultiplier: (multiplier: number) => void;
 };
 
 export type MonsterReward = {
@@ -64,6 +65,11 @@ const STACK_REWARDS: readonly MonsterReward[] = [
         name: "Wildfire",
         description: "Burn stacks ×2",
         apply: ({ applyBurnMultiplier }) => applyBurnMultiplier(2),
+    },
+    {
+        name: "Elixir Mastery",
+        description: "Potion brewing ×2",
+        apply: ({ applyPotionBrewMultiplier }) => applyPotionBrewMultiplier(2),
     },
 ];
 

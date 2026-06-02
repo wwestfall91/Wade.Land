@@ -40,8 +40,10 @@ function PlayerStats({
     statuses,
     className,
 }: PlayerStatsProps) {
-    const { player, levels } = usePlayer();
-    const playerMaxHp = levels.find((levelDef) => levelDef.level === player.level)?.hp ?? Math.max(player.hp, 1);
+    const { player, levels, maxHpMultiplier, potionRequired } = usePlayer();
+    const baseMaxHp = levels.find((levelDef) => levelDef.level === player.level)?.hp ?? Math.max(player.hp, 1);
+    const playerMaxHp = Math.round(baseMaxHp * maxHpMultiplier);
+    const currentBrewPoints = Math.floor((potionFillPercent / 100) * potionRequired);
     const hpFillPercent = Math.max(0, Math.min(100, (hp / playerMaxHp) * 100));
     const style = {
         "--hp-fill": `${hpFillPercent}%`,
@@ -63,7 +65,6 @@ function PlayerStats({
                         type="button"
                         className={`player-potion-panel${isPotionUnavailableFeedback ? " is-unavailable" : ""}${isPotionBrewedFlash ? " is-brew-flash" : ""}`}
                         aria-label={`Potions ${potionCount}. Potion charge ${Math.round(potionFillPercent)} percent`}
-                        title={potionCount > 0 ? "Use potion to restore full health" : "Create Water-type elements to brew a potion"}
                         onClick={onPotionClick}
                         style={{ "--potion-fill": `${Math.max(0, Math.min(100, potionFillPercent))}%` } as React.CSSProperties}
                     >
@@ -72,6 +73,17 @@ function PlayerStats({
                             <span className="player-potion-label">POTION</span>
                             <span className="player-potion-count">{potionCount}</span>
                         </div>
+                        <span className="player-potion-tooltip">
+                            <span className="player-potion-tooltip-header">
+                                <span>Drink Potion</span>
+                                <span className="player-potion-brew-progress">{currentBrewPoints}/{potionRequired}</span>
+                            </span>
+                            <span>Create Water elements to brew potions</span>
+                            <br/>
+                            <span>+50% max HP</span>
+                            <span>Fully restores health</span>
+                            
+                        </span>
                     </button>
                     <div className="player-souls-panel" aria-label={`Souls ${souls}`} title="Souls are earned from victories and persist between battles.">
                         <img src={soulIcon} alt="" aria-hidden="true" className="player-souls-icon" />

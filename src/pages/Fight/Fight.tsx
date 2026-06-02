@@ -116,7 +116,7 @@ type CastableSpell = {
 function Fight() {
     const location = useLocation();
     const navigate = useNavigate();
-    const { player, playerName, levels, applyEnemyAttack, healPlayer, resetGame, typeMultipliers, playerStatuses, setPlayerStatuses, shieldMultiplier, soakMultiplier, burnMultiplier } = usePlayer();
+    const { player, playerName, levels, applyEnemyAttack, healPlayer, resetGame, typeMultipliers, playerStatuses, setPlayerStatuses, shieldMultiplier, soakMultiplier, burnMultiplier, maxHpMultiplier } = usePlayer();
     const [flashingSlotId, setFlashingSlotId] = useState<number | null>(null);
     const [hoveredSpellId, setHoveredSpellId] = useState<number | null>(null);
     const [hoveredEnemyAttack, setHoveredEnemyAttack] = useState(false);
@@ -202,7 +202,7 @@ function Fight() {
     const [enemyHealth, setEnemyHealth] = useState(() => enemy.hp);
     const enemyMaxHp = Math.max(1, enemy.hp);
     const enemyHpFillPercent = Math.max(0, Math.min(100, (enemyHealth / enemyMaxHp) * 100));
-    const playerMaxHp = levels.find((levelDef) => levelDef.level === player.level)?.hp ?? Math.max(player.hp, 1);
+    const playerMaxHp = Math.round((levels.find((levelDef) => levelDef.level === player.level)?.hp ?? Math.max(player.hp, 1)) * maxHpMultiplier);
     const displayedPlayerHp = player.hp + Math.max(0, playerShield);
     const playerHpFillPercent = Math.max(0, Math.min(100, (player.hp / playerMaxHp) * 100));
     const playerShieldFillPercent = Math.max(0, Math.min(100, (Math.max(0, playerShield) / playerMaxHp) * 100));

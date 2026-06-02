@@ -156,7 +156,6 @@ const INTRO_TEXT_FADE_GAP_MS = 850;
 const INTRO_INPUT_FADE_MS = 640;
 const INTRO_SCENE_FADEOUT_MS = 1600;
 const REWARD_CUE_MS = 260;
-const POTION_FILL_PER_WATER_CREATE = 25;
 const POTION_FILL_CAP = 100;
 const POTION_BREW_FLASH_MS = 320;
 const POTION_SPARKLE_TRAVEL_MS = 620;
@@ -244,12 +243,16 @@ function Game() {
         setPotionCount,
         potionFillPercent,
         setPotionFillPercent,
+        potionRequired,
+        drinkPotion,
         applyShieldMultiplier,
         applySoakMultiplier,
         applyBurnMultiplier,
         shieldMultiplier,
         soakMultiplier,
         burnMultiplier,
+        potionBrewMultiplier,
+        applyPotionBrewMultiplier,
     } = usePlayer();
     const gameRef = useRef<HTMLDivElement | null>(null);
     const elementStartRef = useRef<HTMLDivElement | null>(null);
@@ -1141,7 +1144,8 @@ function Game() {
             }
 
             setPotionFillPercent((previousFill) => {
-                const totalFill = previousFill + POTION_FILL_PER_WATER_CREATE;
+                const levelContribution = (newDraggable.level / potionRequired) * 100 * potionBrewMultiplier;
+                const totalFill = previousFill + levelContribution;
                 const createdPotions = Math.floor(totalFill / POTION_FILL_CAP);
 
                 if (createdPotions > 0) {
@@ -1264,10 +1268,9 @@ function Game() {
             return;
         }
 
-        const playerMaxHp = levels.find((levelDef) => levelDef.level === playerProgress.level)?.hp ?? Math.max(playerProgress.hp, 1);
         setPotionCount((previous) => Math.max(0, previous - 1));
-        healPlayer(playerMaxHp);
-    }, [healPlayer, levels, playerProgress.hp, playerProgress.level, potionCount]);
+        drinkPotion();
+    }, [drinkPotion, potionCount, setPotionCount]);
 
     const handlePreviewPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
         event.stopPropagation();
@@ -1587,10 +1590,12 @@ function Game() {
             state: null,
         });
 
-        const waterCount = elements.filter(
-            (el) => normalizeType(el.type1) === "water" || normalizeType(el.type2) === "water",
-        ).length;
-        if (waterCount > 0) {
+        const waterLevelPoints = elements
+            .filter(
+                (el) => normalizeType(el.type1) === "water" || normalizeType(el.type2) === "water",
+            )
+            .reduce((sum, el) => sum + Math.max(1, el.level), 0);
+        if (waterLevelPoints > 0) {
             if (sourceRect) {
                 launchPotionSparkle({
                     x: sourceRect.left + sourceRect.width / 2,
@@ -1598,7 +1603,8 @@ function Game() {
                 });
             }
             setPotionFillPercent((previousFill) => {
-                const totalFill = previousFill + POTION_FILL_PER_WATER_CREATE * waterCount;
+                const levelContribution = (waterLevelPoints / potionRequired) * 100 * potionBrewMultiplier;
+                const totalFill = previousFill + levelContribution;
                 const createdPotions = Math.floor(totalFill / POTION_FILL_CAP);
                 if (createdPotions > 0) {
                     setPotionCount((previousPotions) => previousPotions + createdPotions);
@@ -1894,7 +1900,7 @@ function Game() {
 
             <div className="game-scene-row">
                 <div className="game-scene-col game-scene-col--left">
-                    {(Object.keys(typeMultipliers).length > 0 || shieldMultiplier > 1 || soakMultiplier > 1 || burnMultiplier > 1) ? (
+                    {(Object.keys(typeMultipliers).length > 0 || shieldMultiplier > 1 || soakMultiplier > 1 || burnMultiplier > 1 || potionBrewMultiplier > 1) ? (
                         <div className="upgrades-panel" aria-label="Active upgrades">
                             <div className="upgrades-panel-title">Upgrades</div>
                             <ul className="upgrades-panel-list">
@@ -1920,6 +1926,12 @@ function Game() {
                                     <li className="upgrades-panel-item type-burn">
                                         <span className="upgrades-item-type">burn stacks</span>
                                         <span className="upgrades-item-value">×{burnMultiplier.toFixed(1)}</span>
+                                    </li>
+                                ) : null}
+                                {potionBrewMultiplier > 1 ? (
+                                    <li className="upgrades-panel-item type-water">
+                                        <span className="upgrades-item-type">potion brewing</span>
+                                        <span className="upgrades-item-value">×{potionBrewMultiplier.toFixed(1)}</span>
                                     </li>
                                 ) : null}
                             </ul>
@@ -2033,7 +2045,7 @@ function Game() {
             {pendingUpgradeRewards ? (
                 <MonsterUpgradeModal
                     rewards={pendingUpgradeRewards}
-                    applyContext={{ applyTypeMultiplier, applyShieldMultiplier, applySoakMultiplier, applyBurnMultiplier }}
+                    applyContext={{ applyTypeMultiplier, applyShieldMultiplier, applySoakMultiplier, applyBurnMultiplier, applyPotionBrewMultiplier }}
                     onConfirm={() => setPendingUpgradeRewards(null)}
                 />
             ) : null}

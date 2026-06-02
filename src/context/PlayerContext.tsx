@@ -23,6 +23,18 @@ export type LevelDefinition = {
     hp: number;
 };
 
+type PotionLevelRow = {
+    Level?: number | string;
+    level?: number | string;
+    Required?: number | string;
+    required?: number | string;
+};
+
+export type PotionLevelDefinition = {
+    level: number;
+    required: number;
+};
+
 
 export type PlayerElement = {
     id: number;
@@ -96,12 +108,17 @@ type PlayerContextValue = {
     setPotionCount: React.Dispatch<React.SetStateAction<number>>;
     potionFillPercent: number;
     setPotionFillPercent: React.Dispatch<React.SetStateAction<number>>;
+    potionRequired: number;
+    drinkPotion: () => void;
+    maxHpMultiplier: number;
     shieldMultiplier: number;
     applyShieldMultiplier: (multiplier: number) => void;
     soakMultiplier: number;
     applySoakMultiplier: (multiplier: number) => void;
     burnMultiplier: number;
     applyBurnMultiplier: (multiplier: number) => void;
+    potionBrewMultiplier: number;
+    applyPotionBrewMultiplier: (multiplier: number) => void;
 };
 
 const DEFAULT_PLAYER_PROGRESS: PlayerProgress = {
@@ -150,6 +167,7 @@ const resolvePlayerProgress = (
     levels: LevelDefinition[],
     elements: PlayerElement[],
     currentHp: number | null,
+    maxHpMultiplier: number,
 ): PlayerProgress => {
     const matchedLevel = resolveLevelForPlayer(playerLevel, levels);
 
@@ -161,7 +179,8 @@ const resolvePlayerProgress = (
         };
     }
 
-    const resolvedHp = Math.max(0, Math.min(currentHp ?? matchedLevel.hp, matchedLevel.hp));
+    const effectiveMaxHp = Math.round(matchedLevel.hp * maxHpMultiplier);
+    const resolvedHp = Math.max(0, Math.min(currentHp ?? effectiveMaxHp, effectiveMaxHp));
 
     return {
         level: matchedLevel.level,
@@ -188,9 +207,12 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
     const [playerStatuses, setPlayerStatuses] = useState<PlayerStatuses>(DEFAULT_PLAYER_STATUSES);
     const [potionCount, setPotionCount] = useState(0);
     const [potionFillPercent, setPotionFillPercent] = useState(0);
+    const [potionLevels, setPotionLevels] = useState<PotionLevelDefinition[]>([]);
+    const [maxHpMultiplier, setMaxHpMultiplier] = useState(1);
     const [shieldMultiplier, setShieldMultiplier] = useState(1);
     const [soakMultiplier, setSoakMultiplier] = useState(1);
     const [burnMultiplier, setBurnMultiplier] = useState(1);
+    const [potionBrewMultiplier, setPotionBrewMultiplier] = useState(1);
 
     useEffect(() => {
         fetch("/levels.xlsx")
@@ -210,10 +232,33 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             });
     }, []);
 
+    useEffect(() => {
+        fetch("/potion_levels.xlsx")
+            .then((res) => res.arrayBuffer())
+            .then((buffer) => {
+                const wb = XLSX.read(buffer, { type: "array" });
+                const ws = wb.Sheets[wb.SheetNames[0]];
+                const rows = XLSX.utils.sheet_to_json<PotionLevelRow>(ws);
+                const parsed: PotionLevelDefinition[] = rows
+                    .map((row) => ({
+                        level: Number(row.Level ?? row.level ?? 0) || 0,
+                        required: Number(row.Required ?? row.required ?? 0) || 0,
+                    }))
+                    .filter((row) => row.level > 0 && row.required > 0)
+                    .sort((a, b) => a.level - b.level);
+                setPotionLevels(parsed);
+            });
+    }, []);
+
     const player = useMemo(
-        () => resolvePlayerProgress(souls, playerLevel, levels, elements, currentHp),
-        [currentHp, elements, levels, playerLevel, souls],
+        () => resolvePlayerProgress(souls, playerLevel, levels, elements, currentHp, maxHpMultiplier),
+        [currentHp, elements, levels, maxHpMultiplier, playerLevel, souls],
     );
+
+    const potionRequired = useMemo(() => {
+        if (potionLevels.length === 0) return 4;
+        return potionLevels.find((r) => r.level === playerLevel)?.required ?? potionLevels[0].required;
+    }, [potionLevels, playerLevel]);
 
     const addSouls = useCallback((amount: number) => {
         const normalizedAmount = Math.max(0, amount);
@@ -255,21 +300,29 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
         const normalizedPower = Math.max(0, power);
         setCurrentHp((previousHp) => {
             const matchedLevel = resolveLevelForPlayer(playerLevel, levels);
-            const maxHp = matchedLevel?.hp ?? 0;
-            const startingHp = previousHp ?? maxHp;
+            const effectiveMaxHp = Math.round((matchedLevel?.hp ?? 0) * maxHpMultiplier);
+            const startingHp = previousHp ?? effectiveMaxHp;
             return Math.max(0, startingHp - normalizedPower);
         });
-    }, [levels, playerLevel]);
+    }, [levels, maxHpMultiplier, playerLevel]);
 
     const healPlayer = useCallback((amount: number) => {
         const normalizedAmount = Math.max(0, amount);
         setCurrentHp((previousHp) => {
             const matchedLevel = resolveLevelForPlayer(playerLevel, levels);
-            const maxHp = matchedLevel?.hp ?? 0;
-            const startingHp = previousHp ?? maxHp;
-            return Math.min(maxHp, startingHp + normalizedAmount);
+            const effectiveMaxHp = Math.round((matchedLevel?.hp ?? 0) * maxHpMultiplier);
+            const startingHp = previousHp ?? effectiveMaxHp;
+            return Math.min(effectiveMaxHp, startingHp + normalizedAmount);
         });
-    }, [levels, playerLevel]);
+    }, [levels, maxHpMultiplier, playerLevel]);
+
+    const drinkPotion = useCallback(() => {
+        const matchedLevel = resolveLevelForPlayer(playerLevel, levels);
+        const baseHp = matchedLevel?.hp ?? 0;
+        const newMaxHp = Math.round(baseHp * maxHpMultiplier * 1.5);
+        setMaxHpMultiplier((prev) => prev * 1.5);
+        setCurrentHp(newMaxHp);
+    }, [levels, maxHpMultiplier, playerLevel]);
 
     const applyTypeMultiplier = useCallback((type: string, multiplier: number) => {
         const normalized = type.trim().toLowerCase();
@@ -291,6 +344,10 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
         setBurnMultiplier((previous) => previous + (multiplier - 1));
     }, []);
 
+    const applyPotionBrewMultiplier = useCallback((multiplier: number) => {
+        setPotionBrewMultiplier((previous) => previous + (multiplier - 1));
+    }, []);
+
     const resetGame = useCallback(() => {
         setSouls(0);
         setElements([]);
@@ -301,9 +358,11 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
         setPlayerStatuses(DEFAULT_PLAYER_STATUSES);
         setPotionCount(0);
         setPotionFillPercent(0);
+        setMaxHpMultiplier(1);
         setShieldMultiplier(1);
         setSoakMultiplier(1);
         setBurnMultiplier(1);
+        setPotionBrewMultiplier(1);
     }, []);
 
     const addElement = useCallback((element: RewardElement) => {
@@ -339,12 +398,17 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             setPotionCount,
             potionFillPercent,
             setPotionFillPercent,
+            potionRequired,
+            drinkPotion,
+            maxHpMultiplier,
             shieldMultiplier,
             applyShieldMultiplier,
             soakMultiplier,
             applySoakMultiplier,
             burnMultiplier,
             applyBurnMultiplier,
+            potionBrewMultiplier,
+            applyPotionBrewMultiplier,
         }),
         [
             addSouls,
@@ -370,12 +434,17 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             setPotionCount,
             potionFillPercent,
             setPotionFillPercent,
+            potionRequired,
+            drinkPotion,
+            maxHpMultiplier,
             shieldMultiplier,
             applyShieldMultiplier,
             soakMultiplier,
             applySoakMultiplier,
             burnMultiplier,
             applyBurnMultiplier,
+            potionBrewMultiplier,
+            applyPotionBrewMultiplier,
         ],
     );
 
