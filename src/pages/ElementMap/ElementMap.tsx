@@ -78,24 +78,38 @@ export default function ElementMap() {
     const [sortKey, setSortKey] = useState<SortKey>("level");
     const [hoveredLetter, setHoveredLetter] = useState<string | null>(null);
     const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+    const [pinnedLetter, setPinnedLetter] = useState<string | null>(null);
+    const [pinnedAnchorEl, setPinnedAnchorEl] = useState<HTMLElement | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
     const [hiddenTypes, setHiddenTypes] = useState<Set<string>>(new Set());
+    const [ctrlHeld, setCtrlHeld] = useState(false);
     const nodeRefs = useRef<Map<string, HTMLDivElement>>(new Map());
     const svgRef = useRef<SVGSVGElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [, forceRedraw] = useState(0);
 
-    // Close on Escape
+    // Close on Escape / Ctrl+M; track Ctrl held for tooltip suppression
     useEffect(() => {
-        const handler = (e: KeyboardEvent) => {
+        const onDown = (e: KeyboardEvent) => {
+            if (e.key === "Control" || e.key === "Meta") setCtrlHeld(true);
             if (e.key === "Escape") navigate("/game");
             if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "m") {
                 e.preventDefault();
                 navigate("/game");
             }
         };
-        window.addEventListener("keydown", handler);
-        return () => window.removeEventListener("keydown", handler);
+        const onUp = (e: KeyboardEvent) => {
+            if (e.key === "Control" || e.key === "Meta") setCtrlHeld(false);
+        };
+        const onBlur = () => setCtrlHeld(false);
+        window.addEventListener("keydown", onDown);
+        window.addEventListener("keyup", onUp);
+        window.addEventListener("blur", onBlur);
+        return () => {
+            window.removeEventListener("keydown", onDown);
+            window.removeEventListener("keyup", onUp);
+            window.removeEventListener("blur", onBlur);
+        };
     }, [navigate]);
 
     // Load elements.xlsx
@@ -162,17 +176,55 @@ export default function ElementMap() {
     // Filter
     const filteredNodes = useMemo(() => {
         const q = searchQuery.trim().toLowerCase();
-        return nodes.filter((n) => {
+
+        const typeFilter = (n: ElementNode) => {
             const primaryType = n.type1 || n.type2 || "";
-            if (hiddenTypes.size > 0 && primaryType && hiddenTypes.has(primaryType)) return false;
-            if (!q) return true;
-            return (
-                n.letter.toLowerCase().includes(q) ||
-                normalizeType(n.type1).includes(q) ||
-                normalizeType(n.type2).includes(q)
-            );
-        });
-    }, [nodes, searchQuery, hiddenTypes]);
+            return !(hiddenTypes.size > 0 && primaryType && hiddenTypes.has(primaryType));
+        };
+
+        if (!q) return nodes.filter(typeFilter);
+
+        // Find direct matches first
+        const directMatches = new Set(
+            nodes
+                .filter((n) =>
+                    n.letter.toLowerCase().includes(q) ||
+                    normalizeType(n.type1).includes(q) ||
+                    normalizeType(n.type2).includes(q),
+                )
+                .map((n) => normalizeElementName(n.letter)),
+        );
+
+        // Walk ancestors (ingredients) and descendants (products) transitively
+        const related = new Set(directMatches);
+
+        const addAncestors = (key: string) => {
+            for (const r of recipes) {
+                if (normalizeElementName(r.result) === key) {
+                    const k1 = normalizeElementName(r.element1);
+                    const k2 = normalizeElementName(r.element2);
+                    if (!related.has(k1)) { related.add(k1); addAncestors(k1); }
+                    if (!related.has(k2)) { related.add(k2); addAncestors(k2); }
+                }
+            }
+        };
+
+        const addDescendants = (key: string) => {
+            for (const r of recipes) {
+                if (normalizeElementName(r.element1) === key || normalizeElementName(r.element2) === key) {
+                    const rk = normalizeElementName(r.result);
+                    if (!related.has(rk)) { related.add(rk); addDescendants(rk); }
+                }
+            }
+        };
+
+        for (const key of directMatches) {
+            addAncestors(key);
+            addDescendants(key);
+        }
+
+        return nodes.filter((n) => typeFilter(n) && related.has(normalizeElementName(n.letter)));
+    }, [nodes, recipes, searchQuery, hiddenTypes]);
 
     // Group by level then sort within group
     const levelGroups = useMemo(() => {
@@ -210,10 +262,14 @@ export default function ElementMap() {
         return Math.max(600, ROW_PADDING_TOP * 2 + rows * (NODE_H + ROW_GAP));
     }, [levelGroups]);
 
-    // Which elements are connected to hovered node
+    // Hover takes priority over pin; active letter drives highlighting and tooltip
+    const activeLetter = hoveredLetter ?? pinnedLetter;
+    const activeAnchorEl = hoveredLetter ? anchorEl : pinnedAnchorEl;
+
+    // Which elements are connected to active (hovered or pinned) node
     const connectedLetters = useMemo(() => {
-        if (!hoveredLetter) return new Set<string>();
-        const key = normalizeElementName(hoveredLetter);
+        if (!activeLetter) return new Set<string>();
+        const key = normalizeElementName(activeLetter);
         const set = new Set<string>();
         for (const r of recipes) {
             const rKey = normalizeElementName(r.result);
@@ -226,7 +282,21 @@ export default function ElementMap() {
             }
         }
         return set;
-    }, [hoveredLetter, recipes]);
+    }, [activeLetter, recipes]);
+
+    // Upstream-only connections for pin: just the ingredients that produce the pinned element
+    const pinnedConnections = useMemo(() => {
+        if (!pinnedLetter) return new Set<string>();
+        const key = normalizeElementName(pinnedLetter);
+        const set = new Set<string>();
+        for (const r of recipes) {
+            if (normalizeElementName(r.result) === key) {
+                set.add(normalizeElementName(r.element1));
+                set.add(normalizeElementName(r.element2));
+            }
+        }
+        return set;
+    }, [pinnedLetter, recipes]);
 
     // Build SVG edges
     const edges = useMemo(() => {
@@ -265,7 +335,21 @@ export default function ElementMap() {
         setAnchorEl(null);
     }, []);
 
-    const hoveredNode = hoveredLetter ? nodeMap.get(normalizeElementName(hoveredLetter)) ?? null : null;
+    const handleNodeClick = useCallback((letter: string, el: HTMLDivElement) => {
+        setPinnedLetter((prev) => {
+            const key = normalizeElementName(letter);
+            if (prev !== null && normalizeElementName(prev) === key) {
+                setPinnedAnchorEl(null);
+                return null;
+            }
+            setPinnedAnchorEl(el);
+            return letter;
+        });
+    }, []);
+
+    // Hover takes priority over pin for tooltip anchor; pin persists when not hovering
+    const activeNode = activeLetter ? nodeMap.get(normalizeElementName(activeLetter)) ?? null : null;
+    const hoveredNode = activeNode;
 
     const SORT_LABELS: { key: SortKey; label: string }[] = [
         { key: "level", label: "Level" },
@@ -307,7 +391,11 @@ export default function ElementMap() {
 
             {/* ── Scroll canvas ── */}
             <div className="em-scroll-area" ref={containerRef}>
-                <div className="em-canvas" style={{ width: canvasW, height: canvasH }}>
+                <div
+                    className="em-canvas"
+                    style={{ width: canvasW, height: canvasH }}
+                    onClick={() => { setPinnedLetter(null); setPinnedAnchorEl(null); }}
+                >
                     {/* SVG layer: connection lines */}
                     <svg
                         ref={svgRef}
@@ -325,16 +413,24 @@ export default function ElementMap() {
                             const rKey = normalizeElementName(edge.r);
                             const e1Key = normalizeElementName(edge.e1);
                             const e2Key = normalizeElementName(edge.e2);
-                            const isHighlighted =
-                                hoveredLetter !== null &&
-                                (connectedLetters.has(rKey) || connectedLetters.has(e1Key) || connectedLetters.has(e2Key)) &&
-                                (
-                                    normalizeElementName(hoveredLetter) === rKey ||
-                                    normalizeElementName(hoveredLetter) === e1Key ||
-                                    normalizeElementName(hoveredLetter) === e2Key
+
+                            // When hovering: highlight edges touching the hovered node (all directions)
+                            // When pinned (no hover): highlight only edges where result === pinned node
+                            let isHighlighted = false;
+                            if (hoveredLetter !== null) {
+                                const hKey = normalizeElementName(hoveredLetter);
+                                isHighlighted = (
+                                    (rKey === hKey || e1Key === hKey || e2Key === hKey) &&
+                                    (connectedLetters.has(rKey) || connectedLetters.has(e1Key) || connectedLetters.has(e2Key))
                                 );
-                            const isDimmed = hoveredLetter !== null && !isHighlighted;
-                            const opacity = isDimmed ? 0.06 : isHighlighted ? 0.85 : 0.18;
+                            } else if (pinnedLetter !== null) {
+                                const pKey = normalizeElementName(pinnedLetter);
+                                isHighlighted = rKey === pKey;
+                            }
+
+                            const hasActive = hoveredLetter !== null || pinnedLetter !== null;
+                            const isDimmedEdge = hasActive && !isHighlighted;
+                            const opacity = isDimmedEdge ? 0.06 : isHighlighted ? 0.85 : 0.18;
                             const strokeW = isHighlighted ? 2 : 1;
                             const color = isHighlighted ? "#88cfff" : "rgba(255,255,255,0.7)";
 
@@ -382,9 +478,12 @@ export default function ElementMap() {
                     {levelGroups.map(([lvl, group], rowIdx) =>
                         group.map((node, colIdx) => {
                             const nodeKey = normalizeElementName(node.letter);
-                            const isHovered = hoveredLetter !== null && normalizeElementName(hoveredLetter) === nodeKey;
-                            const isConnected = hoveredLetter !== null && connectedLetters.has(nodeKey);
-                            const isDimmed = hoveredLetter !== null && !isConnected;
+                            const isPinned = pinnedLetter !== null && normalizeElementName(pinnedLetter) === nodeKey;
+                            // When hovering: show all direct connections; when pinned: upstream ingredients only
+                            const activeConnections = hoveredLetter ? connectedLetters : pinnedConnections;
+                            const isActive = activeLetter !== null && normalizeElementName(activeLetter) === nodeKey;
+                            const isConnected = activeLetter !== null && activeConnections.has(nodeKey);
+                            const isDimmed = activeLetter !== null && !isActive && !isConnected;
                             const primaryType = node.type1 || node.type2;
 
                             const x = ROW_PADDING_LEFT + colIdx * (NODE_W + COL_GAP);
@@ -406,16 +505,18 @@ export default function ElementMap() {
                                     className={[
                                         "em-node",
                                         typeColorClass(primaryType),
-                                        isHovered ? "is-hovered" : "",
-                                        isConnected && !isHovered ? "is-connected" : "",
+                                        isActive ? "is-hovered" : "",
+                                        isPinned && !isActive ? "is-pinned" : "",
+                                        isConnected && !isActive ? "is-connected" : "",
                                         isDimmed ? "is-dimmed" : "",
                                     ]
                                         .filter(Boolean)
                                         .join(" ")}
-                                    style={{ left: x, top: y, width: NODE_W, height: NODE_H }}
+                                    style={{ left: x, top: y, width: NODE_W, height: NODE_H, cursor: "pointer" }}
                                     ref={(el) => setNodeRef(node.letter, el)}
                                     onMouseEnter={(e) => handleNodeEnter(node.letter, e.currentTarget)}
                                     onMouseLeave={handleNodeLeave}
+                                    onClick={(e) => { e.stopPropagation(); handleNodeClick(node.letter, e.currentTarget); }}
                                     title={`${node.letter} | Uses: ${ingredients.length} recipe(s) | Used in: ${products.length} recipe(s)`}
                                 >
                                     <div className="em-node__icon">
@@ -425,7 +526,7 @@ export default function ElementMap() {
                                     {node.damage > 0 ? (
                                         <div className="em-node__damage">{node.damage}</div>
                                     ) : null}
-                                    {isConnected && !isHovered ? (
+                                    {isConnected && !isActive ? (
                                         <div className="em-node__recipe-count">
                                             {ingredients.length > 0 ? `↙${ingredients.length}` : ""}
                                             {products.length > 0 ? ` ↗${products.length}` : ""}
@@ -468,9 +569,9 @@ export default function ElementMap() {
             </div>
 
             {/* ── Floating tooltip ── */}
-            {hoveredNode ? (
+            {hoveredNode && ctrlHeld ? (
                 <FloatingTooltip
-                    anchorElement={anchorEl}
+                    anchorElement={activeAnchorEl}
                     open={hoveredNode !== null}
                     className="drag-description-popup"
                     clampHorizontal={true}
