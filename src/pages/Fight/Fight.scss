@@ -486,7 +486,7 @@
     .event-log-panel {
         position: fixed;
         right: clamp(0.55rem, 2vw, 1.2rem);
-        bottom: clamp(0.55rem, 2vw, 1.2rem);
+        top: clamp(0.55rem, 2vw, 1.2rem);
         width: min(22.5rem, calc(100vw - 1.1rem));
         max-height: min(36vh, 17rem);
         display: flex;

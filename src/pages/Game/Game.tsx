@@ -235,6 +235,8 @@ function Game() {
         setSelectedEnemy: setNextEnemy,
         applyTypeMultiplier,
         typeMultipliers,
+        monsterSoulsFed: soulsFed,
+        setMonsterSoulsFed: setSoulsFed,
     } = usePlayer();
     const gameRef = useRef<HTMLDivElement | null>(null);
     const elementStartRef = useRef<HTMLDivElement | null>(null);
@@ -261,7 +263,6 @@ function Game() {
     const [feedAnimations, setFeedAnimations] = useState<number[]>([]);
     const [eyesFlashRevision, setEyesFlashRevision] = useState(0);
     const [monsterThresholds, setMonsterThresholds] = useState<MonsterRewardThreshold[]>([]);
-    const [soulsFed, setSoulsFed] = useState(0);
     const [rewardGlowRevision, setRewardGlowRevision] = useState(0);
     const [pendingUpgradeRewards, setPendingUpgradeRewards] = useState<MonsterReward[] | null>(null);
     const [hasSeenDragTutorial, setHasSeenDragTutorial] = useState(() => {
@@ -536,10 +537,11 @@ function Game() {
         const step = 44;
         const padding = 10;
         const columns = Math.max(1, Math.floor((startRect.width - padding * 2) / step));
+        const row = Math.floor(index / columns);
 
         return {
             x: startRect.left - containerRect.left + padding + (index % columns) * step,
-            y: startRect.top - containerRect.top + padding + Math.floor(index / columns) * step,
+            y: startRect.bottom - containerRect.top - padding - step - row * step,
         };
     };
 
@@ -1847,85 +1849,91 @@ function Game() {
                 </>
             ) : null}
 
-            <div className="element-start" ref={elementStartRef}></div>
-            <div className="game-controls-stack">
-                <div className="combination-station">
-                    <div className="combination-equation">
-                        <div className="drop-zone-area">
-                            <div className={`drop-zone ${hasStartedDraggingElement && !hasSeenDropZoneOneTutorial ? "is-discoverable" : ""}`} ref={dropZoneRefA}>1</div>
-                            <div>+</div>
-                            <div className="drop-zone" ref={dropZoneRefB}>2</div>
-                            {zoneOccupants.length === 3 ? (
-                                <>
-                                    <div>+</div>
-                                    <div className="drop-zone" ref={dropZoneRefC}>3</div>
-                                </>
-                            ) : null}
-                            <div>=</div>
+            <div className="game-scene-row">
+                <div className="game-scene-col game-scene-col--left">
+                    {Object.keys(typeMultipliers).length > 0 ? (
+                        <div className="upgrades-panel" aria-label="Active upgrades">
+                            <div className="upgrades-panel-title">Upgrades</div>
+                            <ul className="upgrades-panel-list">
+                                {Object.entries(typeMultipliers).map(([type, mult]) => (
+                                    <li key={type} className={`upgrades-panel-item type-${type}`}>
+                                        <span className="upgrades-item-type">{type}</span>
+                                        <span className="upgrades-item-value">×{mult.toFixed(1)}</span>
+                                    </li>
+                                ))}
+                            </ul>
                         </div>
-                        <div className="output" ref={outputRef} />
+                    ) : null}
+                </div>
+                <div className="game-controls-stack">
+                    <div className="element-start" ref={elementStartRef}></div>
+                    <div className="combination-station">
+                        <div className="combination-equation">
+                            <div className="drop-zone-area">
+                                <div className={`drop-zone ${hasStartedDraggingElement && !hasSeenDropZoneOneTutorial ? "is-discoverable" : ""}`} ref={dropZoneRefA}>1</div>
+                                <div>+</div>
+                                <div className="drop-zone" ref={dropZoneRefB}>2</div>
+                                {zoneOccupants.length === 3 ? (
+                                    <>
+                                        <div>+</div>
+                                        <div className="drop-zone" ref={dropZoneRefC}>3</div>
+                                    </>
+                                ) : null}
+                                <div>=</div>
+                            </div>
+                            <div className="output" ref={outputRef} />
+                        </div>
+
+                        <div className={`combine-button-wrap ${!canCombine ? "is-disabled" : ""}`}>
+                            <button className="combine-button" disabled={!canCombine} onClick={handleCombine}>
+                                COMBINE!
+                            </button>
+                            <div className="combine-button-tooltip" role="tooltip">
+                                Please insert two base elements to start combining
+                            </div>
+                        </div>
                     </div>
 
-                    <div className={`combine-button-wrap ${!canCombine ? "is-disabled" : ""}`}>
-                        <button className="combine-button" disabled={!canCombine} onClick={handleCombine}>
-                            COMBINE!
+                    <div className="battle-station">
+                        <button className="fight-button" onClick={handleFight}>
+                            FIGHT!
                         </button>
-                        <div className="combine-button-tooltip" role="tooltip">
-                            Please insert two base elements to start combining
-                        </div>
+                        <button className="feed-button" onClick={handleFeedClick}>
+                            FEED
+                        </button>
+                        <PlayerStats
+                            playerName={playerName}
+                            level={playerProgress.level}
+                            hp={playerProgress.hp}
+                            potionCount={potionCount}
+                            potionFillPercent={potionFillPercent}
+                            onPotionClick={handlePotionClick}
+                            isPotionUnavailableFeedback={isPotionUnavailableFeedback}
+                            isPotionBrewedFlash={isPotionBrewedFlash}
+                            souls={playerProgress.souls}
+                            className={`player-stats-dock${isSoulCounterPopping ? " is-soul-counter-pop" : ""}`}
+                        />
                     </div>
                 </div>
-
-                <div className="battle-station">
-                    <button className="fight-button" onClick={handleFight}>
-                        FIGHT!
-                    </button>
-                    <button className="feed-button" onClick={handleFeedClick}>
-                        FEED
-                    </button>
-                    <PlayerStats
-                        playerName={playerName}
-                        level={playerProgress.level}
-                        hp={playerProgress.hp}
-                        potionCount={potionCount}
-                        potionFillPercent={potionFillPercent}
-                        onPotionClick={handlePotionClick}
-                        isPotionUnavailableFeedback={isPotionUnavailableFeedback}
-                        isPotionBrewedFlash={isPotionBrewedFlash}
-                        souls={playerProgress.souls}
-                        className={`player-stats-dock${isSoulCounterPopping ? " is-soul-counter-pop" : ""}`}
-                    />
+                <div className="game-scene-col game-scene-col--right">
+                    <div className="game-enemy-card">
+                        <div className="next-enemy-text">Next Enemy</div>
+                        <div className="game-enemy-card-header">
+                            <div className="game-enemy-card-name">{nextEnemy?.name ?? "Unknown Enemy"}</div>
+                        </div>
+                        <EnemyStage
+                            className="game-enemy-stage"
+                            enemyName={nextEnemy?.name ?? "Unknown Enemy"}
+                            spritePath={nextEnemy?.sprite ?? ""}
+                            enemyHealth={nextEnemy?.hp ?? 0}
+                            enemyMaxHp={nextEnemy?.hp ?? 0}
+                            weaknesses={nextEnemy?.weaknesses ?? []}
+                            elements={nextEnemy?.elements ?? []}
+                            souls={nextEnemy?.souls ?? 0}
+                        />
+                        <div className="game-enemy-card-footer">Hover for details</div>
+                    </div>
                 </div>
-            </div>
-            {Object.keys(typeMultipliers).length > 0 ? (
-                <div className="upgrades-panel" aria-label="Active upgrades">
-                    <div className="upgrades-panel-title">Upgrades</div>
-                    <ul className="upgrades-panel-list">
-                        {Object.entries(typeMultipliers).map(([type, mult]) => (
-                            <li key={type} className={`upgrades-panel-item type-${type}`}>
-                                <span className="upgrades-item-type">{type}</span>
-                                <span className="upgrades-item-value">×{mult.toFixed(1)}</span>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            ) : null}
-            <div className="game-enemy-card">
-                <div className="next-enemy-text">Next Enemy</div>
-                <div className="game-enemy-card-header">
-                    <div className="game-enemy-card-name">{nextEnemy?.name ?? "Unknown Enemy"}</div>
-                </div>
-                <EnemyStage
-                    className="game-enemy-stage"
-                    enemyName={nextEnemy?.name ?? "Unknown Enemy"}
-                    spritePath={nextEnemy?.sprite ?? ""}
-                    enemyHealth={nextEnemy?.hp ?? 0}
-                    enemyMaxHp={nextEnemy?.hp ?? 0}
-                    weaknesses={nextEnemy?.weaknesses ?? []}
-                    elements={nextEnemy?.elements ?? []}
-                    souls={nextEnemy?.souls ?? 0}
-                />
-                <div className="game-enemy-card-footer">Hover for details</div>
             </div>
             {isDevElementPanelOpen ? (
                 <aside className="dev-element-panel" aria-label="Developer element panel">
@@ -1977,6 +1985,7 @@ function Game() {
                         <div
                             key={rewardGlowRevision > 0 ? rewardGlowRevision : eyesFlashRevision}
                             className={`feed-eyes-inner${rewardGlowRevision > 0 ? " is-reward-glow" : eyesFlashRevision > 0 ? " is-soul-flash" : ""}`}
+                            style={{ ["--upgrade-count" as string]: Object.keys(typeMultipliers).length }}
                         >
                             <span className="game-intro-eye game-intro-eye--left" />
                             <span className="game-intro-eye game-intro-eye--right" />

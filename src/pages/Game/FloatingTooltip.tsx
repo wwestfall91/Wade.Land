@@ -29,6 +29,7 @@ type FloatingTooltipProps = {
         effects?: SpellEffectConfig[];
         level?: number;
     };
+    typeMultipliers?: Record<string, number>;
     offset?: number;
     viewportPadding?: number;
     clampHorizontal?: boolean;
@@ -49,6 +50,7 @@ function FloatingTooltip({
     className,
     children,
     elementDetails,
+    typeMultipliers,
     offset = 8,
     viewportPadding = 8,
     clampHorizontal = true,
@@ -158,6 +160,18 @@ function FloatingTooltip({
     const primaryBadgeLabel = elementDetails?.level === 2 ? "SPELL" : "ELEMENT";
     const primaryBadgeClass = elementDetails?.level === 2 ? "tooltip-badge-spell" : "";
 
+    const baseDamage = elementDetails?.damage ?? 0;
+    const masteryMultiplier = elementDetails && typeMultipliers
+        ? Math.max(
+            ...[elementDetails.type1, elementDetails.type2]
+                .filter((t): t is string => Boolean(t?.trim()))
+                .map(t => typeMultipliers[t.trim().toLowerCase()] ?? 1),
+            1,
+        )
+        : 1;
+    const finalDamage = Math.round(baseDamage * masteryMultiplier);
+    const masteryBonus = finalDamage - baseDamage;
+
     return createPortal(
         <div
             ref={tooltipRef}
@@ -198,8 +212,14 @@ function FloatingTooltip({
 
                         <span className="damage-details">
                             <span className="damage-label">Damage:</span>
-                            <span className="damage-value">{elementDetails.damage}</span>
+                            <span className="damage-value">{finalDamage}</span>
                         </span>
+                        {masteryBonus > 0 ? (
+                            <span className="damage-mastery-breakdown">
+                                <span className="damage-base">base {baseDamage}</span>
+                                <span className="damage-bonus">+{masteryBonus} mastery</span>
+                            </span>
+                        ) : null}
 
                         {effectLines.length > 0 ? (
                             <span className="effects-details">Effects:

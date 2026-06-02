@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { SpellEffectConfig } from "../../combat/spellEffects";
 import FloatingTooltip from "./FloatingTooltip";
 import ElementIcon from "../../components/ElementIcon";
+import { usePlayer } from "../../context/PlayerContext";
 import "./Draggable.scss";
 
 type Position = {
@@ -50,6 +51,7 @@ function Draggable({
 	isNewFromChest = false,
 	forcedSnapZone = null,
 }: Props) {
+	const { typeMultipliers } = usePlayer();
 	const [isDragging, setIsDragging] = useState(false);
 	const [hasBeenDragged, setHasBeenDragged] = useState(false);
 	const [isInvalidDrop, setIsInvalidDrop] = useState(false);
@@ -201,6 +203,7 @@ function Draggable({
 				left: position.x,
 				cursor: isDragging ? "grabbing" : "grab",
 				userSelect: "none",
+				zIndex:8999
 			}}
 		>
 			<FloatingTooltip
@@ -208,6 +211,7 @@ function Draggable({
 			open={isHovered && !isDragging}
 				className="drag-description-popup"
 				clampHorizontal={false}
+				typeMultipliers={typeMultipliers}
 				elementDetails={{
 					letter,
 					damage,

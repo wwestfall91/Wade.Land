@@ -71,6 +71,8 @@ type PlayerContextValue = {
     setSelectedEnemy: (enemy: SelectedEnemy | null) => void;
     typeMultipliers: Record<string, number>;
     applyTypeMultiplier: (type: string, multiplier: number) => void;
+    monsterSoulsFed: number;
+    setMonsterSoulsFed: (amount: number) => void;
 };
 
 const DEFAULT_PLAYER_PROGRESS: PlayerProgress = {
@@ -153,6 +155,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
     const [playerName, setPlayerNameState] = useState(() => readCookie(PLAYER_NAME_COOKIE));
     const [selectedEnemy, setSelectedEnemy] = useState<SelectedEnemy | null>(null);
     const [typeMultipliers, setTypeMultipliers] = useState<Record<string, number>>({});
+    const [monsterSoulsFed, setMonsterSoulsFed] = useState(0);
 
     useEffect(() => {
         fetch("/levels.xlsx")
@@ -237,7 +240,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
         const normalized = type.trim().toLowerCase();
         setTypeMultipliers((previous) => ({
             ...previous,
-            [normalized]: Math.max(multiplier, previous[normalized] ?? 1),
+            [normalized]: (previous[normalized] ?? 1) + (multiplier - 1),
         }));
     }, []);
 
@@ -247,6 +250,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
         setCurrentHp(null);
         setSelectedEnemy(null);
         setTypeMultipliers({});
+        setMonsterSoulsFed(0);
     }, []);
 
     const addElement = useCallback((element: RewardElement) => {
@@ -274,6 +278,8 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             setSelectedEnemy,
             typeMultipliers,
             applyTypeMultiplier,
+            monsterSoulsFed,
+            setMonsterSoulsFed,
         }),
         [
             addSouls,
@@ -291,6 +297,8 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             setPlayerName,
             typeMultipliers,
             applyTypeMultiplier,
+            monsterSoulsFed,
+            setMonsterSoulsFed,
         ],
     );
 

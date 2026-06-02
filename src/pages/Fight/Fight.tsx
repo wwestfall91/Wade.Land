@@ -1453,6 +1453,7 @@ function Fight() {
                                 open={hoveredSpellId === spell.id}
                                 className="drag-description-popup"
                                 clampHorizontal={false}
+                                typeMultipliers={typeMultipliers}
                                 elementDetails={{
                                     letter: spell.letter,
                                     damage: spell.damage,
@@ -1469,7 +1470,14 @@ function Fight() {
                                 <ElementIcon name={spell.letter} />
                             </div>
                             <div className="spell-card-name">{spell.letter}</div>
-                            <div className="spell-card-damage">{spell.damage}</div>
+                            <div className="spell-card-damage">
+                                {Math.round(spell.damage * Math.max(
+                                    ...[spell.type1, spell.type2]
+                                        .filter((t): t is string => Boolean(t?.trim()))
+                                        .map(t => typeMultipliers[normalizeType(t)] ?? 1),
+                                    1,
+                                ))}
+                            </div>
                         </button>
                     ))}
                 </div>
