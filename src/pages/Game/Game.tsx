@@ -444,6 +444,17 @@ function Game() {
     }, [clearSoulAnimationTimeouts]);
 
     useEffect(() => {
+        const handler = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "m") {
+                e.preventDefault();
+                navigate("/element-map");
+            }
+        };
+        window.addEventListener("keydown", handler);
+        return () => window.removeEventListener("keydown", handler);
+    }, [navigate]);
+
+    useEffect(() => {
         const state = location.state as GameLocationState | null;
         if (state?.fightReward) {
             if (rewardCueTimeoutRef.current !== null) {

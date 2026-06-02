@@ -1,0 +1,377 @@
+.element-map-root {
+    display: flex;
+    flex-direction: column;
+    width: 100vw;
+    height: 100vh;
+    background: linear-gradient(160deg, #0d1030 0%, #14193e 60%, #0a1520 100%);
+    font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+    color: #e4e9ff;
+    overflow: hidden;
+    position: relative;
+}
+
+// ─── Toolbar ─────────────────────────────────────────────────────────────────
+
+.em-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.5rem 0.9rem;
+    background: rgba(10, 14, 48, 0.9);
+    border-bottom: 1px solid rgba(100, 120, 255, 0.28);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    z-index: 10;
+}
+
+.em-close-btn {
+    background: rgba(255, 80, 80, 0.18);
+    border: 1px solid rgba(255, 100, 100, 0.4);
+    border-radius: 6px;
+    color: #ffaaaa;
+    font-size: 0.82rem;
+    font-weight: 700;
+    padding: 0.22rem 0.52rem;
+    cursor: pointer;
+    transition: background 120ms ease;
+
+    &:hover {
+        background: rgba(255, 80, 80, 0.38);
+    }
+}
+
+.em-title {
+    font-size: 1rem;
+    font-weight: 800;
+    color: #c8d4ff;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-right: 0.4rem;
+}
+
+.em-sort-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    margin-right: 0.2rem;
+}
+
+.em-sort-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: rgba(180, 190, 255, 0.6);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.em-sort-btn {
+    background: rgba(60, 80, 200, 0.2);
+    border: 1px solid rgba(100, 130, 255, 0.3);
+    border-radius: 5px;
+    color: rgba(200, 210, 255, 0.8);
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 0.2rem 0.52rem;
+    cursor: pointer;
+    transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+    letter-spacing: 0.04em;
+
+    &:hover {
+        background: rgba(80, 110, 230, 0.35);
+        color: #fff;
+    }
+
+    &.is-active {
+        background: rgba(80, 120, 255, 0.55);
+        border-color: rgba(140, 170, 255, 0.7);
+        color: #ffffff;
+        box-shadow: 0 0 0.4rem rgba(100, 140, 255, 0.4);
+    }
+}
+
+.em-search {
+    background: rgba(20, 30, 80, 0.7);
+    border: 1px solid rgba(100, 130, 255, 0.35);
+    border-radius: 6px;
+    color: #e0e8ff;
+    font-size: 0.76rem;
+    padding: 0.24rem 0.6rem;
+    outline: none;
+    min-width: 11rem;
+    transition: border-color 120ms ease;
+
+    &::placeholder {
+        color: rgba(150, 170, 255, 0.4);
+    }
+
+    &:focus {
+        border-color: rgba(140, 170, 255, 0.7);
+    }
+}
+
+.em-hint {
+    margin-left: auto;
+    font-size: 0.62rem;
+    color: rgba(150, 165, 220, 0.45);
+    letter-spacing: 0.04em;
+}
+
+// ─── Scroll area ─────────────────────────────────────────────────────────────
+
+.em-scroll-area {
+    flex: 1;
+    overflow: auto;
+    position: relative;
+
+    &::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+
+    &::-webkit-scrollbar-track {
+        background: rgba(10, 14, 48, 0.5);
+    }
+
+    &::-webkit-scrollbar-thumb {
+        background: rgba(80, 100, 200, 0.45);
+        border-radius: 4px;
+
+        &:hover {
+            background: rgba(100, 130, 255, 0.6);
+        }
+    }
+}
+
+.em-canvas {
+    position: relative;
+}
+
+.em-svg {
+    overflow: visible;
+}
+
+// ─── Row headers ──────────────────────────────────────────────────
+
+.em-row-header {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    font-size: 0.64rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(160, 180, 255, 0.55);
+    width: 60px;
+    pointer-events: none;
+}
+
+// ─── Nodes ────────────────────────────────────────────────────────────────────
+
+.em-node {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    border: 2px solid rgba(150, 170, 255, 0.25);
+    background: linear-gradient(180deg, rgba(40, 55, 160, 0.85) 0%, rgba(22, 32, 110, 0.9) 100%);
+    box-shadow:
+        inset 0 0 0 1px rgba(160, 180, 255, 0.1),
+        0 4px 10px rgba(0, 0, 0, 0.35);
+    cursor: default;
+    transition:
+        opacity 140ms ease,
+        transform 140ms ease,
+        border-color 140ms ease,
+        box-shadow 140ms ease;
+    user-select: none;
+    overflow: visible;
+    gap: 1px;
+
+    &.is-hovered {
+        transform: scale(1.12);
+        z-index: 50;
+        border-color: rgba(200, 220, 255, 0.85);
+        box-shadow:
+            inset 0 0 0 1px rgba(200, 220, 255, 0.3),
+            0 0 1rem rgba(120, 160, 255, 0.5),
+            0 6px 16px rgba(0, 0, 0, 0.45);
+    }
+
+    &.is-connected {
+        border-color: rgba(120, 200, 255, 0.6);
+        box-shadow:
+            inset 0 0 0 1px rgba(120, 200, 255, 0.2),
+            0 0 0.6rem rgba(80, 170, 255, 0.3);
+    }
+
+    &.is-dimmed {
+        opacity: 0.2;
+    }
+}
+
+.em-node__icon {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+
+    img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        image-rendering: auto;
+        filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.6));
+    }
+}
+
+.em-node__name {
+    font-size: 0.5rem;
+    font-weight: 700;
+    color: rgba(220, 230, 255, 0.82);
+    text-align: center;
+    line-height: 1.1;
+    padding: 0 3px;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    letter-spacing: 0.02em;
+}
+
+.em-node__damage {
+    font-size: 0.48rem;
+    font-weight: 800;
+    color: rgba(255, 210, 100, 0.82);
+    font-variant-numeric: tabular-nums;
+}
+
+.em-node__recipe-count {
+    font-size: 0.44rem;
+    font-weight: 700;
+    color: rgba(140, 210, 255, 0.7);
+    white-space: nowrap;
+}
+
+// ─── Type colour variants ─────────────────────────────────────────────────────
+
+@mixin em-type($border-color, $bg-from, $bg-to) {
+    border-color: rgba($border-color, 0.45);
+    background: linear-gradient(180deg, rgba($bg-from, 0.88) 0%, rgba($bg-to, 0.92) 100%);
+
+    &.is-hovered {
+        border-color: rgba($border-color, 0.95);
+        box-shadow:
+            inset 0 0 0 1px rgba($border-color, 0.3),
+            0 0 1rem rgba($bg-from, 0.55),
+            0 6px 16px rgba(0, 0, 0, 0.45);
+    }
+
+    &.is-connected {
+        border-color: rgba($border-color, 0.7);
+    }
+}
+
+.em-node--fire    { @include em-type(#ff8060, #8b2f11, #b44620); }
+.em-node--water   { @include em-type(#60bfff, #124071, #267dc1); }
+.em-node--earth   { @include em-type(#c8a870, #5b4027, #8d6642); }
+.em-node--air     { @include em-type(#a0d8ee, #5e8fa6, #8ec1d4); }
+.em-node--lightning { @include em-type(#ffd830, #716305, #b1910e); }
+.em-node--steel   { @include em-type(#b0c4de, #465a6e, #64849b); }
+.em-node--leaf    { @include em-type(#80dd80, #235a23, #378c37); }
+.em-node--ice     { @include em-type(#a0e8f8, #2b7d95, #3ea7bf); }
+.em-node--arcane  { @include em-type(#d07ccc, #7d3e63, #b86593); }
+.em-node--light   { @include em-type(#ffe066, #8d7623, #b49a39); }
+.em-node--dark    { @include em-type(#9978cc, #3c3354, #5f5678); }
+.em-node--none    { /* default blue */ }
+
+// ─── Legend ───────────────────────────────────────────────────────────────────
+
+.em-legend {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.9rem;
+    background: rgba(8, 12, 40, 0.85);
+    border-top: 1px solid rgba(80, 100, 200, 0.22);
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+
+.em-legend-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.14rem 0.44rem;
+    border-radius: 999px;
+    font-size: 0.6rem;
+    font-weight: 700;
+    font-family: inherit;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    opacity: 0.85;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: opacity 120ms ease, filter 120ms ease, transform 80ms ease;
+
+    &:hover {
+        opacity: 1;
+        filter: brightness(1.2);
+        transform: scale(1.08);
+    }
+
+    &:active {
+        transform: scale(0.96);
+    }
+
+    &.is-hidden {
+        opacity: 0.22;
+        filter: grayscale(0.8);
+
+        &:hover {
+            opacity: 0.55;
+            filter: grayscale(0.4);
+        }
+    }
+}
+
+.em-legend-reset {
+    background: rgba(255, 80, 80, 0.14);
+    border: 1px solid rgba(255, 100, 100, 0.35);
+    border-radius: 999px;
+    color: #ffaaaa;
+    font-family: inherit;
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 0.14rem 0.5rem;
+    cursor: pointer;
+    margin-left: 0.2rem;
+    transition: background 120ms ease, opacity 120ms ease;
+    opacity: 0.8;
+
+    &:hover {
+        background: rgba(255, 80, 80, 0.3);
+        opacity: 1;
+    }
+}
+
+// ─── Stats bar ────────────────────────────────────────────────────────────────
+
+.em-stats-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.22rem 0.9rem;
+    background: rgba(6, 10, 36, 0.9);
+    border-top: 1px solid rgba(60, 80, 180, 0.2);
+    font-size: 0.65rem;
+    color: rgba(150, 170, 220, 0.6);
+    flex-shrink: 0;
+    letter-spacing: 0.03em;
+}
