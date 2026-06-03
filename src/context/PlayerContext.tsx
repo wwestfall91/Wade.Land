@@ -97,6 +97,8 @@ type PlayerContextValue = {
     healPlayer: (amount: number) => void;
     resetGame: () => void;
     addElement: (element: RewardElement) => void;
+    discoveredCraftedLetters: Set<string>;
+    addDiscoveredCraftedLetter: (letter: string) => void;
     selectedEnemy: SelectedEnemy | null;
     setSelectedEnemy: (enemy: SelectedEnemy | null) => void;
     typeMultipliers: Record<string, number>;
@@ -211,6 +213,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
     const [potionLevels, setPotionLevels] = useState<PotionLevelDefinition[]>([]);
     const [maxHpMultiplier, setMaxHpMultiplier] = useState(1);
     const [shieldMultiplier, setShieldMultiplier] = useState(1);
+    const [discoveredCraftedLetters, setDiscoveredCraftedLetters] = useState<Set<string>>(new Set());
     const [soakMultiplier, setSoakMultiplier] = useState(1);
     const [burnMultiplier, setBurnMultiplier] = useState(1);
     const [potionBrewMultiplier, setPotionBrewMultiplier] = useState(1);
@@ -364,6 +367,16 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
         setSoakMultiplier(1);
         setBurnMultiplier(1);
         setPotionBrewMultiplier(1);
+        setDiscoveredCraftedLetters(new Set());
+    }, []);
+
+    const addDiscoveredCraftedLetter = useCallback((letter: string) => {
+        setDiscoveredCraftedLetters((previous) => {
+            if (previous.has(letter)) return previous;
+            const next = new Set(previous);
+            next.add(letter);
+            return next;
+        });
     }, []);
 
     const addElement = useCallback((element: RewardElement) => {
@@ -410,6 +423,8 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             applyBurnMultiplier,
             potionBrewMultiplier,
             applyPotionBrewMultiplier,
+            discoveredCraftedLetters,
+            addDiscoveredCraftedLetter,
         }),
         [
             addSouls,
@@ -446,6 +461,8 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             applyBurnMultiplier,
             potionBrewMultiplier,
             applyPotionBrewMultiplier,
+            discoveredCraftedLetters,
+            addDiscoveredCraftedLetter,
         ],
     );
 

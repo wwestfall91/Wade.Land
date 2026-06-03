@@ -1423,6 +1423,54 @@
     }
 }
 
+.new-element-toast {
+    position: absolute;
+    pointer-events: none;
+    white-space: nowrap;
+    font-size: 0.72rem;
+    font-weight: 900;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #ffe566;
+    text-shadow:
+        0 0 6px rgba(255, 200, 0, 0.9),
+        0 1px 4px rgba(0, 0, 0, 0.85);
+    transform: translateX(-50%);
+    z-index: 9500;
+    animation: new-element-float 2.6s ease-out forwards;
+    user-select: none;
+}
+
+@keyframes new-element-float {
+    0% {
+        opacity: 0;
+        transform: translateX(-50%) translateY(4px) scale(0.6);
+    }
+
+    12% {
+        opacity: 1;
+        transform: translateX(-50%) translateY(-10px) scale(1.15);
+    }
+
+    22% {
+        transform: translateX(-50%) translateY(-4px) scale(0.95);
+    }
+
+    34% {
+        transform: translateX(-50%) translateY(-16px) scale(1.05);
+    }
+
+    60% {
+        opacity: 1;
+        transform: translateX(-50%) translateY(-26px) scale(1);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-50px) scale(0.9);
+    }
+}
+
 @keyframes chest-reveal-in {
     0% {
         opacity: 0;

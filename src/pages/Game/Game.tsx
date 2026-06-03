@@ -263,6 +263,8 @@ function Game() {
         burnMultiplier,
         potionBrewMultiplier,
         applyPotionBrewMultiplier,
+        discoveredCraftedLetters,
+        addDiscoveredCraftedLetter,
     } = usePlayer();
     const gameRef = useRef<HTMLDivElement | null>(null);
     const elementStartRef = useRef<HTMLDivElement | null>(null);
@@ -291,6 +293,7 @@ function Game() {
     const [monsterThresholds, setMonsterThresholds] = useState<MonsterRewardThreshold[]>([]);
     const [rewardGlowRevision, setRewardGlowRevision] = useState(0);
     const [pendingUpgradeRewards, setPendingUpgradeRewards] = useState<MonsterReward[] | null>(null);
+    const [newElementToasts, setNewElementToasts] = useState<Array<{ id: number; x: number; y: number; category?: string }>>([]);
     const [hasSeenDragTutorial, setHasSeenDragTutorial] = useState(() => {
         if (typeof window === "undefined") {
             return false;
@@ -349,6 +352,8 @@ function Game() {
     const hasShownInitialRewardModalRef = useRef(false);
     const levelZeroElementsRef = useRef<RewardElement[]>([]);
     const allElementOptionsRef = useRef<RewardElement[]>([]);
+    const discoveredCraftedLettersRef = useRef<Set<string>>(new Set());
+    const newElementToastIdRef = useRef(0);
 
     useEffect(() => () => {
         if (rewardCueTimeoutRef.current !== null) {
@@ -477,21 +482,24 @@ function Game() {
             rewardCueTimeoutRef.current = window.setTimeout(() => {
                 const reward = state.fightReward;
                 const soulsGained = reward?.soulsGained ?? 0;
-                const levelZeroElements = allElementOptionsRef.current.filter((e) => e.level === 0);
+                const discovered = discoveredCraftedLettersRef.current;
+                const rewardPool = allElementOptionsRef.current.filter(
+                    (e) => e.level === 0 || discovered.has(e.letter),
+                );
                 const bonusSoulsCount = Math.floor(soulsGained * 0.5);
                 const mysteryCount = Math.floor(Math.random() * 10) + 1;
                 const chests: ChestDefinition[] = [
                     {
-                        elements: getRandomElements(levelZeroElements, 5),
+                        elements: getRandomElements(rewardPool, 5),
                         tooltip: "5 random elements",
                     },
                     {
-                        elements: getRandomElements(levelZeroElements, 3),
+                        elements: getRandomElements(rewardPool, 3),
                         bonusSoulsMultiplier: 0.5,
                         tooltip: `3 random elements \r + ${bonusSoulsCount} souls`,
                     },
                     {
-                        elements: getRandomElements(levelZeroElements, mysteryCount),
+                        elements: getRandomElements(rewardPool, mysteryCount),
                         tooltip: "???",
                     },
                 ];
@@ -868,6 +876,10 @@ function Game() {
     }, [allElementOptions]);
 
     useEffect(() => {
+        discoveredCraftedLettersRef.current = discoveredCraftedLetters;
+    }, [discoveredCraftedLetters]);
+
+    useEffect(() => {
         setDraggables((previous) => {
             const previousById = new Map(previous.map((item) => [item.id, item]));
 
@@ -1206,7 +1218,16 @@ function Game() {
         setIsPreviewDragging(false);
         setPreviewPosition(null);
         previewPositionRef.current = null;
-    }, [combineElements, getOutputCenterPosition, launchPotionSparkle, previewCombination, triggerPotionBrewFlash]);
+
+        if (newDraggable.level > 0 && !discoveredCraftedLettersRef.current.has(newDraggable.letter)) {
+            addDiscoveredCraftedLetter(newDraggable.letter);
+            const toastId = newElementToastIdRef.current++;
+            setNewElementToasts((previous) => [...previous, { id: toastId, x: targetPosition.x, y: targetPosition.y, category: newDraggable.category }]);
+            window.setTimeout(() => {
+                setNewElementToasts((previous) => previous.filter((t) => t.id !== toastId));
+            }, 2600);
+        }
+    }, [addDiscoveredCraftedLetter, combineElements, getOutputCenterPosition, launchPotionSparkle, previewCombination, triggerPotionBrewFlash]);
 
     useEffect(() => {
         if (previewCombination) {
@@ -1816,6 +1837,16 @@ function Game() {
                     ))}
                 </div>
             ) : null}
+            {newElementToasts.map((toast) => (
+                <div
+                    key={toast.id}
+                    className="new-element-toast"
+                    style={{ left: toast.x + 16, top: toast.y }}
+                    aria-hidden="true"
+                >
+                    New {toast.category}!
+                </div>
+            ))}
             {soulFlightIcons.length > 0 ? (
                 <div className="soul-collection-layer" aria-hidden="true">
                     {soulFlightIcons.map((icon) => (
