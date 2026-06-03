@@ -46,6 +46,7 @@ export type PlayerElement = {
     type1?: string;
     type2?: string;
     effects?: SpellEffectConfig[];
+    category?: string;
 };
 
 export type PlayerProgress = {

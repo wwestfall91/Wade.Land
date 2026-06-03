@@ -112,6 +112,62 @@
         animation: invalid-drop-shake 0.35s ease-in-out;
     }
 
+    // ── Spell draggables ────────────────────────────────────────────────────────
+
+    .drag.is-spell {
+        width: 2rem;
+        height: 2rem;
+        border-radius: 8px;
+        border: 2px solid #ffd700;
+        background: linear-gradient(135deg, #5f5030 0%, #8a7040 100%);
+        box-shadow: inset 0 0 0 1px rgba(255, 230, 100, 0.35);
+        transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+
+        &:hover {
+            transform: translateY(-1px);
+            border-color: #ffe566;
+            box-shadow: inset 0 0 0 1px rgba(255, 240, 140, 0.45);
+        }
+
+        &.is-dragging {
+            transform: translateY(-1px) scale(1.05);
+            border-color: #ffee88;
+            box-shadow: inset 0 0 0 1px rgba(255, 248, 160, 0.5);
+        }
+
+        // Override the general is-invalid-drop rule — keep type bg, flash red border
+        &.is-invalid-drop {
+            animation: spell-reject 0.4s ease-in-out;
+            border-color: #ff4040 !important;
+            box-shadow:
+                inset 0 0 0 1px rgba(255, 120, 120, 0.5),
+                0 0 16px rgba(255, 50, 50, 0.65) !important;
+        }
+
+        // Type-specific backgrounds
+        &.is-spell--fire      { background: linear-gradient(135deg, #8b2f11 0%, #c94820 100%); }
+        &.is-spell--water     { background: linear-gradient(135deg, #124071 0%, #1e6aac 100%); }
+        &.is-spell--earth     { background: linear-gradient(135deg, #5b4027 0%, #8d6642 100%); }
+        &.is-spell--air       { background: linear-gradient(135deg, #5e8fa6 0%, #8ec1d4 100%); }
+        &.is-spell--lightning { background: linear-gradient(135deg, #716305 0%, #b1910e 100%); }
+        &.is-spell--steel     { background: linear-gradient(135deg, #465a6e 0%, #64849b 100%); }
+        &.is-spell--leaf      { background: linear-gradient(135deg, #235a23 0%, #378c37 100%); }
+        &.is-spell--ice       { background: linear-gradient(135deg, #2b7d95 0%, #3ea7bf 100%); }
+        &.is-spell--arcane    { background: linear-gradient(135deg, #7d3e63 0%, #b86593 100%); }
+        &.is-spell--light     { background: linear-gradient(135deg, #8d7623 0%, #b49a39 100%); }
+        &.is-spell--dark      { background: linear-gradient(135deg, #3c3354 0%, #5f5678 100%); }
+    }
+
+    @keyframes spell-reject {
+        0%   { transform: translateX(0); }
+        15%  { transform: translateX(-6px); }
+        30%  { transform: translateX(6px); }
+        45%  { transform: translateX(-5px); }
+        60%  { transform: translateX(5px); }
+        80%  { transform: translateX(-2px); }
+        100% { transform: translateX(0); }
+    }
+
     @keyframes invalid-drop-shake {
         0% { transform: translateX(0); }
         20% { transform: translateX(-5px); }

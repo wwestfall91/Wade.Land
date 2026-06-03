@@ -28,6 +28,7 @@ type FloatingTooltipProps = {
         type2?: string;
         effects?: SpellEffectConfig[];
         level?: number;
+        category?: string;
     };
     typeMultipliers?: Record<string, number>;
     offset?: number;
@@ -157,8 +158,9 @@ function FloatingTooltip({
 
     const primaryBadgeType = elementDetails?.type1 ?? elementDetails?.type2;
     const primaryThemeType = elementDetails?.type1 ?? elementDetails?.type2;
-    const primaryBadgeLabel = elementDetails?.level === 2 ? "SPELL" : "ELEMENT";
-    const primaryBadgeClass = elementDetails?.level === 2 ? "tooltip-badge-spell" : "";
+    const isSpell = elementDetails?.category?.toLowerCase() === "spell";
+    const primaryBadgeLabel = isSpell ? "SPELL" : "ELEMENT";
+    const primaryBadgeClass = isSpell ? "tooltip-badge-spell" : "";
 
     const baseDamage = elementDetails?.damage ?? 0;
     const masteryMultiplier = elementDetails && typeMultipliers

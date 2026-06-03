@@ -22,6 +22,7 @@ type Props = {
 	type2?: string;
 	effects?: SpellEffectConfig[];
 	level?: number;
+	category?: string;
 	containerRef: React.RefObject<HTMLDivElement | null>;
 	dropZoneRefs: Array<React.RefObject<HTMLDivElement | null>>;
 	initialPosition: Position;
@@ -43,6 +44,7 @@ function Draggable({
 	type2,
 	effects,
 	level,
+	category,
 	containerRef,
 	dropZoneRefs,
 	initialPosition,
@@ -190,7 +192,14 @@ function Draggable({
 		<div
 			id="Draggable"
 			ref={draggableRef}
-			className={`drag ${isInvalidDrop ? "is-invalid-drop" : ""} ${isDragging ? "is-dragging" : ""} ${showTutorialCue && !hasBeenDragged ? "is-discoverable" : ""}`}
+			className={[
+				"drag",
+				category === "spell" ? "is-spell" : "",
+				category === "spell" ? `is-spell--${(type1 || type2 || "none")}` : "",
+				isInvalidDrop ? "is-invalid-drop" : "",
+				isDragging ? "is-dragging" : "",
+				showTutorialCue && !hasBeenDragged ? "is-discoverable" : "",
+			].filter(Boolean).join(" ")}
 			onPointerDown={handlePointerDown}
 			onAnimationEnd={() => setIsInvalidDrop(false)}
 			onMouseEnter={() => setIsHovered(true)}
@@ -221,6 +230,7 @@ function Draggable({
 					type2,
 					effects,
 					level,
+					category,
 				}}
 			/>
 			<div className={`element-glisten-shell${isNewFromChest ? " is-new-from-chest" : ""}`}>

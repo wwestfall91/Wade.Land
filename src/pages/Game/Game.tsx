@@ -35,6 +35,7 @@ type DraggableItem = {
     type1?: string;
     type2?: string;
     effects?: SpellEffectConfig[];
+    category?: string;
     initialPosition: Position;
 };
 
@@ -49,6 +50,7 @@ type CombinationRecipe = {
     type1?: string;
     type2?: string;
     effects?: SpellEffectConfig[];
+    category?: string;
 };
 
 type ElementRow = {
@@ -69,6 +71,8 @@ type ElementRow = {
     ["Type 2"]?: string;
     Type1?: string;
     Type2?: string;
+    Category?: string;
+    category?: string;
 };
 
 type EnemyRow = {
@@ -128,6 +132,7 @@ type PreviewCombination = {
     type1?: string;
     type2?: string;
     effects?: SpellEffectConfig[];
+    category?: string;
 };
 
 type ChestDefinition = {
@@ -679,6 +684,7 @@ function Game() {
                     type1: normalizeType((row.Type1 || "") as string),
                     type2: normalizeType((row.Type2 || "") as string),
                     effects: parseSpellEffectsFromRow(row),
+                    category: ((row.Category ?? row.category ?? "") as string).trim().toLowerCase(),
                 }))
                 .filter((row) => row.name.length > 0);
 
@@ -695,6 +701,7 @@ function Game() {
                     type1: row.type1,
                     type2: row.type2,
                     effects: row.effects,
+                    category: row.category,
                 }));
 
             setRecipes(combinationRecipes);
@@ -712,6 +719,7 @@ function Game() {
                     type1: row.type1,
                     type2: row.type2,
                     effects: row.effects,
+                    category: row.category,
                 })),
             );
 
@@ -725,6 +733,7 @@ function Game() {
                     type1: row.type1,
                     type2: row.type2,
                     effects: row.effects,
+                    category: row.category,
                 } satisfies RewardElement]),
             );
             setBaseElements(
@@ -737,6 +746,7 @@ function Game() {
                     type1: row.type1,
                     type2: row.type2,
                     effects: row.effects,
+                    category: row.category,
                 })),
             );
         };
@@ -867,6 +877,7 @@ function Game() {
                         type1: element.type1,
                         type2: element.type2,
                         effects: element.effects,
+                        category: element.category,
                     };
                 }
 
@@ -1094,6 +1105,7 @@ function Game() {
             type1: matchingRecipe?.type1,
             type2: matchingRecipe?.type2,
             effects: matchingRecipe?.effects,
+            category: matchingRecipe?.category,
         };
     }, [draggables, recipes, zoneOccupants]);
 
@@ -1137,6 +1149,7 @@ function Game() {
             type1: previewCombination.type1,
             type2: previewCombination.type2,
             effects: previewCombination.effects,
+            category: previewCombination.category,
         };
 
         nextId.current += 1;
@@ -1359,6 +1372,11 @@ function Game() {
     const canSnapToZone = (draggableId: number, zoneIndex: number) => {
         const draggable = draggables.find((item) => item.id === draggableId);
         if (!draggable) {
+            return false;
+        }
+
+        // Spells cannot be combined — block snapping entirely
+        if (draggable.category === "spell") {
             return false;
         }
 
@@ -1861,6 +1879,7 @@ function Game() {
                     type2={draggable.type2}
                     effects={draggable.effects}
                     level={draggable.level}
+                    category={draggable.category}
                     containerRef={gameRef}
                     dropZoneRefs={activeDropZoneRefs}
                     initialPosition={draggable.initialPosition}
