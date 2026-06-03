@@ -223,6 +223,11 @@ const getRandomUniqueElements = (elements: RewardElement[], count: number): Rewa
     return shuffled.slice(0, Math.min(count, shuffled.length));
 };
 
+const getRandomElements = (elements: RewardElement[], count: number): RewardElement[] => {
+    if (elements.length === 0) return [];
+    return Array.from({ length: count }, () => elements[Math.floor(Math.random() * elements.length)]);
+};
+
 function Game() {
     const navigate = useNavigate();
     const location = useLocation();
@@ -343,6 +348,7 @@ function Game() {
     const elementFlightTimeoutsRef = useRef<number[]>([]);
     const hasShownInitialRewardModalRef = useRef(false);
     const levelZeroElementsRef = useRef<RewardElement[]>([]);
+    const allElementOptionsRef = useRef<RewardElement[]>([]);
 
     useEffect(() => () => {
         if (rewardCueTimeoutRef.current !== null) {
@@ -471,21 +477,21 @@ function Game() {
             rewardCueTimeoutRef.current = window.setTimeout(() => {
                 const reward = state.fightReward;
                 const soulsGained = reward?.soulsGained ?? 0;
-                const levelZero = levelZeroElementsRef.current;
+                const levelZeroElements = allElementOptionsRef.current.filter((e) => e.level === 0);
                 const bonusSoulsCount = Math.floor(soulsGained * 0.5);
                 const mysteryCount = Math.floor(Math.random() * 10) + 1;
                 const chests: ChestDefinition[] = [
                     {
-                        elements: getRandomUniqueElements(levelZero, 5),
+                        elements: getRandomElements(levelZeroElements, 5),
                         tooltip: "5 random elements",
                     },
                     {
-                        elements: getRandomUniqueElements(levelZero, 3),
+                        elements: getRandomElements(levelZeroElements, 3),
                         bonusSoulsMultiplier: 0.5,
                         tooltip: `3 random elements \r + ${bonusSoulsCount} souls`,
                     },
                     {
-                        elements: getRandomUniqueElements(levelZero, mysteryCount),
+                        elements: getRandomElements(levelZeroElements, mysteryCount),
                         tooltip: "???",
                     },
                 ];
@@ -858,6 +864,7 @@ function Game() {
 
     useEffect(() => {
         levelZeroElementsRef.current = allElementOptions.filter((e) => e.level === 0);
+        allElementOptionsRef.current = allElementOptions;
     }, [allElementOptions]);
 
     useEffect(() => {
@@ -1894,7 +1901,13 @@ function Game() {
                 <>
                     <div
                         ref={previewRef}
-                        className={`drag drag-preview ${isPreviewDragging ? "is-dragging" : ""}`}
+                        className={[
+                            "drag",
+                            "drag-preview",
+                            isPreviewDragging ? "is-dragging" : "",
+                            previewCombination.category === "spell" ? "is-spell" : "",
+                            previewCombination.category === "spell" ? `is-spell--${previewCombination.type1 || previewCombination.type2 || "none"}` : "",
+                        ].filter(Boolean).join(" ")}
                         onPointerDown={handlePreviewPointerDown}
                         onMouseEnter={() => setIsPreviewHovered(true)}
                         onMouseLeave={() => setIsPreviewHovered(false)}
@@ -1923,6 +1936,7 @@ function Game() {
                             type1: previewCombination.type1,
                             type2: previewCombination.type2,
                             effects: previewCombination.effects,
+                            category: previewCombination.category,
                         }}
                     />
                 </>
