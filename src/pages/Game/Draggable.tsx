@@ -58,9 +58,32 @@ function Draggable({
 	const [hasBeenDragged, setHasBeenDragged] = useState(false);
 	const [isInvalidDrop, setIsInvalidDrop] = useState(false);
 	const [isHovered, setIsHovered] = useState(false);
+	const [isTooltipHovered, setIsTooltipHovered] = useState(false);
+	const [isTooltipGraceOpen, setIsTooltipGraceOpen] = useState(false);
 	const [mouseOffset, setMouseOffset] = useState({ x: 0, y: 0 });
 	const [position, setPosition] = useState<Position>(initialPosition);
 	const draggableRef = useRef<HTMLDivElement | null>(null);
+	const tooltipGraceTimeoutRef = useRef<number | null>(null);
+
+	const clearTooltipGraceTimeout = () => {
+		if (tooltipGraceTimeoutRef.current !== null) {
+			window.clearTimeout(tooltipGraceTimeoutRef.current);
+			tooltipGraceTimeoutRef.current = null;
+		}
+	};
+
+	const startTooltipGraceClose = () => {
+		setIsTooltipGraceOpen(true);
+		clearTooltipGraceTimeout();
+		tooltipGraceTimeoutRef.current = window.setTimeout(() => {
+			setIsTooltipGraceOpen(false);
+			tooltipGraceTimeoutRef.current = null;
+		}, 250);
+	};
+
+	useEffect(() => () => {
+		clearTooltipGraceTimeout();
+	}, []);
 
 	useEffect(() => {
 		if (!isDragging) return;
@@ -180,6 +203,9 @@ function Draggable({
 			y: e.clientY - rect.top - position.y,
 		});
 		setIsHovered(false);
+		setIsTooltipHovered(false);
+		setIsTooltipGraceOpen(false);
+		clearTooltipGraceTimeout();
 		if (showTutorialCue && !hasBeenDragged) {
 			onDismissTutorialCue?.();
 		}
@@ -187,6 +213,31 @@ function Draggable({
 		setHasBeenDragged(true);
 		setIsDragging(true);
 	};
+
+	const handleDraggableMouseEnter = () => {
+		clearTooltipGraceTimeout();
+		setIsTooltipGraceOpen(false);
+		setIsHovered(true);
+	};
+
+	const handleDraggableMouseLeave = () => {
+		setIsHovered(false);
+		startTooltipGraceClose();
+	};
+
+	const handleTooltipMouseEnter = () => {
+		clearTooltipGraceTimeout();
+		setIsTooltipGraceOpen(false);
+		setIsTooltipHovered(true);
+	};
+
+	const handleTooltipMouseLeave = () => {
+		setIsTooltipHovered(false);
+		startTooltipGraceClose();
+	};
+
+	const isTooltipOpen = !isDragging && (isHovered || isTooltipHovered || isTooltipGraceOpen);
+	const isTooltipClosing = isTooltipGraceOpen && !isHovered && !isTooltipHovered;
 
 	return (
 		<div
@@ -203,8 +254,8 @@ function Draggable({
 			].filter(Boolean).join(" ")}
 			onPointerDown={handlePointerDown}
 			onAnimationEnd={() => setIsInvalidDrop(false)}
-			onMouseEnter={() => setIsHovered(true)}
-			onMouseLeave={() => setIsHovered(false)}
+			onMouseEnter={handleDraggableMouseEnter}
+			onMouseLeave={handleDraggableMouseLeave}
 			style={{
 				display: "flex",
 				justifyContent: "center",
@@ -218,8 +269,11 @@ function Draggable({
 		>
 			<FloatingTooltip
 				anchorElement={draggableRef.current}
-			open={isHovered && !isDragging}
-				className="drag-description-popup"
+				open={isTooltipOpen}
+				className={`drag-description-popup${isTooltipClosing ? " is-closing" : ""}`}
+				interactive
+				onTooltipMouseEnter={handleTooltipMouseEnter}
+				onTooltipMouseLeave={handleTooltipMouseLeave}
 				clampHorizontal={false}
 				typeMultipliers={typeMultipliers}
 				elementDetails={{

@@ -1,4 +1,5 @@
 import type { SpellEffectConfig } from "./spellEffects";
+import { statusEffectsRegistry } from "./statusEffectsRegistry";
 
 type EffectTarget = "self" | "enemy";
 
@@ -12,63 +13,9 @@ export const getEffectSummaryLines = (effects?: SpellEffectConfig[] | null): str
     }
 
     normalizedEffects.forEach((effect) => {
-        switch (effect.kind) {
-            case "heal": {
-                const amount = Math.max(0, effect.amount ?? 0);
-                if (amount > 0) {
-                    lines.push(`Heal: +${amount}`);
-                }
-                break;
-            }
-            case "burn": {
-                const amount = Math.max(0, effect.amount ?? 0);
-                if (amount > 0) {
-                    lines.push(`Burn: +${amount}`);
-                }
-                break;
-            }
-            case "shield": {
-                const amount = Math.max(0, effect.amount ?? 0);
-                if (amount > 0) {
-                    lines.push(`Shield: +${amount}`);
-                }
-                break;
-            }
-            case "lifesteal": {
-                const amount = Math.max(0, effect.amount ?? 0);
-                if (amount > 0) {
-                    const percent = amount > 1 ? amount : Math.round(amount * 100);
-                    lines.push(`Lifesteal: ${percent}%`);
-                }
-                break;
-            }
-            case "soak": {
-                const amount = Math.max(1, effect.amount ?? 1);
-                lines.push(`Soak: +${amount}`);
-                break;
-            }
-            case "energize": {
-                const amount = Math.max(1, effect.amount ?? 1);
-                lines.push(`Energize: +${amount}`);
-                break;
-            }
-            case "freeze": {
-                const amount = Math.max(1, effect.amount ?? 1);
-                lines.push(`Freeze: +${amount}`);
-                break;
-            }
-            case "thorns": {
-                const amount = Math.max(1, effect.amount ?? 1);
-                lines.push(`Thorns: +${amount}`);
-                break;
-            }
-            case "float": {
-                const amount = Math.max(1, effect.amount ?? 1);
-                lines.push(`Float: +${amount}`);
-                break;
-            }
-            default:
-                break;
+        const line = statusEffectsRegistry.getSummaryLine(effect);
+        if (line) {
+            lines.push(line);
         }
     });
 
@@ -92,63 +39,9 @@ export const getEffectSummaryLinesForTarget = (
             return;
         }
 
-        switch (effect.kind) {
-            case "heal": {
-                const amount = Math.max(0, effect.amount ?? 0);
-                if (amount > 0) {
-                    lines.push(`Heal: +${amount}`);
-                }
-                break;
-            }
-            case "burn": {
-                const amount = Math.max(0, effect.amount ?? 0);
-                if (amount > 0) {
-                    lines.push(`Burn: +${amount}`);
-                }
-                break;
-            }
-            case "shield": {
-                const amount = Math.max(0, effect.amount ?? 0);
-                if (amount > 0) {
-                    lines.push(`Shield: +${amount}`);
-                }
-                break;
-            }
-            case "lifesteal": {
-                const amount = Math.max(0, effect.amount ?? 0);
-                if (amount > 0) {
-                    const percent = amount > 1 ? amount : Math.round(amount * 100);
-                    lines.push(`Lifesteal: ${percent}%`);
-                }
-                break;
-            }
-            case "soak": {
-                const amount = Math.max(1, effect.amount ?? 1);
-                lines.push(`Soak: +${amount}`);
-                break;
-            }
-            case "energize": {
-                const amount = Math.max(1, effect.amount ?? 1);
-                lines.push(`Energize: +${amount}`);
-                break;
-            }
-            case "freeze": {
-                const amount = Math.max(1, effect.amount ?? 1);
-                lines.push(`Freeze: +${amount}`);
-                break;
-            }
-            case "thorns": {
-                const amount = Math.max(1, effect.amount ?? 1);
-                lines.push(`Thorns: +${amount}`);
-                break;
-            }
-            case "float": {
-                const amount = Math.max(1, effect.amount ?? 1);
-                lines.push(`Float: +${amount}`);
-                break;
-            }
-            default:
-                break;
+        const line = statusEffectsRegistry.getSummaryLine(effect);
+        if (line) {
+            lines.push(line);
         }
     });
 
@@ -156,36 +49,5 @@ export const getEffectSummaryLinesForTarget = (
 };
 
 export const getEffectChipClass = (line: string): string => {
-    if (line.startsWith("Heal:")) {
-        return "effect-heal";
-    }
-    if (line.startsWith("Burn:")) {
-        return "effect-burn";
-    }
-    if (line.startsWith("Shield:")) {
-        return "effect-shield";
-    }
-    if (line.startsWith("Lifesteal:")) {
-        return "effect-lifesteal";
-    }
-    if (line.startsWith("Soak:")) {
-        return "effect-soak";
-    }
-    if (line.startsWith("Energize:")) {
-        return "effect-energize";
-    }
-    if (line.startsWith("Freeze:")) {
-        return "effect-freeze";
-    }
-    if (line.startsWith("Thorns:")) {
-        return "effect-thorns";
-    }
-    if (line.startsWith("Float:")) {
-        return "effect-float";
-    }
-    if (line.startsWith("Hits:")) {
-        return "effect-multi-hit";
-    }
-
-    return "effect-default";
+    return statusEffectsRegistry.getChipClass(line);
 };

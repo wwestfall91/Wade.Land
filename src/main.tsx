@@ -9,6 +9,7 @@ import Game from "./pages/Game/Game.tsx";
 import Fight from "./pages/Fight/Fight.tsx";
 import ElementMap from "./pages/ElementMap/ElementMap.tsx";
 import { PlayerProvider } from "./context/PlayerContext";
+import { StatusEffectsProvider } from "./context/StatusEffectsContext";
 
 const router = createBrowserRouter([
   { path: "/", element: <App /> },
@@ -20,10 +21,12 @@ const router = createBrowserRouter([
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <CookiesProvider>
-    <PlayerProvider>
-      <body>
-        <RouterProvider router={router} />
-      </body>
-    </PlayerProvider>
+    <StatusEffectsProvider>
+      <PlayerProvider>
+        <body>
+          <RouterProvider router={router} />
+        </body>
+      </PlayerProvider>
+    </StatusEffectsProvider>
   </CookiesProvider>
 );

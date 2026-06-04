@@ -150,6 +150,7 @@ type FightRewardState = {
 
 type GameLocationState = {
     fightReward?: FightRewardState;
+    battleEnded?: boolean;
 };
 
 const SPREAD_X = 200;
@@ -282,8 +283,6 @@ function Game() {
     const [enemies, setEnemies] = useState<Enemy[]>([]);
     const [baseElements, setBaseElements] = useState<RewardElement[]>([]);
     const [allElementOptions, setAllElementOptions] = useState<RewardElement[]>([]);
-    const [starterChoices, setStarterChoices] = useState<RewardElement[]>([]);
-    const [selectedStarter, setSelectedStarter] = useState<RewardElement | null>(null);
     const [isDevElementPanelOpen, setIsDevElementPanelOpen] = useState(false);
     const [isFeedOverlayOpen, setIsFeedOverlayOpen] = useState(false);
     const [isFeedOverlayFadingOut, setIsFeedOverlayFadingOut] = useState(false);
@@ -321,6 +320,7 @@ function Game() {
     const [introNameInput, setIntroNameInput] = useState("");
     const [isIntroInputFadingOut, setIsIntroInputFadingOut] = useState(false);
     const [fightReward, setFightReward] = useState<FightRewardState | null>(null);
+    const [isCombinationStationUnlocked, setIsCombinationStationUnlocked] = useState(false);
     const [isFightVictoryCueVisible, setIsFightVictoryCueVisible] = useState(false);
     const [isPotionUnavailableFeedback, setIsPotionUnavailableFeedback] = useState(false);
     const [isPotionBrewedFlash, setIsPotionBrewedFlash] = useState(false);
@@ -472,6 +472,10 @@ function Game() {
 
     useEffect(() => {
         const state = location.state as GameLocationState | null;
+        if (state?.battleEnded || state?.fightReward) {
+            setIsCombinationStationUnlocked(true);
+        }
+
         if (state?.fightReward) {
             if (rewardCueTimeoutRef.current !== null) {
                 window.clearTimeout(rewardCueTimeoutRef.current);
@@ -830,15 +834,6 @@ function Game() {
     }, []);
 
 
-    // FORCE: Always set starterChoices on mount for debugging
-    useEffect(() => {
-        if (allElementOptions.length === 0) return;
-        const levelZero = allElementOptions.filter(e => e.level === 0);
-        const choices = getRandomUniqueElements(levelZero, 3);
-        setStarterChoices(choices);
-        setSelectedStarter(null);
-    }, [allElementOptions]);
-
     useEffect(() => {
         if (introPhase !== "hidden") {
             return;
@@ -852,23 +847,60 @@ function Game() {
             return;
         }
 
+        if (playerProgress.elements.length > 0) {
+            return;
+        }
+
         const state = location.state as GameLocationState | null;
         if (state?.fightReward) {
             return;
         }
 
-        const rewardPool = allElementOptions.filter((element) => element.level === 0 && element.category?.toLowerCase() === "element");
-        const rewardElements = getRandomUniqueElements(rewardPool, 3);
-        if (rewardElements.length === 0) {
+        const starterElements = allElementOptions
+            .filter((element) => element.level === 0 && element.category?.toLowerCase() === "element")
+            .slice(0, 4);
+        if (starterElements.length === 0) {
             return;
         }
 
         hasShownInitialRewardModalRef.current = true;
-        setFightReward({
-            soulsGained: 0,
-            rewardElements,
+        setIsFightVictoryCueVisible(false);
+
+        const containerRect = gameRef.current?.getBoundingClientRect();
+        const currentCount = playerProgress.elements.length;
+        const centerX = window.innerWidth / 2;
+        const centerY = window.innerHeight / 2;
+        const flightIcons: ElementFlightIcon[] = starterElements.map((element, index) => {
+            const targetPos = getSpawnPosition(currentCount + index);
+            const targetX = (containerRect?.left ?? 0) + targetPos.x + 16;
+            const targetY = (containerRect?.top ?? 0) + targetPos.y + 16;
+            return {
+                id: elementFlightIdRef.current++,
+                startX: centerX,
+                startY: centerY,
+                toX: targetX - centerX,
+                toY: targetY - centerY,
+                letter: element.letter,
+                delayMs: 120 + index * ELEMENT_FLIGHT_STAGGER_MS,
+            };
         });
-    }, [allElementOptions, introPhase, location.state]);
+
+        setElementFlightIcons(flightIcons);
+
+        starterElements.forEach((element, index) => {
+            const landTimeoutId = window.setTimeout(() => {
+                addElement(element);
+            }, flightIcons[index].delayMs + ELEMENT_FLIGHT_TRAVEL_MS);
+            elementFlightTimeoutsRef.current.push(landTimeoutId);
+        });
+
+        const lastLandMs = 120 + (starterElements.length - 1) * ELEMENT_FLIGHT_STAGGER_MS + ELEMENT_FLIGHT_TRAVEL_MS;
+        const cleanupTimeoutId = window.setTimeout(() => {
+            setElementFlightIcons([]);
+            elementFlightTimeoutsRef.current = [];
+        }, lastLandMs + 120);
+        elementFlightTimeoutsRef.current.push(cleanupTimeoutId);
+    }, [addElement, allElementOptions, introPhase, location.state, playerProgress.elements.length]);
 
     useEffect(() => {
         levelZeroElementsRef.current = allElementOptions.filter((e) => e.level === 0);
@@ -1535,21 +1567,6 @@ function Game() {
         setIntroPhase("line3");
     };
 
-    const handleConfirmStarter = () => {
-        if (!selectedStarter) {
-            return;
-        }
-
-        initializeElements([
-            {
-                id: nextId.current++,
-                ...selectedStarter,
-            },
-        ]);
-        setStarterChoices([]);
-        setSelectedStarter(null);
-    };
-
     const startSoulCollectionAnimation = useCallback((soulsGained: number) => {
         const normalizedSouls = Math.max(0, Math.floor(soulsGained));
         if (normalizedSouls <= 0) {
@@ -1756,8 +1773,6 @@ function Game() {
         }
     };
 
-    // Always show the starter modal on page load for debugging
-    const isStartMenuOpen = starterChoices.length > 0;
     const isIntroVisible = introPhase !== "hidden";
     const introDisplayName = introChosenNameRef.current || playerName || "Traveler";
     const introText =
@@ -2012,40 +2027,36 @@ function Game() {
                 </div>
                 <div className="game-controls-stack">
                     <div className="element-start" ref={elementStartRef}></div>
-                    <div className="combination-station">
-                        <div className="combination-equation">
-                            <div className="drop-zone-area">
-                                <div className={`drop-zone ${hasStartedDraggingElement && !hasSeenDropZoneOneTutorial ? "is-discoverable" : ""}`} ref={dropZoneRefA}>1</div>
-                                <div>+</div>
-                                <div className="drop-zone" ref={dropZoneRefB}>2</div>
-                                {zoneOccupants.length === 3 ? (
-                                    <>
-                                        <div>+</div>
-                                        <div className="drop-zone" ref={dropZoneRefC}>3</div>
-                                    </>
-                                ) : null}
-                                <div>=</div>
+                    {isCombinationStationUnlocked ? (
+                        <div className="combination-station">
+                            <div className="combination-equation">
+                                <div className="drop-zone-area">
+                                    <div className={`drop-zone ${hasStartedDraggingElement && !hasSeenDropZoneOneTutorial ? "is-discoverable" : ""}`} ref={dropZoneRefA}>1</div>
+                                    <div>+</div>
+                                    <div className="drop-zone" ref={dropZoneRefB}>2</div>
+                                    {zoneOccupants.length === 3 ? (
+                                        <>
+                                            <div>+</div>
+                                            <div className="drop-zone" ref={dropZoneRefC}>3</div>
+                                        </>
+                                    ) : null}
+                                    <div>=</div>
+                                </div>
+                                <div className="output" ref={outputRef} />
                             </div>
-                            <div className="output" ref={outputRef} />
-                        </div>
 
-                        <div className={`combine-button-wrap ${!canCombine ? "is-disabled" : ""}`}>
-                            <button className="combine-button" disabled={!canCombine} onClick={handleCombine}>
-                                COMBINE!
-                            </button>
-                            <div className="combine-button-tooltip" role="tooltip">
-                                Please insert two base elements to start combining
+                            <div className={`combine-button-wrap ${!canCombine ? "is-disabled" : ""}`}>
+                                <button className="combine-button" disabled={!canCombine} onClick={handleCombine}>
+                                    COMBINE!
+                                </button>
+                                <div className="combine-button-tooltip" role="tooltip">
+                                    Please insert two base elements to start combining
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    ) : null}
 
                     <div className="battle-station">
-                        <button className="fight-button" onClick={handleFight}>
-                            FIGHT!
-                        </button>
-                        <button className="feed-button" onClick={handleFeedClick}>
-                            FEED
-                        </button>
                         <PlayerStats
                             playerName={playerName}
                             level={playerProgress.level}
@@ -2059,6 +2070,9 @@ function Game() {
                             statuses={playerStatuses}
                             className={`player-stats-dock${isSoulCounterPopping ? " is-soul-counter-pop" : ""}`}
                         />
+                        <button className="feed-button" onClick={handleFeedClick}>
+                            FEED
+                        </button>
                     </div>
                 </div>
                 <div className="game-scene-col game-scene-col--right">
@@ -2078,6 +2092,11 @@ function Game() {
                             souls={nextEnemy?.souls ?? 0}
                         />
                         <div className="game-enemy-card-footer">Hover for details</div>
+                    </div>
+                    <div className="game-enemy-actions">
+                        <button className="fight-button" onClick={handleFight}>
+                            FIGHT!
+                        </button>
                     </div>
                 </div>
             </div>

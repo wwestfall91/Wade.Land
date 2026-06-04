@@ -560,6 +560,8 @@
 
     .game-scene-col--right {
         align-items: flex-start;
+        gap: 0.8rem;
+        align-self: flex-end;
     }
 
     .game-controls-stack {
@@ -1361,6 +1363,7 @@
         .game-scene-col--right {
             align-items: center;
             order: 3;
+            align-self: auto;
         }
 
         .game-controls-stack {
@@ -1591,6 +1594,13 @@
         padding: 0.25rem 0;
         text-shadow: 0 1px 1px rgba(0, 0, 0, 0.82);
     }
+}
+
+.game-enemy-actions {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
 @keyframes upgrades-panel-in {

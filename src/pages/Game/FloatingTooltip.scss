@@ -8,6 +8,12 @@
     color: #181818;
     z-index: 2147483647;
     gap: 0.45rem;
+    opacity: 1;
+    transition: opacity 170ms linear;
+
+    &.is-closing {
+        opacity: 0;
+    }
 }
 
 .tooltip-container{
@@ -227,8 +233,6 @@
     width: min(15.5rem, 90vw);
     max-width: min(15.5rem, 90vw);
     min-width: min(13rem, 82vw);
-    opacity: 0;
-    animation: floatingTooltipFadeIn 0.16s ease-out forwards;
 }
 
 .floating-tooltip.drag-description-popup .floating-tooltip__panel,
@@ -532,6 +536,11 @@
     box-shadow:
         0 2px 0 rgba(0, 0, 0, 0.29),
         0 4px 24px rgba(11, 16, 48, 0.24);
+}
+
+.floating-tooltip .effect-combo {
+    background: linear-gradient(180deg, #9ed4ff 0%, #5ba7ff 100%);
+    color: #07203d;
 }
 
 .floating-tooltip .type-chip {

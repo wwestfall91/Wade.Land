@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { SpellEffectConfig } from "../../combat/spellEffects";
-import { getEffectChipClass, getEffectSummaryLines } from "../../combat/effectSummary";
+import { statusEffectsRegistry } from "../../combat/statusEffectsRegistry";
 import "./FloatingTooltip.scss";
 import ElementIcon from "../../components/ElementIcon";
 
@@ -18,6 +18,9 @@ type FloatingTooltipProps = {
     anchorElement: HTMLElement | null;
     open: boolean;
     className: string;
+    interactive?: boolean;
+    onTooltipMouseEnter?: () => void;
+    onTooltipMouseLeave?: () => void;
     children?: ReactNode;
     elementDetails?: {
         letter: string;
@@ -49,6 +52,9 @@ function FloatingTooltip({
     anchorElement,
     open,
     className,
+    interactive = false,
+    onTooltipMouseEnter,
+    onTooltipMouseLeave,
     children,
     elementDetails,
     typeMultipliers,
@@ -135,10 +141,17 @@ function FloatingTooltip({
         )
         : [];
 
-    const effectLines = elementDetails ? getEffectSummaryLines(elementDetails.effects) : [];
+    const effectKinds = (elementDetails?.effects ?? []).map((effect, index) => {
+        const descriptor = effect.kind === "multi_hit" ? undefined : statusEffectsRegistry.get(effect.kind);
 
-    const toTypeClass = (value: string) =>
-        `type-${value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+        return {
+            key: `${effect.kind}-${index}`,
+            label: effect.kind,
+            chipClass: effect.kind === "multi_hit"
+                ? "effect-multi-hit"
+                : (descriptor?.chipClass ?? "effect-default"),
+        };
+    });
 
     const toTypeBadgeClass = (value?: string) => {
         if (!value || value.trim().length === 0) {
@@ -179,13 +192,15 @@ function FloatingTooltip({
         <div
             ref={tooltipRef}
             className={`floating-tooltip ${className} ${layout.isBelow ? "is-below" : ""}`}
+            onMouseEnter={onTooltipMouseEnter}
+            onMouseLeave={onTooltipMouseLeave}
             style={{
                 position: "absolute",
                 left: layout.left,
                 top: layout.top,
                 marginLeft: `${-layout.width / 2 + layout.offsetX}px`,
                 marginTop: layout.isBelow ? "0px" : `${-layout.height}px`,
-                pointerEvents: "none",
+                pointerEvents: interactive ? "auto" : "none",
                 zIndex: 2147483647,
             }}
         >
@@ -224,14 +239,14 @@ function FloatingTooltip({
                             </span>
                         ) : null}
 
-                        {effectLines.length > 0 ? (
+                        {effectKinds.length > 0 ? (
                             <span className="effects-details">Effects:
-                                {effectLines.map((line, lineIndex) => (
+                                {effectKinds.map((effectKind) => (
                                     <span
-                                        key={`${line}-${lineIndex}`}
-                                        className={`effect-chip ${getEffectChipClass(line)}`}
+                                        key={effectKind.key}
+                                        className={`effect-chip ${effectKind.chipClass}`}
                                     >
-                                        {line}
+                                        {effectKind.label}
                                     </span>
                                 ))}
                             </span>
@@ -240,57 +255,6 @@ function FloatingTooltip({
                 ) : (
                     children
                 )}
-                {/* {elementDetails ? (
-                    <>
-                        <div className="element-info-title-row">
-                            <div className="element-info-header">
-                                <div className="drag-title">
-                                    <span className="drag-title-icon">
-                                        <ElementIcon name={elementDetails.letter} />
-                                    </span>
-                                    <span className="drag-title-name">{elementDetails.letter}</span>
-                                </div>
-                                <div className="right-info-header">
-                                    <span className="element-info-badge">ELEMENT</span>
-                                    <span className="element-info-badge">ELEMENT</span>
-                                </div>
-                            </div>
-                            <div>{elementDetails.description}</div>
-                        </div>
-                        <div className="drag-damage-text">Damage: {elementDetails.damage}</div>
-                        <div className="drag-type-text">
-                            <span className="drag-type-label">Types:</span>
-                            <span className="drag-type-list">
-                                {types.length > 0 ? (
-                                    types.map((type) => (
-                                        <span key={type} className={`type-chip ${toTypeClass(type)}`}>
-                                            {type}
-                                        </span>
-                                    ))
-                                ) : (
-                                    <span className="type-chip type-none">None</span>
-                                )}
-                            </span>
-                        </div>
-                        {effectLines.length > 0 ? (
-                            <div className="drag-effect-text">
-                                <span className="drag-effect-label">Effects:</span>
-                                <span className="drag-effect-list">
-                                    {effectLines.map((line, lineIndex) => (
-                                        <span
-                                            key={`${line}-${lineIndex}`}
-                                            className={`effect-chip ${getEffectChipClass(line)}`}
-                                        >
-                                            {line}
-                                        </span>
-                                    ))}
-                                </span>
-                            </div>
-                        ) : null}
-                    </>
-                ) : (
-                    children
-                )} */}
             </div>
 
         </div>,

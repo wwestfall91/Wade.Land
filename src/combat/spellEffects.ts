@@ -1,4 +1,4 @@
-export type SpellEffectKind = "heal" | "multi_hit" | "burn" | "shield" | "lifesteal" | "soak" | "energize" | "freeze" | "thorns" | "float";
+export type SpellEffectKind = "heal" | "multi_hit" | "burn" | "shield" | "lifesteal" | "soak" | "energize" | "freeze" | "thorns" | "float" | "combo";
 
 export type SpellEffectTarget = "self" | "enemy";
 
@@ -8,6 +8,7 @@ export type SpellEffectConfig = {
     hits?: number;
     duration?: number;
     target?: SpellEffectTarget;
+    targetType?: string;
 };
 
 export type ActiveBurnStatus = {
@@ -80,10 +81,15 @@ const normalizeEffectKind = (value: string): SpellEffectKind | null => {
             return "thorns";
         case "float":
             return "float";
+        case "combo":
+            return "combo";
         default:
             return null;
     }
 };
+
+const normalizeBattleType = (value: string): string =>
+    value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
 
 const normalizeTarget = (value: string, fallback: SpellEffectTarget): SpellEffectTarget => {
     const normalized = value.trim().toLowerCase();
@@ -124,18 +130,20 @@ export const parseSpellEffectsFromRow = (
             continue;
         }
 
-        const amount = safeNumber(readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Amount")));
-        const hits = safeNumber(readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Hits")));
-        const duration = safeNumber(readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Duration")));
-    const defaultTarget: SpellEffectTarget = ["heal", "shield", "lifesteal", "energize", "thorns", "float"].includes(kind)
+            const amount = safeNumber(readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Amount")));
+            const hits = safeNumber(readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Hits")));
+            const duration = safeNumber(readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Duration")));
+            const defaultTarget: SpellEffectTarget = ["heal", "shield", "lifesteal", "energize", "thorns", "float", "combo"].includes(kind)
             ? "self"
             : "enemy";
-        const target = normalizeTarget(
-            readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Target")),
-            defaultTarget,
-        );
+            const rawTarget = readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Target"));
+            const target = normalizeTarget(rawTarget, defaultTarget);
 
         const effect: SpellEffectConfig = { kind, target };
+
+            if (kind === "combo" && rawTarget.length > 0 && target === defaultTarget) {
+                effect.targetType = normalizeBattleType(rawTarget);
+            }
 
         if (amount !== undefined) {
             effect.amount = amount;

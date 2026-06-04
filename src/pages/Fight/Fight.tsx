@@ -109,6 +109,7 @@ type FightRewardState = {
 
 type GameLocationState = {
     fightReward?: FightRewardState;
+    battleEnded?: boolean;
 };
 
 type CastableSpell = {
@@ -120,6 +121,10 @@ type CastableSpell = {
     type2?: string;
     effects?: SpellEffectConfig[];
     category?: string;
+};
+
+type ComboStatus = {
+    requiredType: string;
 };
 
 function Fight() {
@@ -160,6 +165,7 @@ function Fight() {
     const [playerThornsStatus, setPlayerThornsStatus] = useState<ActiveThornsStatus | null>(playerStatuses.thorns);
     const [playerFloatStatus, setPlayerFloatStatus] = useState<ActiveFloatStatus | null>(playerStatuses.float);
     const [playerShield, setPlayerShield] = useState(playerStatuses.shield);
+    const [playerComboStatus, setPlayerComboStatus] = useState<ComboStatus | null>(null);
     const [enemyShield, setEnemyShield] = useState(0);
     const [isResolvingTurn, setIsResolvingTurn] = useState(false);
     const [isEnemyTurnActive, setIsEnemyTurnActive] = useState(false);
@@ -224,11 +230,16 @@ function Fight() {
     const playerShieldTailFillPercent = Math.min(playerShieldFillPercent, playerTotalFillPercent);
     const playerHealthFillPercent = Math.max(0, playerTotalFillPercent - playerShieldTailFillPercent);
 
-    const normalizeType = (value?: string) => value?.trim().toLowerCase() ?? "";
+    const normalizeType = (value?: string) => value?.trim().toLowerCase().replace(/[^a-z0-9]+/g, "") ?? "";
+    const formatTypeLabel = (value: string) => value.length > 0 ? value.charAt(0).toUpperCase() + value.slice(1) : value;
     const toTypeClass = (value: string) =>
         `type-${value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
     const pickEnemyAttack = () => enemy.elements[Math.floor(Math.random() * enemy.elements.length)] ?? null;
     const enemyWeaknesses = (enemy.weaknesses ?? []).map((weakness) => weakness.trim()).filter((weakness) => weakness.length > 0);
+    const getSpellTypeList = (spell: { type1?: string; type2?: string }) =>
+        [spell.type1, spell.type2].map(normalizeType).filter(Boolean);
+    const getSpellComboType = (effects?: SpellEffectConfig[]) =>
+        effects?.find((effect) => effect.kind === "combo")?.targetType ?? null;
 
     const getSpellSlotStyle = (type1?: string, type2?: string) => {
         const normalized = [type1, type2].map(normalizeType).filter(Boolean);
@@ -323,7 +334,15 @@ function Fight() {
         }, scaleCombatAnimationMs(480));
     };
 
-    const getSpellEnergyCost = (spell: { energy?: number }) => Math.max(0, spell.energy ?? 0);
+    const getSpellEnergyCost = (spell: { energy?: number; type1?: string; type2?: string }, comboType: string | null = playerComboStatus?.requiredType ?? null) => {
+        const baseCost = Math.max(0, spell.energy ?? 0);
+        if (!comboType) {
+            return baseCost;
+        }
+
+        const spellTypes = getSpellTypeList(spell);
+        return spellTypes.includes(comboType) ? Math.max(0, baseCost - 1) : baseCost;
+    };
 
     const inferEventKind = (message: string): EventLogEntry["kind"] => {
         if (message.startsWith("Enemy attacks")) {
@@ -458,6 +477,7 @@ function Fight() {
             navigate("/game", {
                 replace: true,
                 state: {
+                    battleEnded: true,
                     fightReward: {
                         soulsGained: enemy.souls,
                         rewardElements: chosen,
@@ -1112,13 +1132,16 @@ function Fight() {
     };
 
     const handleSlotClick = async (spell: CastableSpell) => {
-        const spellEnergyCost = getSpellEnergyCost(spell);
+        const activeComboType = playerComboStatus?.requiredType ?? null;
+        const spellTypes = getSpellTypeList(spell);
+        const spellComboType = getSpellComboType(spell.effects);
+        const comboMatches = Boolean(activeComboType && spellTypes.includes(activeComboType));
+        const spellEnergyCost = getSpellEnergyCost(spell, activeComboType);
         const isWeapon = spell.category?.toLowerCase() === "weapon";
         if (
             enemyHealth <= 0 ||
             isGameOver ||
             isResolvingTurn ||
-            (!isWeapon && remainingEnergy <= 0) ||
             remainingEnergy < spellEnergyCost ||
             (isWeapon && usedWeaponThisTurn)
         ) {
@@ -1144,7 +1167,6 @@ function Fight() {
         });
 
         setFlashingSlotId(spell.id);
-        const spellTypes = [spell.type1, spell.type2].map(normalizeType).filter(Boolean);
         const enemyWeaknesses = (enemy.weaknesses ?? []).map(normalizeType).filter(Boolean);
         const isWaterSpell = spellTypes.includes("water");
         const isLightningSpell = spellTypes.includes("lightning");
@@ -1180,6 +1202,8 @@ function Fight() {
         let enemyFreezeWasConsumed = false;
         let consumedEnemyFreezeStacks = 0;
         let remainingEnemyFreezeStacks = enemyFreezeStatus?.stacks ?? 0;
+        let comboWasConsumed = false;
+        let comboWasBroken = false;
 
         for (let hitIndex = 0; hitIndex < hitCount; hitIndex += 1) {
             if (nextEnemyHealth <= 0) {
@@ -1451,6 +1475,23 @@ function Fight() {
             await wait(EFFECT_STEP_DELAY_MS);
         }
 
+        if (activeComboType) {
+            if (comboMatches) {
+                comboWasConsumed = true;
+                pushEventLog(`Combo used: ${formatTypeLabel(activeComboType)} attack costs -1 energy`, "status", { isDetail: true });
+            } else if (!spellComboType) {
+                comboWasBroken = true;
+                pushEventLog("Combo fades", "status", { isDetail: true });
+            }
+        }
+
+        if (spellComboType) {
+            setPlayerComboStatus({ requiredType: spellComboType });
+            pushEventLog(`Combo primed: next ${formatTypeLabel(spellComboType)} attack costs -1 energy`, "status", { isDetail: true });
+        } else if (comboWasConsumed || comboWasBroken) {
+            setPlayerComboStatus(null);
+        }
+
         pushEventLog(`${abilityName} deals ${totalDamage} damage`, "player");
 
         const effectMessages: string[] = [];
@@ -1516,6 +1557,9 @@ function Fight() {
         resetGame();
         navigate("/game", {
             replace: true,
+            state: {
+                battleEnded: true,
+            } as GameLocationState,
         });
     };
 
@@ -1609,19 +1653,26 @@ function Fight() {
             <div className="spell-hand">
                 <div className="spell-hand-scroll">
                     {player.elements.map((spell) => (
+                        (() => {
+                            const activeComboType = playerComboStatus?.requiredType ?? null;
+                            const spellTypes = getSpellTypeList(spell);
+                            const comboReady = Boolean(activeComboType && spellTypes.includes(activeComboType));
+                            const displayedEnergyCost = getSpellEnergyCost(spell, activeComboType);
+                            const isWeapon = spell.category?.toLowerCase() === "weapon";
+
+                            return (
                         <button
                             key={spell.id}
                             ref={(element) => {
                                 spellSlotRefs.current[spell.id] = element;
                             }}
                             type="button"
-                            className={`spell-card ${flashingSlotId === spell.id ? "is-flashing" : ""} ${(!isGameOver && !isResolvingTurn && remainingEnergy < getSpellEnergyCost(spell)) ? "is-unaffordable" : ""} ${(spell.category?.toLowerCase() === "weapon" && usedWeaponThisTurn) ? "is-used" : ""}`}
+                            className={`spell-card ${flashingSlotId === spell.id ? "is-flashing" : ""} ${comboReady ? "is-combo-ready" : ""} ${(!isGameOver && !isResolvingTurn && remainingEnergy < displayedEnergyCost) ? "is-unaffordable" : ""} ${(isWeapon && usedWeaponThisTurn) ? "is-used" : ""}`}
                             disabled={
                                 isGameOver ||
                                 isResolvingTurn ||
-                                (spell.category?.toLowerCase() !== "weapon" && remainingEnergy <= 0) ||
-                                remainingEnergy < getSpellEnergyCost(spell) ||
-                                (spell.category?.toLowerCase() === "weapon" && usedWeaponThisTurn)
+                                remainingEnergy < displayedEnergyCost ||
+                                (isWeapon && usedWeaponThisTurn)
                             }
                             style={getSpellSlotStyle(spell.type1, spell.type2)}
                             onMouseEnter={() => setHoveredSpellId(spell.id)}
@@ -1665,7 +1716,7 @@ function Fight() {
                                     level: spell.level,
                                 }}
                             />
-                            <span className="spell-card-energy">{getSpellEnergyCost(spell)}</span>
+                            <span className={`spell-card-energy${comboReady ? " is-combo-discounted" : ""}`}>{displayedEnergyCost}</span>
                             <div className="spell-card-icon">
                                 <ElementIcon name={spell.letter} />
                             </div>
@@ -1679,6 +1730,8 @@ function Fight() {
                                 ))}
                             </div>
                         </button>
+                            );
+                        })()
                     ))}
                 </div>
             </div>
