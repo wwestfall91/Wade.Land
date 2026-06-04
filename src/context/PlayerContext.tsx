@@ -9,7 +9,7 @@ import React, {
 } from "react";
 import * as XLSX from "xlsx";
 import type { SpellEffectConfig } from "../combat/spellEffects";
-import type { ActiveBurnStatus, ActiveSoakStatus, ActiveFreezeStatus, ActiveEnergizeStatus } from "../combat/spellEffects";
+import type { ActiveBurnStatus, ActiveSoakStatus, ActiveFreezeStatus, ActiveEnergizeStatus, ActiveThornsStatus, ActiveFloatStatus } from "../combat/spellEffects";
 
 type LevelRow = {
     Level?: number | string;
@@ -73,6 +73,8 @@ export type PlayerStatuses = {
     soak: ActiveSoakStatus | null;
     freeze: ActiveFreezeStatus | null;
     energize: ActiveEnergizeStatus | null;
+    thorns: ActiveThornsStatus | null;
+    float: ActiveFloatStatus | null;
     shield: number;
 };
 
@@ -81,6 +83,8 @@ const DEFAULT_PLAYER_STATUSES: PlayerStatuses = {
     soak: null,
     freeze: null,
     energize: null,
+    thorns: null,
+    float: null,
     shield: 0,
 };
 

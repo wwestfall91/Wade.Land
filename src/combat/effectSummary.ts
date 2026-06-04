@@ -52,6 +52,21 @@ export const getEffectSummaryLines = (effects?: SpellEffectConfig[] | null): str
                 lines.push(`Energize: +${amount}`);
                 break;
             }
+            case "freeze": {
+                const amount = Math.max(1, effect.amount ?? 1);
+                lines.push(`Freeze: +${amount}`);
+                break;
+            }
+            case "thorns": {
+                const amount = Math.max(1, effect.amount ?? 1);
+                lines.push(`Thorns: +${amount}`);
+                break;
+            }
+            case "float": {
+                const amount = Math.max(1, effect.amount ?? 1);
+                lines.push(`Float: +${amount}`);
+                break;
+            }
             default:
                 break;
         }
@@ -117,6 +132,21 @@ export const getEffectSummaryLinesForTarget = (
                 lines.push(`Energize: +${amount}`);
                 break;
             }
+            case "freeze": {
+                const amount = Math.max(1, effect.amount ?? 1);
+                lines.push(`Freeze: +${amount}`);
+                break;
+            }
+            case "thorns": {
+                const amount = Math.max(1, effect.amount ?? 1);
+                lines.push(`Thorns: +${amount}`);
+                break;
+            }
+            case "float": {
+                const amount = Math.max(1, effect.amount ?? 1);
+                lines.push(`Float: +${amount}`);
+                break;
+            }
             default:
                 break;
         }
@@ -143,6 +173,15 @@ export const getEffectChipClass = (line: string): string => {
     }
     if (line.startsWith("Energize:")) {
         return "effect-energize";
+    }
+    if (line.startsWith("Freeze:")) {
+        return "effect-freeze";
+    }
+    if (line.startsWith("Thorns:")) {
+        return "effect-thorns";
+    }
+    if (line.startsWith("Float:")) {
+        return "effect-float";
     }
     if (line.startsWith("Hits:")) {
         return "effect-multi-hit";

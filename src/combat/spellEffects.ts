@@ -1,4 +1,4 @@
-export type SpellEffectKind = "heal" | "multi_hit" | "burn" | "shield" | "lifesteal" | "soak" | "energize";
+export type SpellEffectKind = "heal" | "multi_hit" | "burn" | "shield" | "lifesteal" | "soak" | "energize" | "freeze" | "thorns" | "float";
 
 export type SpellEffectTarget = "self" | "enemy";
 
@@ -31,7 +31,18 @@ export type ActiveEnergizeStatus = {
     stacks: number;
 };
 
+export type ActiveThornsStatus = {
+    kind: "thorns";
+    stacks: number;
+};
+
+export type ActiveFloatStatus = {
+    kind: "float";
+    stacks: number;
+};
+
 const EFFECT_COLUMN_CANDIDATES = (index: number, suffix: string) => [
+    `SE${index} ${suffix}`,
     `Effect ${index} ${suffix}`,
     `Effect${index} ${suffix}`,
     `Effect${index}${suffix}`,
@@ -63,6 +74,12 @@ const normalizeEffectKind = (value: string): SpellEffectKind | null => {
             return "soak";
         case "energize":
             return "energize";
+        case "freeze":
+            return "freeze";
+        case "thorns":
+            return "thorns";
+        case "float":
+            return "float";
         default:
             return null;
     }
@@ -110,7 +127,7 @@ export const parseSpellEffectsFromRow = (
         const amount = safeNumber(readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Amount")));
         const hits = safeNumber(readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Hits")));
         const duration = safeNumber(readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Duration")));
-        const defaultTarget: SpellEffectTarget = ["heal", "shield", "lifesteal", "energize"].includes(kind)
+    const defaultTarget: SpellEffectTarget = ["heal", "shield", "lifesteal", "energize", "thorns", "float"].includes(kind)
             ? "self"
             : "enemy";
         const target = normalizeTarget(

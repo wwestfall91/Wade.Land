@@ -8,7 +8,9 @@ import {
     type ActiveBurnStatus,
     type ActiveEnergizeStatus,
     type ActiveFreezeStatus,
+    type ActiveFloatStatus,
     type ActiveSoakStatus,
+    type ActiveThornsStatus,
     type SpellEffectConfig,
 } from "../../combat/spellEffects";
 import {
@@ -18,10 +20,16 @@ import {
     MAX_TURN_ENERGY,
     SOAK_FIRE_PENALTY_PER_STACK,
     SOAK_LIGHTNING_BONUS_PER_STACK,
+    THORNS_REFLECT_PERCENT_PER_STACK,
+    FLOAT_EARTH_REDUCTION_PERCENT_PER_STACK,
+    FLOAT_LIGHTNING_BONUS_PERCENT_PER_STACK,
     getBurnTickDamage,
     getFreezeFireBonus,
+    getFloatEarthReduction,
+    getFloatLightningBonus,
     getSoakFirePenalty,
     getSoakLightningBonus,
+    getThornsReflect,
 } from "../../combat/statusMath";
 import EnemyStage, { type EnemyDamagePopup } from "../../components/EnemyStage";
 import ElementDetailsTooltip from "../../components/ElementDetailsTooltip";
@@ -144,9 +152,13 @@ function Fight() {
     const [enemyBurnStatus, setEnemyBurnStatus] = useState<ActiveBurnStatus | null>(null);
     const [enemySoakStatus, setEnemySoakStatus] = useState<ActiveSoakStatus | null>(null);
     const [enemyFreezeStatus, setEnemyFreezeStatus] = useState<ActiveFreezeStatus | null>(null);
+    const [enemyThornsStatus, setEnemyThornsStatus] = useState<ActiveThornsStatus | null>(null);
+    const [enemyFloatStatus, setEnemyFloatStatus] = useState<ActiveFloatStatus | null>(null);
     const [playerBurnStatus, setPlayerBurnStatus] = useState<ActiveBurnStatus | null>(playerStatuses.burn);
     const [playerSoakStatus, setPlayerSoakStatus] = useState<ActiveSoakStatus | null>(playerStatuses.soak);
     const [playerFreezeStatus, setPlayerFreezeStatus] = useState<ActiveFreezeStatus | null>(playerStatuses.freeze);
+    const [playerThornsStatus, setPlayerThornsStatus] = useState<ActiveThornsStatus | null>(playerStatuses.thorns);
+    const [playerFloatStatus, setPlayerFloatStatus] = useState<ActiveFloatStatus | null>(playerStatuses.float);
     const [playerShield, setPlayerShield] = useState(playerStatuses.shield);
     const [enemyShield, setEnemyShield] = useState(0);
     const [isResolvingTurn, setIsResolvingTurn] = useState(false);
@@ -439,6 +451,8 @@ function Fight() {
                 soak: playerSoakStatus,
                 freeze: playerFreezeStatus,
                 energize: playerEnergizeStatus,
+                thorns: playerThornsStatus,
+                float: playerFloatStatus,
                 shield: 0,
             });
             navigate("/game", {
@@ -512,6 +526,8 @@ function Fight() {
         let currentPlayerBurn = playerBurnStatus;
         let currentPlayerSoak = playerSoakStatus;
         let currentPlayerFreeze = playerFreezeStatus;
+        const currentPlayerThorns = playerThornsStatus;
+        const currentPlayerFloat = playerFloatStatus;
 
         if (currentPlayerBurn) {
             const burnDamage = getBurnTickDamage(currentPlayerBurn.stacks);
@@ -539,6 +555,7 @@ function Fight() {
         const isLightningAttack = attackTypes.includes("lightning");
         const isFireAttack = attackTypes.includes("fire");
         const isIceAttack = attackTypes.includes("ice");
+        const isEarthAttack = attackTypes.includes("earth");
         const hitCount = getSpellHitCount(attack.effects);
         const perHitEffects = getPerHitSpellEffects(attack.effects);
         const attackDamageBreakdown: number[] = [];
@@ -554,6 +571,11 @@ function Fight() {
         let currentPlayerSoakStacks = currentPlayerSoak?.stacks ?? 0;
         let currentPlayerFreezeStacks = currentPlayerFreeze?.stacks ?? 0;
         let totalEnemyHealing = 0;
+        let totalThornsReflected = 0;
+        let totalPlayerFreezeApplied = 0;
+        let totalPlayerThornsApplied = 0;
+        let totalPlayerFloatApplied = 0;
+        let nextEnemyHealthForThorns = enemyHealth;
         const enemyAttackSource = enemyIntentIconRef.current ?? enemyAttackMarkerRef.current;
 
         for (let hitIndex = 0; hitIndex < hitCount; hitIndex += 1) {
@@ -564,7 +586,10 @@ function Fight() {
             const soakBonus = isLightningAttack ? getSoakLightningBonus(currentPlayerSoakStacks) : 0;
             const soakPenalty = isFireAttack ? getSoakFirePenalty(currentPlayerSoakStacks) : 0;
             const freezeBonus = isFireAttack ? getFreezeFireBonus(currentPlayerFreezeStacks) : 0;
-            const baseHitDamage = Math.max(0, attack.damage + soakBonus - soakPenalty + freezeBonus);
+            const floatStacks = currentPlayerFloat?.stacks ?? 0;
+            const floatEarthReduction = isEarthAttack ? getFloatEarthReduction(floatStacks, attack.damage) : 0;
+            const floatLightningBonus = isLightningAttack ? getFloatLightningBonus(floatStacks, attack.damage) : 0;
+            const baseHitDamage = Math.max(0, attack.damage + soakBonus - soakPenalty + freezeBonus - floatEarthReduction + floatLightningBonus);
             const absorbedDamage = Math.min(currentPlayerShield, baseHitDamage);
             const remainingDamage = Math.max(0, baseHitDamage - absorbedDamage);
 
@@ -582,6 +607,19 @@ function Fight() {
                 totalDamageTaken += remainingDamage;
                 simulatedPlayerHp = Math.max(0, simulatedPlayerHp - remainingDamage);
                 applyEnemyAttack(remainingDamage);
+
+                // Thorns: reflect a portion of damage back to the enemy
+                const thornsStacks = currentPlayerThorns?.stacks ?? 0;
+                if (thornsStacks > 0) {
+                    const thornsReflect = getThornsReflect(thornsStacks, remainingDamage);
+                    if (thornsReflect > 0) {
+                        totalThornsReflected += thornsReflect;
+                        nextEnemyHealthForThorns = Math.max(0, nextEnemyHealthForThorns - thornsReflect);
+                        setEnemyHealth(nextEnemyHealthForThorns);
+                        triggerEnemyHitFeedback(thornsReflect, "#44ff88", `-${thornsReflect} THORNS`);
+                        await wait(EFFECT_STEP_DELAY_MS);
+                    }
+                }
             }
 
             if (isWaterAttack && currentPlayerBurn) {
@@ -660,6 +698,30 @@ function Fight() {
                         }
 
                         totalPlayerSoakApplied += Math.max(1, effect.amount ?? 1);
+                        break;
+                    }
+                    case "freeze": {
+                        if (effect.target !== "enemy") {
+                            return;
+                        }
+
+                        totalPlayerFreezeApplied += Math.max(1, effect.amount ?? 1);
+                        break;
+                    }
+                    case "thorns": {
+                        if (effect.target !== "enemy") {
+                            return;
+                        }
+
+                        totalPlayerThornsApplied += Math.max(1, effect.amount ?? 1);
+                        break;
+                    }
+                    case "float": {
+                        if (effect.target !== "enemy") {
+                            return;
+                        }
+
+                        totalPlayerFloatApplied += Math.max(1, effect.amount ?? 1);
                         break;
                     }
                     default:
@@ -748,6 +810,36 @@ function Fight() {
             await wait(EFFECT_STEP_DELAY_MS);
         }
 
+        if (totalPlayerFreezeApplied > 0 && simulatedPlayerHp > 0) {
+            setPlayerFreezeStatus((previous) => {
+                if (!previous) {
+                    return { kind: "freeze", stacks: totalPlayerFreezeApplied };
+                }
+                return { kind: "freeze", stacks: previous.stacks + totalPlayerFreezeApplied };
+            });
+            await wait(EFFECT_STEP_DELAY_MS);
+        }
+
+        if (totalPlayerThornsApplied > 0 && simulatedPlayerHp > 0) {
+            setPlayerThornsStatus((previous) => {
+                if (!previous) {
+                    return { kind: "thorns", stacks: totalPlayerThornsApplied };
+                }
+                return { kind: "thorns", stacks: previous.stacks + totalPlayerThornsApplied };
+            });
+            await wait(EFFECT_STEP_DELAY_MS);
+        }
+
+        if (totalPlayerFloatApplied > 0 && simulatedPlayerHp > 0) {
+            setPlayerFloatStatus((previous) => {
+                if (!previous) {
+                    return { kind: "float", stacks: totalPlayerFloatApplied };
+                }
+                return { kind: "float", stacks: previous.stacks + totalPlayerFloatApplied };
+            });
+            await wait(EFFECT_STEP_DELAY_MS);
+        }
+
         if (totalEnemyHealing > 0) {
             // Enemy self-heal is intentionally kept simple here; it is enough to make healing spells matter.
             // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -776,6 +868,18 @@ function Fight() {
         }
         if (playerFreezeWasConsumed) {
             detailLines.push("Freeze consumed");
+        }
+        if (totalPlayerFreezeApplied > 0) {
+            detailLines.push(`Freeze +${totalPlayerFreezeApplied}`);
+        }
+        if (totalPlayerThornsApplied > 0) {
+            detailLines.push(`Thorns +${totalPlayerThornsApplied}`);
+        }
+        if (totalPlayerFloatApplied > 0) {
+            detailLines.push(`Float +${totalPlayerFloatApplied}`);
+        }
+        if (totalThornsReflected > 0) {
+            detailLines.push(`Thorns reflects ${totalThornsReflected}`);
         }
 
         if (detailLines.length > 0) {
@@ -1046,6 +1150,7 @@ function Fight() {
         const isLightningSpell = spellTypes.includes("lightning");
         const isFireSpell = spellTypes.includes("fire");
         const isIceSpell = spellTypes.includes("ice");
+        const isEarthSpell = spellTypes.includes("earth");
         const abilityName = getAbilityLogName(spell);
         const hitFlashColor = getSpellHitFlashColor(spell.type1, spell.type2);
         const hitCount = getSpellHitCount(spell.effects);
@@ -1069,6 +1174,12 @@ function Fight() {
         let freezeWasConsumed = false;
         let consumedFreezeStacks = 0;
         let totalEnergizeApplied = 0;
+        let totalEnemyFreezeApplied = 0;
+        let totalEnemyThornsApplied = 0;
+        let totalEnemyFloatApplied = 0;
+        let enemyFreezeWasConsumed = false;
+        let consumedEnemyFreezeStacks = 0;
+        let remainingEnemyFreezeStacks = enemyFreezeStatus?.stacks ?? 0;
 
         for (let hitIndex = 0; hitIndex < hitCount; hitIndex += 1) {
             if (nextEnemyHealth <= 0) {
@@ -1080,12 +1191,15 @@ function Fight() {
             const soakBonus = isLightningSpell ? getSoakLightningBonus(remainingSoakStacks) : 0;
             const soakPenalty = isFireSpell ? getSoakFirePenalty(remainingSoakStacks) : 0;
             const freezeBonus = isFireSpell ? getFreezeFireBonus(remainingFreezeStacks) : 0;
+            const enemyFloatStacks = enemyFloatStatus?.stacks ?? 0;
             const spellTypeMultiplier = Math.max(
                 ...spellTypes.map((t) => typeMultipliers[t] ?? 1),
                 1,
             );
             const scaledSpellDamage = Math.round(spell.damage * spellTypeMultiplier);
-            const baseHitDamage = Math.max(0, scaledSpellDamage + soakBonus - soakPenalty + freezeBonus);
+            const enemyFloatEarthReduction = isEarthSpell ? getFloatEarthReduction(enemyFloatStacks, scaledSpellDamage) : 0;
+            const enemyFloatLightningBonus = isLightningSpell ? getFloatLightningBonus(enemyFloatStacks, scaledSpellDamage) : 0;
+            const baseHitDamage = Math.max(0, scaledSpellDamage + soakBonus - soakPenalty + freezeBonus - enemyFloatEarthReduction + enemyFloatLightningBonus);
             const hitDamage = isCritical ? baseHitDamage * 2 : baseHitDamage;
             hitDamageBreakdown.push(hitDamage);
             totalDamage += hitDamage;
@@ -1192,6 +1306,28 @@ function Fight() {
                         totalEnergizeApplied += Math.max(1, effect.amount ?? 1);
                         break;
                     }
+                    case "freeze": {
+                        // freeze targeting the enemy: if they have soak, convert it; otherwise apply directly
+                        if (effect.target === "self") {
+                            return;
+                        }
+
+                        totalEnemyFreezeApplied += Math.max(1, effect.amount ?? 1);
+                        break;
+                    }
+                    case "thorns": {
+                        // thorns targeting self = buff the player; targeting enemy = debuff the enemy
+                        if (effect.target === "enemy") {
+                            totalEnemyThornsApplied += Math.max(1, effect.amount ?? 1);
+                        }
+                        break;
+                    }
+                    case "float": {
+                        if (effect.target === "enemy") {
+                            totalEnemyFloatApplied += Math.max(1, effect.amount ?? 1);
+                        }
+                        break;
+                    }
                     default:
                         break;
                 }
@@ -1265,6 +1401,40 @@ function Fight() {
             await wait(EFFECT_STEP_DELAY_MS);
         }
 
+        // Freeze effect: convert enemy soak to freeze first, then add any remaining
+        if (nextEnemyHealth > 0 && totalEnemyFreezeApplied > 0) {
+            const currentSoakStacks = enemySoakStatus?.stacks ?? 0;
+            if (currentSoakStacks > 0) {
+                setEnemySoakStatus(null);
+                setEnemyFreezeStatus((previous) => ({
+                    kind: "freeze",
+                    stacks: (previous?.stacks ?? 0) + currentSoakStacks + totalEnemyFreezeApplied,
+                }));
+            } else {
+                setEnemyFreezeStatus((previous) => ({
+                    kind: "freeze",
+                    stacks: (previous?.stacks ?? 0) + totalEnemyFreezeApplied,
+                }));
+            }
+            await wait(EFFECT_STEP_DELAY_MS);
+        }
+
+        if (nextEnemyHealth > 0 && totalEnemyThornsApplied > 0) {
+            setEnemyThornsStatus((previous) => ({
+                kind: "thorns",
+                stacks: (previous?.stacks ?? 0) + totalEnemyThornsApplied,
+            }));
+            await wait(EFFECT_STEP_DELAY_MS);
+        }
+
+        if (nextEnemyHealth > 0 && totalEnemyFloatApplied > 0) {
+            setEnemyFloatStatus((previous) => ({
+                kind: "float",
+                stacks: (previous?.stacks ?? 0) + totalEnemyFloatApplied,
+            }));
+            await wait(EFFECT_STEP_DELAY_MS);
+        }
+
         if (totalShieldGranted > 0) {
             setPlayerShield((previous) => previous + Math.round(totalShieldGranted * shieldMultiplier));
             await wait(EFFECT_STEP_DELAY_MS);
@@ -1301,6 +1471,15 @@ function Fight() {
         }
         if (totalEnergizeApplied > 0) {
             effectMessages.push(`Energize +${totalEnergizeApplied}`);
+        }
+        if (totalEnemyFreezeApplied > 0 && nextEnemyHealth > 0) {
+            effectMessages.push(`Freeze +${totalEnemyFreezeApplied}`);
+        }
+        if (totalEnemyThornsApplied > 0 && nextEnemyHealth > 0) {
+            effectMessages.push(`Thorns +${totalEnemyThornsApplied}`);
+        }
+        if (totalEnemyFloatApplied > 0 && nextEnemyHealth > 0) {
+            effectMessages.push(`Float +${totalEnemyFloatApplied}`);
         }
         if (soakWasConsumed) {
             effectMessages.push("Soak evaporates");

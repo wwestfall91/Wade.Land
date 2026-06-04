@@ -31,6 +31,7 @@ function ElementDetailsTooltip({
                 type2: element.type2,
                 effects: element.effects,
                 level: element.level,
+                category: element.category,
             }}
         />
     );

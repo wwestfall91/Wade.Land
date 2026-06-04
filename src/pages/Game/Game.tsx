@@ -1420,10 +1420,6 @@ function Game() {
             }
         }
 
-        if (!hasThreeSlots && draggable.level >= 2 && !isPlasma && !isUnstableName(draggable.letter)) {
-            return false;
-        }
-
         const occupantId = zoneOccupants[zoneIndex];
         return occupantId === null || occupantId === draggableId;
     };
