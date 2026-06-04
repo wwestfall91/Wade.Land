@@ -484,7 +484,7 @@ function Game() {
                 const soulsGained = reward?.soulsGained ?? 0;
                 const discovered = discoveredCraftedLettersRef.current;
                 const rewardPool = allElementOptionsRef.current.filter(
-                    (e) => e.level === 0 || discovered.has(e.letter),
+                    (e) => e.category?.toLowerCase() === "element" && (e.level === 0 || discovered.has(e.letter)),
                 );
                 const bonusSoulsCount = Math.floor(soulsGained * 0.5);
                 const mysteryCount = Math.floor(Math.random() * 10) + 1;
@@ -857,7 +857,7 @@ function Game() {
             return;
         }
 
-        const rewardPool = allElementOptions.filter((element) => element.level === 0);
+        const rewardPool = allElementOptions.filter((element) => element.level === 0 && element.category?.toLowerCase() === "element");
         const rewardElements = getRandomUniqueElements(rewardPool, 3);
         if (rewardElements.length === 0) {
             return;
@@ -1938,6 +1938,7 @@ function Game() {
                             isPreviewDragging ? "is-dragging" : "",
                             previewCombination.category === "spell" ? "is-spell" : "",
                             previewCombination.category === "spell" ? `is-spell--${previewCombination.type1 || previewCombination.type2 || "none"}` : "",
+                            previewCombination.category === "weapon" ? "is-weapon" : "",
                         ].filter(Boolean).join(" ")}
                         onPointerDown={handlePreviewPointerDown}
                         onMouseEnter={() => setIsPreviewHovered(true)}

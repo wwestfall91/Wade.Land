@@ -156,11 +156,12 @@ function FloatingTooltip({
         return `tooltip-theme-${value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
     };
 
-    const primaryBadgeType = elementDetails?.type1 ?? elementDetails?.type2;
     const primaryThemeType = elementDetails?.type1 ?? elementDetails?.type2;
     const isSpell = elementDetails?.category?.toLowerCase() === "spell";
-    const primaryBadgeLabel = isSpell ? "SPELL" : "ELEMENT";
-    const primaryBadgeClass = isSpell ? "tooltip-badge-spell" : "";
+    const isWeapon = elementDetails?.category?.toLowerCase() === "weapon";
+    const primaryBadgeLabel = elementDetails?.category;
+    const primaryBadgeClass = isSpell  ? "tooltip-badge-spell" : 
+                              isWeapon ? "tooltip-badge-weapon" : "";
 
     const baseDamage = elementDetails?.damage ?? 0;
     const masteryMultiplier = elementDetails && typeMultipliers

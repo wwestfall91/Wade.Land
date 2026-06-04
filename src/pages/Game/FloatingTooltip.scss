@@ -61,6 +61,11 @@
     font-size: 14px;
 }
 
+.element-types{
+    display: flex;
+    gap:3px;
+}
+
 .element-title{
     display: flex;
     flex-direction: column;
@@ -347,6 +352,12 @@
     color: #fff;
 }
 
+.floating-tooltip .element-info-badge.tooltip-badge-weapon {
+    border-color: #222222;
+    background: linear-gradient(180deg, #c4c4c4 0%, #696969 100%);
+    color: #111111;
+}
+
 .floating-tooltip .element-info-badge.type-badge-fire {
     background: linear-gradient(180deg, #ffd5bc 0%, #ff9d6d 100%);
     border-color: #c5652a;
@@ -361,8 +372,14 @@
 
 .floating-tooltip .element-info-badge.type-badge-earth {
     background: linear-gradient(180deg, #e2d0b7 0%, #c19b6f 100%);
-    border-color: #75512f;
-    color: #291a0d;
+    border-color: #251a0f;
+    color: #000000;
+}
+
+.floating-tooltip .element-info-badge.type-badge-steel {
+    border-color: #2e2e2e;
+    background: linear-gradient(180deg, #e0e0e0 0%, #575757 100%);
+    color: #111111;
 }
 
 .floating-tooltip .element-info-badge.type-badge-air {

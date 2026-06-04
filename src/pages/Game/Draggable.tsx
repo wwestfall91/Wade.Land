@@ -196,6 +196,7 @@ function Draggable({
 				"drag",
 				category === "spell" ? "is-spell" : "",
 				category === "spell" ? `is-spell--${(type1 || type2 || "none")}` : "",
+				category === "weapon" ? "is-weapon" : "",
 				isInvalidDrop ? "is-invalid-drop" : "",
 				isDragging ? "is-dragging" : "",
 				showTutorialCue && !hasBeenDragged ? "is-discoverable" : "",

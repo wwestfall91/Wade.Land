@@ -168,6 +168,71 @@
         100% { transform: translateX(0); }
     }
 
+    // ── Weapon draggables ───────────────────────────────────────────────────────
+
+    .drag.is-weapon {
+        border: none;
+        border-radius: 0;
+        width: 2.4rem;
+        height: 2.4rem;
+        display: flex;
+        align-items: stretch;
+        justify-content: stretch;
+        background: #c2c8d2;   // silver border colour
+        box-shadow: none;
+        clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%);
+        transition: filter 120ms ease, transform 120ms ease;
+
+        // Inner octagon – creates the "border" by sitting 2px inset from the silver bg
+        &::before {
+            content: "";
+            position: absolute;
+            inset: 2px;
+            clip-path: polygon(30% 0%, 70% 0%, 100% 30%, 100% 70%, 70% 100%, 30% 100%, 0% 70%, 0% 30%);
+            background: linear-gradient(160deg, #3a4050 0%, #5c6475 100%);
+            z-index: 0;
+        }
+
+        .element-glisten-shell {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        &:hover {
+            transform: translateY(-1px);
+            border-color: transparent;
+            box-shadow: none;
+            filter: brightness(1.15);
+        }
+
+        &.is-dragging {
+            transform: translateY(-1px) scale(1.05);
+            border-color: transparent;
+            box-shadow: none;
+            filter: brightness(1.2);
+        }
+
+        // Red triangle flash on invalid drop; hide inner fill so the red shows cleanly
+        &.is-invalid-drop {
+            animation: spell-reject 0.4s ease-in-out;
+            background: #c04040;
+            border-color: transparent !important;
+            box-shadow: none !important;
+
+            &::before { opacity: 0; }
+        }
+
+        // Discoverable pulse ring looks wrong on a triangle – suppress it
+        &.is-discoverable:not(.drag-preview)::after {
+            display: none;
+        }
+    }
+
     @keyframes invalid-drop-shake {
         0% { transform: translateX(0); }
         20% { transform: translateX(-5px); }

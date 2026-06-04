@@ -111,6 +111,7 @@ type CastableSpell = {
     type1?: string;
     type2?: string;
     effects?: SpellEffectConfig[];
+    category?: string;
 };
 
 function Fight() {
@@ -150,6 +151,7 @@ function Fight() {
     const [enemyShield, setEnemyShield] = useState(0);
     const [isResolvingTurn, setIsResolvingTurn] = useState(false);
     const [isEnemyTurnActive, setIsEnemyTurnActive] = useState(false);
+    const [usedWeaponThisTurn, setUsedWeaponThisTurn] = useState(false);
     const [queuedEnemyAttack, setQueuedEnemyAttack] = useState<RewardElement | null>(null);
     const [isReadyingNextAttack, setIsReadyingNextAttack] = useState(false);
     const [isEnemySpriteFlashing, setIsEnemySpriteFlashing] = useState(false);
@@ -866,6 +868,7 @@ function Fight() {
             }
             setPlayerShield(0);
             setIsEnemyTurnActive(false);
+            setUsedWeaponThisTurn(false);
             setIsResolvingTurn(false);
             return;
         }
@@ -888,10 +891,11 @@ function Fight() {
             setPlayerEnergizeStatus(null);
         }
         setIsEnemyTurnActive(false);
+        setUsedWeaponThisTurn(false);
         setIsResolvingTurn(false);
     };
 
-    const launchProjectileBurst = (
+    const launchProjectileBurst = async (
         letter: string,
         fromElement: HTMLElement | null,
         toElement: HTMLElement | null,
@@ -1005,17 +1009,22 @@ function Fight() {
 
     const handleSlotClick = async (spell: CastableSpell) => {
         const spellEnergyCost = getSpellEnergyCost(spell);
+        const isWeapon = spell.category?.toLowerCase() === "weapon";
         if (
             enemyHealth <= 0 ||
             isGameOver ||
             isResolvingTurn ||
-            remainingEnergy <= 0 ||
-            remainingEnergy < spellEnergyCost
+            (!isWeapon && remainingEnergy <= 0) ||
+            remainingEnergy < spellEnergyCost ||
+            (isWeapon && usedWeaponThisTurn)
         ) {
             return;
         }
 
         setIsResolvingTurn(true);
+        if (isWeapon) {
+            setUsedWeaponThisTurn(true);
+        }
         setRemainingEnergy((previous) => Math.max(0, previous - spellEnergyCost));
 
         setSpellCastFlashBackground(getSpellCastFlashBackground(spell.type1, spell.type2));
@@ -1427,12 +1436,13 @@ function Fight() {
                                 spellSlotRefs.current[spell.id] = element;
                             }}
                             type="button"
-                            className={`spell-card ${flashingSlotId === spell.id ? "is-flashing" : ""} ${(!isGameOver && !isResolvingTurn && remainingEnergy < getSpellEnergyCost(spell)) ? "is-unaffordable" : ""}`}
+                            className={`spell-card ${flashingSlotId === spell.id ? "is-flashing" : ""} ${(!isGameOver && !isResolvingTurn && remainingEnergy < getSpellEnergyCost(spell)) ? "is-unaffordable" : ""} ${(spell.category?.toLowerCase() === "weapon" && usedWeaponThisTurn) ? "is-used" : ""}`}
                             disabled={
                                 isGameOver ||
                                 isResolvingTurn ||
-                                remainingEnergy <= 0 ||
-                                remainingEnergy < getSpellEnergyCost(spell)
+                                (spell.category?.toLowerCase() !== "weapon" && remainingEnergy <= 0) ||
+                                remainingEnergy < getSpellEnergyCost(spell) ||
+                                (spell.category?.toLowerCase() === "weapon" && usedWeaponThisTurn)
                             }
                             style={getSpellSlotStyle(spell.type1, spell.type2)}
                             onMouseEnter={() => setHoveredSpellId(spell.id)}
@@ -1454,6 +1464,7 @@ function Fight() {
                                     type1: spell.type1,
                                     type2: spell.type2,
                                     effects: spell.effects,
+                                    category: spell.category,
                                 });
                             }}
                             onAnimationEnd={() => handleFlashEnd(spell.id)}
