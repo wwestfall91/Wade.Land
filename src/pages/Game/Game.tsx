@@ -173,6 +173,35 @@ const SOUL_COLLECTION_TEXT_EXTRA_MS = 500;
 const ELEMENT_FLIGHT_TRAVEL_MS = 520;
 const ELEMENT_FLIGHT_STAGGER_MS = 130;
 const CHEST_REVEAL_FADEOUT_MS = 320;
+const STARTER_LABEL_ANIM_MS = 520;
+
+type StarterButtonTheme = {
+    top: string;
+    bottom: string;
+    border: string;
+    text: string;
+    glow: string;
+};
+
+const STARTER_BUTTON_THEME_DEFAULT: StarterButtonTheme = {
+    top: "#5a71e3",
+    bottom: "#2b3ea9",
+    border: "#e8edff",
+    text: "#fff6a9",
+    glow: "rgba(164, 179, 255, 0.32)",
+};
+
+const STARTER_BUTTON_THEME_BY_TYPE: Record<string, StarterButtonTheme> = {
+    fire: { top: "#cf5f42", bottom: "#872f20", border: "#ffd1c4", text: "#fff3e8", glow: "rgba(255, 135, 108, 0.34)" },
+    water: { top: "#3f7fc6", bottom: "#1f4f89", border: "#b8daff", text: "#ecf7ff", glow: "rgba(114, 191, 255, 0.34)" },
+    earth: { top: "#8a6a3f", bottom: "#594224", border: "#f1debe", text: "#fff6df", glow: "rgba(216, 176, 118, 0.32)" },
+    air: { top: "#6aa2b8", bottom: "#3d6f84", border: "#d6f2ff", text: "#f3fcff", glow: "rgba(161, 225, 255, 0.34)" },
+    lightning: { top: "#b29225", bottom: "#7b620e", border: "#ffe480", text: "#fffbe2", glow: "rgba(255, 224, 120, 0.35)" },
+    ice: { top: "#4d9abb", bottom: "#2a647f", border: "#c8f2ff", text: "#eefbff", glow: "rgba(146, 224, 255, 0.34)" },
+    light: { top: "#d2b85d", bottom: "#8f7a30", border: "#ffefb4", text: "#fffdf1", glow: "rgba(255, 238, 170, 0.35)" },
+    dark: { top: "#69579a", bottom: "#3f2f67", border: "#d6ccff", text: "#f4efff", glow: "rgba(179, 154, 255, 0.32)" },
+    arcane: { top: "#b4658f", bottom: "#744165", border: "#ffd2e7", text: "#fff0f8", glow: "rgba(255, 171, 214, 0.34)" },
+};
 
 type SoulFlightIcon = {
     id: number;
@@ -288,6 +317,15 @@ function Game() {
     const [isFeedOverlayFadingOut, setIsFeedOverlayFadingOut] = useState(false);
     const [isSoulsPanelFlashing, setIsSoulsPanelFlashing] = useState(false);
     const [feedAnimations, setFeedAnimations] = useState<number[]>([]);
+    const [isOldOneIntroTriggered, setIsOldOneIntroTriggered] = useState(false);
+    const [isOldOneReturnLocked, setIsOldOneReturnLocked] = useState(false);
+    const [oldOneFeedCount, setOldOneFeedCount] = useState(0);
+    const [isOldOneSequenceRunning, setIsOldOneSequenceRunning] = useState(false);
+    const [feedStoryText, setFeedStoryText] = useState<string | null>(null);
+    const [isFeedStoryTextFading, setIsFeedStoryTextFading] = useState(false);
+    const [isOldOneStirsModalVisible, setIsOldOneStirsModalVisible] = useState(false);
+    const [isOldOneStirsModalFadingOut, setIsOldOneStirsModalFadingOut] = useState(false);
+    const [isEnhanceStationUnlocked, setIsEnhanceStationUnlocked] = useState(false);
     const [eyesFlashRevision, setEyesFlashRevision] = useState(0);
     const [monsterThresholds, setMonsterThresholds] = useState<MonsterRewardThreshold[]>([]);
     const [rewardGlowRevision, setRewardGlowRevision] = useState(0);
@@ -328,11 +366,25 @@ function Game() {
     const [isSoulPulseVisible, setIsSoulPulseVisible] = useState(false);
     const [soulPulseAmount, setSoulPulseAmount] = useState(0);
     const [isSoulCounterPopping, setIsSoulCounterPopping] = useState(false);
+    const [isPostBattleSoulSequenceActive, setIsPostBattleSoulSequenceActive] = useState(false);
+    const [postBattleSoulFillDurationMs, setPostBattleSoulFillDurationMs] = useState(0);
+    const [isOldOnePreludeActive, setIsOldOnePreludeActive] = useState(false);
+    const [isOldOnePreludeBlackVisible, setIsOldOnePreludeBlackVisible] = useState(false);
+    const [isOldOnePreludeTextVisible, setIsOldOnePreludeTextVisible] = useState(false);
+    const [isOldOnePreludeEyesApproaching, setIsOldOnePreludeEyesApproaching] = useState(false);
     const [soulFlightIcons, setSoulFlightIcons] = useState<SoulFlightIcon[]>([]);
     const [elementFlightIcons, setElementFlightIcons] = useState<ElementFlightIcon[]>([]);
     const [isChestRevealVisible, setIsChestRevealVisible] = useState(false);
     const [isChestRevealFadingOut, setIsChestRevealFadingOut] = useState(false);
     const [newChestElementIds, setNewChestElementIds] = useState<Set<number>>(new Set());
+    const [isStarterChoiceOpen, setIsStarterChoiceOpen] = useState(false);
+    const [starterChoiceElements, setStarterChoiceElements] = useState<RewardElement[]>([]);
+    const [hoveredStarterChoiceIndex, setHoveredStarterChoiceIndex] = useState<number | null>(null);
+    const [selectedStarterChoiceIndex, setSelectedStarterChoiceIndex] = useState<number | null>(null);
+    const [isStarterChoiceConfirming, setIsStarterChoiceConfirming] = useState(false);
+    const [starterChoiceNameCurrent, setStarterChoiceNameCurrent] = useState("");
+    const [starterChoiceNameOutgoing, setStarterChoiceNameOutgoing] = useState<string | null>(null);
+    const [starterChoiceNameRevision, setStarterChoiceNameRevision] = useState(0);
     const previewPositionRef = useRef<Position | null>(null);
     const previewPointerClientRef = useRef<Position>({ x: 0, y: 0 });
     const introChosenNameRef = useRef("");
@@ -354,6 +406,9 @@ function Game() {
     const allElementOptionsRef = useRef<RewardElement[]>([]);
     const discoveredCraftedLettersRef = useRef<Set<string>>(new Set());
     const newElementToastIdRef = useRef(0);
+    const starterChoiceButtonRefs = useRef<(HTMLButtonElement | null)[]>([]);
+    const starterChoiceLabelTimeoutRef = useRef<number | null>(null);
+    const oldOneSequenceTimeoutsRef = useRef<number[]>([]);
 
     useEffect(() => () => {
         if (rewardCueTimeoutRef.current !== null) {
@@ -377,7 +432,115 @@ function Game() {
         if (rewardGlowTimerRef.current !== null) {
             window.clearTimeout(rewardGlowTimerRef.current);
         }
+        if (starterChoiceLabelTimeoutRef.current !== null) {
+            window.clearTimeout(starterChoiceLabelTimeoutRef.current);
+        }
+        oldOneSequenceTimeoutsRef.current.forEach((timeoutId) => {
+            window.clearTimeout(timeoutId);
+        });
+        oldOneSequenceTimeoutsRef.current = [];
     }, []);
+
+    const clearOldOneSequenceTimeouts = useCallback(() => {
+        oldOneSequenceTimeoutsRef.current.forEach((timeoutId) => {
+            window.clearTimeout(timeoutId);
+        });
+        oldOneSequenceTimeoutsRef.current = [];
+    }, []);
+
+    const runOldOneAwakeningSequence = useCallback(() => {
+        setIsOldOneSequenceRunning(true);
+        setFeedStoryText("GOOD... PROTECT");
+        setIsFeedStoryTextFading(false);
+
+        clearOldOneSequenceTimeouts();
+
+        const toMakeStrongId = window.setTimeout(() => {
+            setIsFeedStoryTextFading(true);
+            const swapTextId = window.setTimeout(() => {
+                setFeedStoryText("I MAKE... STRONG");
+                setIsFeedStoryTextFading(false);
+            }, 700);
+            oldOneSequenceTimeoutsRef.current.push(swapTextId);
+        }, 1200);
+        oldOneSequenceTimeoutsRef.current.push(toMakeStrongId);
+
+        const fadeOutSecondLineId = window.setTimeout(() => {
+            setIsFeedStoryTextFading(true);
+        }, 3000);
+        oldOneSequenceTimeoutsRef.current.push(fadeOutSecondLineId);
+
+        const showStirsModalId = window.setTimeout(() => {
+            setFeedStoryText(null);
+            setIsFeedStoryTextFading(false);
+            setIsOldOneStirsModalVisible(true);
+            setIsOldOneStirsModalFadingOut(false);
+
+            const hideStirsModalId = window.setTimeout(() => {
+                setIsOldOneStirsModalFadingOut(true);
+                const finalizeIntroId = window.setTimeout(() => {
+                    setIsOldOneStirsModalVisible(false);
+                    setIsOldOneStirsModalFadingOut(false);
+                    setIsOldOneReturnLocked(false);
+                    setIsOldOneSequenceRunning(false);
+                }, 2000);
+                oldOneSequenceTimeoutsRef.current.push(finalizeIntroId);
+            }, 2000);
+
+            oldOneSequenceTimeoutsRef.current.push(hideStirsModalId);
+        }, 3800);
+        oldOneSequenceTimeoutsRef.current.push(showStirsModalId);
+    }, [clearOldOneSequenceTimeouts]);
+
+    const startOldOneFirstBattleIntro = useCallback((options?: { skipTimerClear?: boolean }) => {
+        if (!options?.skipTimerClear) {
+            clearOldOneSequenceTimeouts();
+        }
+        setIsOldOneIntroTriggered(true);
+        setIsOldOneReturnLocked(true);
+        setOldOneFeedCount(0);
+        setIsOldOneSequenceRunning(false);
+        setFeedStoryText("FEED...");
+        setIsFeedStoryTextFading(false);
+        setIsOldOneStirsModalVisible(false);
+        setIsOldOneStirsModalFadingOut(false);
+        setIsFeedOverlayFadingOut(false);
+        setIsFeedOverlayOpen(true);
+    }, [clearOldOneSequenceTimeouts]);
+
+    const startOldOneStoryPrelude = useCallback(() => {
+        clearOldOneSequenceTimeouts();
+
+        setIsOldOnePreludeActive(true);
+        setIsOldOnePreludeBlackVisible(false);
+        setIsOldOnePreludeTextVisible(false);
+        setIsOldOnePreludeEyesApproaching(false);
+
+        const blackFadeId = window.setTimeout(() => {
+            setIsOldOnePreludeBlackVisible(true);
+        }, 250);
+        oldOneSequenceTimeoutsRef.current.push(blackFadeId);
+
+        const textFadeId = window.setTimeout(() => {
+            setIsOldOnePreludeTextVisible(true);
+            // Story scene starts the moment FEED appears.
+            startOldOneFirstBattleIntro({ skipTimerClear: true });
+        }, 4200);
+        oldOneSequenceTimeoutsRef.current.push(textFadeId);
+
+        const eyesApproachId = window.setTimeout(() => {
+            setIsOldOnePreludeEyesApproaching(true);
+        }, 4350);
+        oldOneSequenceTimeoutsRef.current.push(eyesApproachId);
+
+        const finishPreludeId = window.setTimeout(() => {
+            setIsOldOnePreludeActive(false);
+            setIsOldOnePreludeBlackVisible(false);
+            setIsOldOnePreludeTextVisible(false);
+            setIsOldOnePreludeEyesApproaching(false);
+        }, 6200);
+        oldOneSequenceTimeoutsRef.current.push(finishPreludeId);
+    }, [clearOldOneSequenceTimeouts, startOldOneFirstBattleIntro]);
 
     const clearSoulAnimationTimeouts = useCallback(() => {
         soulAnimationTimeoutsRef.current.forEach((timeoutId) => {
@@ -460,6 +623,18 @@ function Game() {
     }, [clearSoulAnimationTimeouts]);
 
     useEffect(() => {
+        if (!isStarterChoiceOpen) {
+            return;
+        }
+
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        return () => {
+            document.body.style.overflow = previousOverflow;
+        };
+    }, [isStarterChoiceOpen]);
+
+    useEffect(() => {
         const handler = (e: KeyboardEvent) => {
             if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "m") {
                 e.preventDefault();
@@ -473,7 +648,7 @@ function Game() {
     useEffect(() => {
         const state = location.state as GameLocationState | null;
         if (state?.battleEnded || state?.fightReward) {
-            setIsCombinationStationUnlocked(true);
+            setIsCombinationStationUnlocked(false);
         }
 
         if (state?.fightReward) {
@@ -486,32 +661,30 @@ function Game() {
             rewardCueTimeoutRef.current = window.setTimeout(() => {
                 const reward = state.fightReward;
                 const soulsGained = reward?.soulsGained ?? 0;
-                const discovered = discoveredCraftedLettersRef.current;
-                const rewardPool = allElementOptionsRef.current.filter(
-                    (e) => e.category?.toLowerCase() === "element" && (e.level === 0 || discovered.has(e.letter)),
-                );
-                const bonusSoulsCount = Math.floor(soulsGained * 0.5);
-                const mysteryCount = Math.floor(Math.random() * 10) + 1;
-                const chests: ChestDefinition[] = [
-                    {
-                        elements: getRandomElements(rewardPool, 5),
-                        tooltip: "5 random elements",
-                    },
-                    {
-                        elements: getRandomElements(rewardPool, 3),
-                        bonusSoulsMultiplier: 0.5,
-                        tooltip: `3 random elements \r + ${bonusSoulsCount} souls`,
-                    },
-                    {
-                        elements: getRandomElements(rewardPool, mysteryCount),
-                        tooltip: "???",
-                    },
-                ];
-                setFightReward(reward ? { ...reward, isChestReward: true, chests } : null);
+                const shouldTriggerOldOneIntro = Boolean(state?.battleEnded && !isOldOneIntroTriggered);
+
+                if (soulsGained > 0) {
+                    startSoulCollectionAnimation(soulsGained, {
+                        isPostBattleSequence: shouldTriggerOldOneIntro,
+                        onComplete: () => {
+                            if (shouldTriggerOldOneIntro) {
+                                startOldOneStoryPrelude();
+                            }
+                        },
+                    });
+                } else if (shouldTriggerOldOneIntro) {
+                    startOldOneStoryPrelude();
+                }
+
+                navigate("/game", {
+                    replace: true,
+                    state: null,
+                });
+
                 setIsFightVictoryCueVisible(false);
             }, REWARD_CUE_MS);
         }
-    }, [location.state]);
+    }, [isOldOneIntroTriggered, location.state, navigate, startOldOneStoryPrelude]);
 
     const activeDropZoneRefs = zoneOccupants.length === 3
         ? [dropZoneRefA, dropZoneRefB, dropZoneRefC]
@@ -866,41 +1039,15 @@ function Game() {
         hasShownInitialRewardModalRef.current = true;
         setIsFightVictoryCueVisible(false);
 
-        const containerRect = gameRef.current?.getBoundingClientRect();
-        const currentCount = playerProgress.elements.length;
-        const centerX = window.innerWidth / 2;
-        const centerY = window.innerHeight / 2;
-        const flightIcons: ElementFlightIcon[] = starterElements.map((element, index) => {
-            const targetPos = getSpawnPosition(currentCount + index);
-            const targetX = (containerRect?.left ?? 0) + targetPos.x + 16;
-            const targetY = (containerRect?.top ?? 0) + targetPos.y + 16;
-            return {
-                id: elementFlightIdRef.current++,
-                startX: centerX,
-                startY: centerY,
-                toX: targetX - centerX,
-                toY: targetY - centerY,
-                letter: element.letter,
-                delayMs: 120 + index * ELEMENT_FLIGHT_STAGGER_MS,
-            };
-        });
-
-        setElementFlightIcons(flightIcons);
-
-        starterElements.forEach((element, index) => {
-            const landTimeoutId = window.setTimeout(() => {
-                addElement(element);
-            }, flightIcons[index].delayMs + ELEMENT_FLIGHT_TRAVEL_MS);
-            elementFlightTimeoutsRef.current.push(landTimeoutId);
-        });
-
-        const lastLandMs = 120 + (starterElements.length - 1) * ELEMENT_FLIGHT_STAGGER_MS + ELEMENT_FLIGHT_TRAVEL_MS;
-        const cleanupTimeoutId = window.setTimeout(() => {
-            setElementFlightIcons([]);
-            elementFlightTimeoutsRef.current = [];
-        }, lastLandMs + 120);
-        elementFlightTimeoutsRef.current.push(cleanupTimeoutId);
-    }, [addElement, allElementOptions, introPhase, location.state, playerProgress.elements.length]);
+        setStarterChoiceElements(starterElements);
+        setHoveredStarterChoiceIndex(null);
+        setSelectedStarterChoiceIndex(null);
+        setIsStarterChoiceConfirming(false);
+        setStarterChoiceNameCurrent("");
+        setStarterChoiceNameOutgoing(null);
+        setStarterChoiceNameRevision((current) => current + 1);
+        setIsStarterChoiceOpen(true);
+    }, [allElementOptions, introPhase, location.state, playerProgress.elements.length]);
 
     useEffect(() => {
         levelZeroElementsRef.current = allElementOptions.filter((e) => e.level === 0);
@@ -1501,11 +1648,19 @@ function Game() {
     };
 
     const handleFeedOverlayClose = () => {
+        if (isOldOneReturnLocked) {
+            return;
+        }
+
         if (isFeedOverlayFadingOut) return;
         setIsFeedOverlayFadingOut(true);
         window.setTimeout(() => {
             setIsFeedOverlayOpen(false);
             setIsFeedOverlayFadingOut(false);
+
+            if (isOldOneIntroTriggered && !isEnhanceStationUnlocked) {
+                setIsEnhanceStationUnlocked(true);
+            }
         }, 1000);
     };
 
@@ -1522,7 +1677,19 @@ function Game() {
         const nextFed = prevFed + 1;
         setSoulsFed(nextFed);
 
-        const crossed = monsterThresholds.find((t) => nextFed >= t.souls && prevFed < t.souls);
+        if (isOldOneReturnLocked && !isOldOneSequenceRunning) {
+            setOldOneFeedCount((previousCount) => {
+                const nextCount = previousCount + 1;
+                if (nextCount >= 5) {
+                    runOldOneAwakeningSequence();
+                }
+                return nextCount;
+            });
+        }
+
+        const crossed = isOldOneReturnLocked
+            ? undefined
+            : monsterThresholds.find((t) => nextFed >= t.souls && prevFed < t.souls);
         if (crossed) {
             const choices = RewardFactory.getRandom(3);
             setPendingUpgradeRewards(choices);
@@ -1567,9 +1734,19 @@ function Game() {
         setIntroPhase("line3");
     };
 
-    const startSoulCollectionAnimation = useCallback((soulsGained: number) => {
+    const startSoulCollectionAnimation = useCallback((
+        soulsGained: number,
+        options?: {
+            onComplete?: () => void;
+            isPostBattleSequence?: boolean;
+        },
+    ) => {
+        const onComplete = options?.onComplete;
+        const isPostBattleSequence = options?.isPostBattleSequence ?? false;
         const normalizedSouls = Math.max(0, Math.floor(soulsGained));
         if (normalizedSouls <= 0) {
+            setIsPostBattleSoulSequenceActive(false);
+            onComplete?.();
             return;
         }
 
@@ -1580,6 +1757,8 @@ function Game() {
         if (!soulsTarget) {
             addSouls(normalizedSouls);
             triggerSoulCounterPop();
+            setIsPostBattleSoulSequenceActive(false);
+            onComplete?.();
             return;
         }
 
@@ -1594,6 +1773,12 @@ function Game() {
         const gainsPerIcon = Array.from({ length: iconCount }, (_, index) => (
             baseAmount + (index < remainder ? 1 : 0)
         ));
+        const collectionDurationMs = SOUL_COLLECTION_PULSE_MS + (iconCount - 1) * SOUL_COLLECTION_STAGGER_MS + SOUL_COLLECTION_TRAVEL_MS + 140;
+
+        if (isPostBattleSequence) {
+            setPostBattleSoulFillDurationMs(collectionDurationMs);
+            setIsPostBattleSoulSequenceActive(true);
+        }
 
         const nextIcons: SoulFlightIcon[] = gainsPerIcon.map((_, index) => {
             const delayMs = index * SOUL_COLLECTION_STAGGER_MS;
@@ -1627,6 +1812,10 @@ function Game() {
 
             const cleanupTimeoutId = window.setTimeout(() => {
                 setSoulFlightIcons([]);
+                if (isPostBattleSequence) {
+                    setIsPostBattleSoulSequenceActive(false);
+                }
+                onComplete?.();
                 soulAnimationTimeoutsRef.current = [];
             }, (iconCount - 1) * SOUL_COLLECTION_STAGGER_MS + SOUL_COLLECTION_TRAVEL_MS + 140);
             soulAnimationTimeoutsRef.current.push(cleanupTimeoutId);
@@ -1773,6 +1962,103 @@ function Game() {
         }
     };
 
+    const handleStarterChoiceSelect = (index: number) => {
+        if (isStarterChoiceConfirming) {
+            return;
+        }
+
+        setSelectedStarterChoiceIndex(index);
+    };
+
+    const handleConfirmStarterChoice = () => {
+        if (selectedStarterChoiceIndex === null || isStarterChoiceConfirming) {
+            return;
+        }
+
+        const chosenElement = starterChoiceElements[selectedStarterChoiceIndex];
+        if (!chosenElement) {
+            return;
+        }
+
+        const sourceRect = starterChoiceButtonRefs.current[selectedStarterChoiceIndex]?.getBoundingClientRect();
+        const containerRect = gameRef.current?.getBoundingClientRect();
+        const spawnPosition = getSpawnPosition(playerProgress.elements.length);
+        const targetX = (containerRect?.left ?? 0) + spawnPosition.x + 16;
+        const targetY = (containerRect?.top ?? 0) + spawnPosition.y + 16;
+        const startX = sourceRect ? sourceRect.left + sourceRect.width / 2 : window.innerWidth / 2;
+        const startY = sourceRect ? sourceRect.top + sourceRect.height / 2 : window.innerHeight / 2;
+
+        setIsStarterChoiceConfirming(true);
+        setHoveredStarterChoiceIndex(null);
+        setIsStarterChoiceOpen(false);
+        setElementFlightIcons([
+            {
+                id: elementFlightIdRef.current++,
+                startX,
+                startY,
+                toX: targetX - startX,
+                toY: targetY - startY,
+                letter: chosenElement.letter,
+                delayMs: 0,
+            },
+        ]);
+
+        const landTimeoutId = window.setTimeout(() => {
+            addElement(chosenElement);
+        }, ELEMENT_FLIGHT_TRAVEL_MS);
+
+        const cleanupTimeoutId = window.setTimeout(() => {
+            setElementFlightIcons([]);
+            setStarterChoiceElements([]);
+            setSelectedStarterChoiceIndex(null);
+            setIsStarterChoiceConfirming(false);
+        }, ELEMENT_FLIGHT_TRAVEL_MS + 120);
+
+        elementFlightTimeoutsRef.current.push(landTimeoutId, cleanupTimeoutId);
+    };
+
+    const hoveredStarterChoiceElement =
+        hoveredStarterChoiceIndex !== null
+            ? (starterChoiceElements[hoveredStarterChoiceIndex] ?? null)
+            : null;
+    const selectedStarterChoiceElement =
+        selectedStarterChoiceIndex !== null
+            ? (starterChoiceElements[selectedStarterChoiceIndex] ?? null)
+            : null;
+    const starterChoiceTypeKey = normalizeType(selectedStarterChoiceElement?.type1 ?? selectedStarterChoiceElement?.type2);
+    const starterChoiceButtonTheme = STARTER_BUTTON_THEME_BY_TYPE[starterChoiceTypeKey] ?? STARTER_BUTTON_THEME_DEFAULT;
+    const starterChoiceModalStyle = {
+        ["--starter-modal-top" as string]: starterChoiceButtonTheme.top,
+        ["--starter-modal-bottom" as string]: starterChoiceButtonTheme.bottom,
+        ["--starter-modal-border" as string]: starterChoiceButtonTheme.border,
+        ["--starter-modal-title-text" as string]: starterChoiceButtonTheme.text,
+        ["--starter-modal-glow" as string]: starterChoiceButtonTheme.glow,
+    } as React.CSSProperties;
+
+    useEffect(() => {
+        const nextName = selectedStarterChoiceElement?.letter ?? "";
+
+        setStarterChoiceNameCurrent((currentName) => {
+            if (currentName === nextName) {
+                return currentName;
+            }
+
+            setStarterChoiceNameOutgoing(currentName.length > 0 ? currentName : null);
+            setStarterChoiceNameRevision((current) => current + 1);
+
+            if (starterChoiceLabelTimeoutRef.current !== null) {
+                window.clearTimeout(starterChoiceLabelTimeoutRef.current);
+            }
+
+            starterChoiceLabelTimeoutRef.current = window.setTimeout(() => {
+                setStarterChoiceNameOutgoing(null);
+                starterChoiceLabelTimeoutRef.current = null;
+            }, STARTER_LABEL_ANIM_MS);
+
+            return nextName;
+        });
+    }, [selectedStarterChoiceElement]);
+
     const isIntroVisible = introPhase !== "hidden";
     const introDisplayName = introChosenNameRef.current || playerName || "Traveler";
     const introText =
@@ -1792,7 +2078,12 @@ function Game() {
             ref={gameRef}
             onDragOver={handleGameDragOver}
             onDrop={handleGameDrop}
-            style={{ position: "relative", width: "100%", height: "100%" }}
+            style={{
+                position: "relative",
+                width: "100%",
+                height: "100%",
+                ["--post-battle-soul-fill-ms" as string]: `${postBattleSoulFillDurationMs}ms`,
+            }}
         >
             {potionSparkles.length > 0 ? (
                 <div className="potion-sparkle-layer" aria-hidden="true">
@@ -1819,6 +2110,15 @@ function Game() {
                 <div className="soul-pulse-cue" aria-hidden="true">
                     <img src={soulIcon} alt="" className="soul-pulse-cue-icon" />
                     <span className="soul-pulse-cue-text">+{soulPulseAmount} SOULS</span>
+                </div>
+            ) : null}
+            {isOldOnePreludeActive ? (
+                <div className={`old-one-prelude-overlay${isOldOnePreludeBlackVisible ? " is-black-visible" : ""}`} aria-hidden="true">
+                    <div className={`feed-story-text old-one-prelude-text${isOldOnePreludeTextVisible ? " is-visible" : ""}`}>FEED...</div>
+                    <div className={`old-one-prelude-eyes${isOldOnePreludeEyesApproaching ? " is-approaching" : ""}`}>
+                        <span className="game-intro-eye game-intro-eye--left" />
+                        <span className="game-intro-eye game-intro-eye--right" />
+                    </div>
                 </div>
             ) : null}
             {isChestRevealVisible ? (
@@ -1913,6 +2213,71 @@ function Game() {
                         </div>
                     ) : null}
                 </div>
+            ) : null}
+            {isStarterChoiceOpen ? (
+                <div className="starter-choice-overlay" role="dialog" aria-modal="true" aria-label="Starter choice">
+                    <div className="starter-choice-modal" style={starterChoiceModalStyle}>
+                        <div className={`starter-choice-grid${selectedStarterChoiceIndex !== null ? " has-selection" : ""}`}>
+                            {starterChoiceElements.map((element, index) => (
+                                <button
+                                    key={`${element.letter}-${index}`}
+                                    ref={(button) => { starterChoiceButtonRefs.current[index] = button; }}
+                                    type="button"
+                                    className={`starter-choice-element${selectedStarterChoiceIndex === index ? " is-selected" : ""}`}
+                                    onClick={() => handleStarterChoiceSelect(index)}
+                                    onMouseEnter={() => setHoveredStarterChoiceIndex(index)}
+                                    onMouseLeave={() => setHoveredStarterChoiceIndex((current) => (current === index ? null : current))}
+                                    onFocus={() => setHoveredStarterChoiceIndex(index)}
+                                    onBlur={() => setHoveredStarterChoiceIndex((current) => (current === index ? null : current))}
+                                    disabled={isStarterChoiceConfirming}
+                                    aria-label={`Choose ${element.letter}`}
+                                >
+                                    <ElementIcon name={element.letter} />
+                                </button>
+                            ))}
+                        </div>
+                        <button
+                            type="button"
+                            className="starter-choice-confirm"
+                            onClick={handleConfirmStarterChoice}
+                            disabled={selectedStarterChoiceIndex === null || isStarterChoiceConfirming}
+                        >
+                            <span className="starter-choice-confirm-label" aria-live="polite">
+                                {starterChoiceNameCurrent.length === 0 && !starterChoiceNameOutgoing ? (
+                                    <span className="starter-choice-confirm-prefix">Make Your Choice</span>
+                                ) : (
+                                    <>
+                                        <span className="starter-choice-confirm-prefix">I Choose</span>
+                                        {starterChoiceNameOutgoing ? (
+                                            <span className="starter-choice-confirm-text is-outgoing">{starterChoiceNameOutgoing}</span>
+                                        ) : null}
+                                        <span key={starterChoiceNameRevision} className="starter-choice-confirm-text is-current">{starterChoiceNameCurrent}</span>
+                                    </>
+                                )}
+                            </span>
+                        </button>
+                    </div>
+                </div>
+            ) : null}
+            {isStarterChoiceOpen && hoveredStarterChoiceElement && hoveredStarterChoiceIndex !== null ? (
+                <FloatingTooltip
+                    anchorElement={starterChoiceButtonRefs.current[hoveredStarterChoiceIndex]}
+                    open
+                    className="start-menu-element-tooltip-shell"
+                    clampHorizontal={false}
+                    typeMultipliers={typeMultipliers}
+                    elementDetails={{
+                        letter: hoveredStarterChoiceElement.letter,
+                        damage: hoveredStarterChoiceElement.damage,
+                        energy: hoveredStarterChoiceElement.energy,
+                        description: hoveredStarterChoiceElement.description,
+                        type1: hoveredStarterChoiceElement.type1,
+                        type2: hoveredStarterChoiceElement.type2,
+                        effects: hoveredStarterChoiceElement.effects,
+                        level: hoveredStarterChoiceElement.level,
+                        category: hoveredStarterChoiceElement.category,
+                    }}
+                />
             ) : null}
             {draggables.map((draggable) => (
                 <Draggable
@@ -2055,10 +2420,18 @@ function Game() {
                         </div>
                     ) : null}
 
+                    <div className="element-start" ref={elementStartRef}></div>
+
+                    {isEnhanceStationUnlocked ? (
+                        <div className="enhance-station" aria-label="Enhance station">
+                            <div className="enhance-slot-shell">
+                                <div className="enhance-slot" aria-hidden="true">1</div>
+                            </div>
+                            <button type="button" className="enhance-button">ENHANCE</button>
+                        </div>
+                    ) : null}
+
                     <div className="battle-station">
-                        <button className="feed-button" onClick={handleFeedClick}>
-                            FEED
-                        </button>
                         <PlayerStats
                             playerName={playerName}
                             level={playerProgress.level}
@@ -2070,17 +2443,14 @@ function Game() {
                             isPotionBrewedFlash={isPotionBrewedFlash}
                             souls={playerProgress.souls}
                             statuses={playerStatuses}
-                            className={`player-stats-dock${isSoulCounterPopping ? " is-soul-counter-pop" : ""}`}
+                            className={`player-stats-dock${isSoulCounterPopping ? " is-soul-counter-pop" : ""}${isPostBattleSoulSequenceActive ? " is-soul-fill-sequence" : ""}`}
                         />
-                    </div>
-                    <div className="element-start" ref={elementStartRef}></div>
-                </div>
-                <div className="game-scene-col game-scene-col--right">
-                    <div className="game-enemy-actions">
-                        <button className="fight-button" onClick={handleFight}>
-                            FIGHT!
+                        <button className="feed-button" onClick={handleFeedClick}>
+                            FEED
                         </button>
                     </div>
+                </div>
+                <div className="game-scene-col game-scene-col--right">
                     <div className="game-enemy-card">
                         <div className="next-enemy-text">Next Enemy</div>
                         <div className="game-enemy-card-header">
@@ -2097,6 +2467,11 @@ function Game() {
                             souls={nextEnemy?.souls ?? 0}
                         />
                         <div className="game-enemy-card-footer">Hover for details</div>
+                    </div>
+                    <div className="game-enemy-actions">
+                        <button className="fight-button" onClick={handleFight}>
+                            FIGHT!
+                        </button>
                     </div>
                 </div>
             </div>
@@ -2124,15 +2499,15 @@ function Game() {
                     </div>
                 </aside>
             ) : null}
-            {fightReward ? (
+            {/* {fightReward ? (
                 <RewardModal
-                    soulsGained={fightReward.soulsGained}
-                    rewardElements={fightReward.rewardElements}
-                    isChestReward={fightReward.isChestReward}
-                    chests={fightReward.chests}
+                    soulsGained={fightReward.soulsGained ?? null}
+                    rewardElements={fightReward.rewardElements ?? null}
+                    isChestReward={fightReward.isChestReward ?? false}
+                    chests={fightReward.chests ?? []}
                     onConfirm={handleRewardConfirm}
                 />
-            ) : null}
+            ) : null} */}
             {pendingUpgradeRewards ? (
                 <MonsterUpgradeModal
                     rewards={pendingUpgradeRewards}
@@ -2165,6 +2540,16 @@ function Game() {
                             className="feed-soul-fly"
                         />
                     ))}
+                    {feedStoryText ? (
+                        <div className={`feed-story-text${isFeedStoryTextFading ? " is-fading" : ""}`} aria-live="polite">
+                            {feedStoryText}
+                        </div>
+                    ) : null}
+                    {isOldOneStirsModalVisible ? (
+                        <div className={`old-one-stirs-overlay${isOldOneStirsModalFadingOut ? " is-fading-out" : ""}`} aria-hidden="true">
+                            <div className="old-one-stirs-modal">The old one stirs</div>
+                        </div>
+                    ) : null}
                     <div className="feed-overlay-actions" onClick={(e) => e.stopPropagation()}>
                         <div className={`player-souls-panel${isSoulsPanelFlashing ? " player-souls-panel--flash" : ""}`} aria-label={`Souls ${playerProgress.souls}`} title="Souls are earned from victories and persist between battles.">
                             <img src={soulIcon} alt="" aria-hidden="true" className="player-souls-icon" />
@@ -2173,12 +2558,19 @@ function Game() {
                                 <span className="player-souls-value">{playerProgress.souls}</span>
                             </div>
                         </div>
-                        <button className="feed-button" onClick={handleFeedSpend}>
+                        <button
+                            className="feed-button"
+                            onClick={handleFeedSpend}
+                            disabled={isOldOneSequenceRunning || isOldOneStirsModalVisible}
+                            aria-label={isOldOneReturnLocked ? `Feed (${Math.min(oldOneFeedCount, 5)}/5)` : "Feed"}
+                        >
                             FEED
                         </button>
-                        <button className="feed-overlay-return-button" onClick={handleFeedOverlayClose}>
-                            RETURN
-                        </button>
+                        {!isOldOneReturnLocked ? (
+                            <button className="feed-overlay-return-button" onClick={handleFeedOverlayClose}>
+                                RETURN
+                            </button>
+                        ) : null}
                     </div>
                 </div>
             ) : null}
