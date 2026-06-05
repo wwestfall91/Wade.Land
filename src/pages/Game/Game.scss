@@ -63,6 +63,25 @@
         z-index: 8800;
     }
 
+    .enhance-soul-flight-layer {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 8850;
+    }
+
+    .enhance-soul-flight {
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        width: 1.7rem;
+        height: 1.7rem;
+        object-fit: contain;
+        filter: drop-shadow(0 0 0.45rem rgba(95, 255, 186, 0.72));
+        transform: translate(-50%, -50%);
+        animation: enhance-soul-flight 420ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    }
+
     .potion-sparkle-layer {
         position: fixed;
         inset: 0;
@@ -209,6 +228,22 @@
 
         .player-souls-value {
             animation: souls-counter-value-pop 220ms ease-out;
+        }
+    }
+
+    .player-stats.player-stats-dock.is-soul-panel-error {
+        .player-souls-panel {
+            border-color: rgba(255, 125, 125, 0.94);
+            background: linear-gradient(180deg, rgba(136, 20, 20, 0.9) 0%, rgba(72, 8, 8, 0.94) 100%);
+            animation: souls-panel-error-shake 500ms linear;
+            box-shadow:
+                inset 0 0 0 1px rgba(255, 160, 160, 0.22),
+                0 0 0.78rem rgba(255, 74, 74, 0.42);
+        }
+
+        .player-souls-label,
+        .player-souls-value {
+            color: #ffd8d8;
         }
     }
 
@@ -1012,71 +1047,185 @@
         flex-direction: column;
         align-items: center;
         gap: 0.75rem;
-        padding: 1rem 1rem 0.9rem;
-        border: 2px solid #3a3a3a;
+        position: relative;
+        padding: 1rem 1.1rem 1rem;
+        border: 2px solid #84ffd0;
         border-radius: 4px;
-        background: linear-gradient(180deg, #1a1a1a 0%, #090909 100%);
+        background:
+            radial-gradient(circle at 14% 10%, rgba(67, 255, 180, 0.16), transparent 34%),
+            linear-gradient(180deg, #104e37 0%, #06291d 100%);
         box-shadow:
-            inset 0 0 0 1px #4b4b4b,
-            inset 0 0 0 2px #050505,
+            inset 0 0 0 1px #98ffd8,
+            inset 0 0 0 2px #053727,
             0 8px 0 rgba(0, 0, 0, 0.45);
-    }
-
-    .enhance-slot-shell {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 6rem;
-        height: 6rem;
-        border-radius: 4px;
-        border: 2px solid #6a6a6a;
-        background: linear-gradient(180deg, #222 0%, #111 100%);
-        box-shadow:
-            inset 0 0 0 1px #7f7f7f,
-            inset 0 0 0 2px #0b0b0b;
     }
 
     .enhance-slot {
         display: flex;
+        position: relative;
         align-items: center;
         justify-content: center;
         width: 3rem;
         height: 3rem;
-        border-radius: 4px;
-        border: 2px dashed #5a5a5a;
-        color: #8e8e8e;
-        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
-        font-size: 1rem;
+        border-radius: 22px;
+        border: 2px solid #e6ecff;
+        font-size: 1.05rem;
         font-weight: 700;
-        background: rgba(0, 0, 0, 0.35);
+        color: #fff7ab;
+        text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.7);
+        background: linear-gradient(180deg, #28684f 0%, #114130 100%);
+        box-shadow:
+            inset 0 0 0 1px #9ef3d0,
+            inset 0 0 0 2px #093223;
+
+        .element-icon {
+            width: 1.65rem;
+            height: 1.65rem;
+            object-fit: contain;
+            pointer-events: none;
+        }
+    }
+
+    .enhance-slot.has-element {
+        color: transparent;
+    }
+
+    .enhance-button-wrap {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        position: relative;
+
+        &.is-disabled:hover .enhance-button-tooltip {
+            opacity: 1;
+            transform: translateX(-50%) scale(1);
+        }
+    }
+
+    .enhance-button-tooltip {
+        position: absolute;
+        left: 50%;
+        bottom: calc(100% + 0.34rem);
+        transform: translateX(-50%) scale(0.88);
+        transform-origin: bottom center;
+        padding: 0.26rem 0.52rem;
+        border-radius: 0.45rem;
+        border: 1px solid rgba(105, 255, 187, 0.36);
+        background: rgba(4, 18, 13, 0.94);
+        color: #d6ffe9;
+        font-size: 0.68rem;
+        font-weight: 700;
+        white-space: nowrap;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 130ms ease, transform 130ms ease;
+        z-index: 20;
     }
 
     .enhance-button {
         display: flex;
         justify-content: center;
         align-items: center;
+        gap: 0.34rem;
         min-height: 2.8rem;
         min-width: 9.5rem;
         padding: 0 1rem;
         border-radius: 4px;
-        border: 2px solid #676767;
-        background: linear-gradient(180deg, #2c2c2c 0%, #171717 100%);
-        color: #f0f0f0;
+        border: 2px solid #8fffd3;
+        background: linear-gradient(180deg, #2f8c66 0%, #16503a 100%);
+        color: #eafff4;
         font-family: "Trebuchet MS", "Segoe UI", sans-serif;
         font-size: 1rem;
         font-weight: 700;
         letter-spacing: 0.03em;
         text-transform: uppercase;
         cursor: pointer;
+        transition: transform 110ms ease, box-shadow 110ms ease, border-color 110ms ease;
         box-shadow:
-            inset 0 0 0 1px #878787,
-            inset 0 0 0 2px #0a0a0a,
+            inset 0 0 0 1px #b4ffe2,
+            inset 0 0 0 2px #0b3b2a,
             0 5px 0 rgba(0, 0, 0, 0.38);
 
-        &:hover {
+        &:hover:enabled {
             transform: translateY(-1px);
-            border-color: #868686;
+            border-color: #bbffe8;
         }
+
+        &:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+            filter: saturate(0.55) brightness(0.92);
+        }
+    }
+
+    .enhance-button-icon {
+        width: 1.06rem;
+        height: 1.06rem;
+        object-fit: contain;
+        display: block;
+        flex-shrink: 0;
+        filter: drop-shadow(0 0 0.3rem rgba(95, 255, 186, 0.72));
+    }
+
+    .enhance-button span {
+        line-height: 1;
+        display: inline-flex;
+        align-items: center;
+    }
+
+    .enhance-slot[aria-label="Enhance slot"]::after {
+        content: "";
+        position: absolute;
+        inset: -3px;
+        border-radius: 22px;
+        border: 1px dashed rgba(146, 255, 210, 0.35);
+        pointer-events: none;
+        opacity: 0.5;
+    }
+
+    .enhance-slot.has-element::after {
+        opacity: 0;
+    }
+
+    .enhance-slot[aria-label="Enhance slot"] {
+        user-select: none;
+    }
+
+    .enhance-slot.has-element {
+        animation: enhance-slot-occupancy 220ms ease-out;
+    }
+
+    .enhance-slot.has-element .element-icon {
+        filter: drop-shadow(0 0 0.25rem rgba(95, 255, 186, 0.35));
+    }
+
+    .enhance-button-wrap.is-disabled .enhance-button {
+        pointer-events: auto;
+    }
+
+    .enhance-button-wrap.is-disabled .enhance-button:disabled {
+        border-color: #86d8b6;
+        background: linear-gradient(180deg, #2d7056 0%, #184533 100%);
+    }
+
+    .enhance-station > * {
+        position: relative;
+        z-index: 1;
+    }
+
+    .enhance-station::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: repeating-linear-gradient(
+            0deg,
+            rgba(255, 255, 255, 0.035) 0,
+            rgba(255, 255, 255, 0.035) 1px,
+            transparent 1px,
+            transparent 4px
+        );
+        opacity: 0.33;
     }
 
     .game-scene-row {
@@ -1723,6 +1872,66 @@
     100% {
         transform: translate(-50%, -8rem) scale(0);
         opacity: 0;
+    }
+}
+
+@keyframes enhance-soul-flight {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.5);
+    }
+
+    16% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1.06);
+    }
+
+    85% {
+        opacity: 1;
+        transform: translate(calc(-50% + var(--enhance-soul-fly-x)), calc(-50% + var(--enhance-soul-fly-y))) scale(0.9);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translate(calc(-50% + var(--enhance-soul-fly-x)), calc(-50% + var(--enhance-soul-fly-y))) scale(0.2);
+    }
+}
+
+@keyframes souls-panel-error-shake {
+    0% {
+        transform: translateX(0);
+    }
+
+    15% {
+        transform: translateX(-2px);
+    }
+
+    35% {
+        transform: translateX(3px);
+    }
+
+    55% {
+        transform: translateX(-3px);
+    }
+
+    75% {
+        transform: translateX(2px);
+    }
+
+    100% {
+        transform: translateX(0);
+    }
+}
+
+@keyframes enhance-slot-occupancy {
+    0% {
+        transform: scale(0.94);
+        filter: brightness(0.86);
+    }
+
+    100% {
+        transform: scale(1);
+        filter: brightness(1);
     }
 }
 

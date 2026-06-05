@@ -214,6 +214,14 @@ type SoulFlightIcon = {
     delayMs: number;
 };
 
+type EnhanceSoulFlight = {
+    id: number;
+    startX: number;
+    startY: number;
+    toX: number;
+    toY: number;
+};
+
 type ElementFlightIcon = {
     id: number;
     startX: number;
@@ -302,6 +310,7 @@ function Game() {
     const dropZoneRefB = useRef<HTMLDivElement | null>(null);
     const dropZoneRefC = useRef<HTMLDivElement | null>(null);
     const outputRef = useRef<HTMLDivElement | null>(null);
+    const enhanceSlotRef = useRef<HTMLDivElement | null>(null);
     const previewRef = useRef<HTMLDivElement | null>(null);
     const feedAnimCounterRef = useRef(0);
     const eyesFlashTimerRef = useRef<number | null>(null);
@@ -326,6 +335,7 @@ function Game() {
     const [isOldOneStirsModalVisible, setIsOldOneStirsModalVisible] = useState(false);
     const [isOldOneStirsModalFadingOut, setIsOldOneStirsModalFadingOut] = useState(false);
     const [isEnhanceStationUnlocked, setIsEnhanceStationUnlocked] = useState(false);
+    const [enhanceSlotOccupantId, setEnhanceSlotOccupantId] = useState<number | null>(null);
     const [eyesFlashRevision, setEyesFlashRevision] = useState(0);
     const [monsterThresholds, setMonsterThresholds] = useState<MonsterRewardThreshold[]>([]);
     const [rewardGlowRevision, setRewardGlowRevision] = useState(0);
@@ -366,6 +376,7 @@ function Game() {
     const [isSoulPulseVisible, setIsSoulPulseVisible] = useState(false);
     const [soulPulseAmount, setSoulPulseAmount] = useState(0);
     const [isSoulCounterPopping, setIsSoulCounterPopping] = useState(false);
+    const [isSoulPanelErrorFeedback, setIsSoulPanelErrorFeedback] = useState(false);
     const [isPostBattleSoulSequenceActive, setIsPostBattleSoulSequenceActive] = useState(false);
     const [postBattleSoulFillDurationMs, setPostBattleSoulFillDurationMs] = useState(0);
     const [isOldOnePreludeActive, setIsOldOnePreludeActive] = useState(false);
@@ -373,6 +384,7 @@ function Game() {
     const [isOldOnePreludeTextVisible, setIsOldOnePreludeTextVisible] = useState(false);
     const [isOldOnePreludeEyesApproaching, setIsOldOnePreludeEyesApproaching] = useState(false);
     const [soulFlightIcons, setSoulFlightIcons] = useState<SoulFlightIcon[]>([]);
+    const [enhanceSoulFlights, setEnhanceSoulFlights] = useState<EnhanceSoulFlight[]>([]);
     const [elementFlightIcons, setElementFlightIcons] = useState<ElementFlightIcon[]>([]);
     const [isChestRevealVisible, setIsChestRevealVisible] = useState(false);
     const [isChestRevealFadingOut, setIsChestRevealFadingOut] = useState(false);
@@ -399,6 +411,9 @@ function Game() {
     const potionSparkleTimeoutsRef = useRef<number[]>([]);
     const soulAnimationTimeoutsRef = useRef<number[]>([]);
     const soulCounterPopTimeoutRef = useRef<number | null>(null);
+    const soulPanelErrorTimeoutRef = useRef<number | null>(null);
+    const enhanceSoulFlightIdRef = useRef(1);
+    const enhanceSoulFlightTimeoutsRef = useRef<number[]>([]);
     const elementFlightIdRef = useRef(1);
     const elementFlightTimeoutsRef = useRef<number[]>([]);
     const hasShownInitialRewardModalRef = useRef(false);
@@ -426,6 +441,12 @@ function Game() {
         if (soulCounterPopTimeoutRef.current !== null) {
             window.clearTimeout(soulCounterPopTimeoutRef.current);
         }
+        if (soulPanelErrorTimeoutRef.current !== null) {
+            window.clearTimeout(soulPanelErrorTimeoutRef.current);
+        }
+        enhanceSoulFlightTimeoutsRef.current.forEach((timeoutId) => {
+            window.clearTimeout(timeoutId);
+        });
         elementFlightTimeoutsRef.current.forEach((timeoutId) => {
             window.clearTimeout(timeoutId);
         });
@@ -563,6 +584,50 @@ function Game() {
         });
     }, []);
 
+    const triggerSoulPanelErrorFeedback = useCallback(() => {
+        setIsSoulPanelErrorFeedback(false);
+        window.requestAnimationFrame(() => {
+            setIsSoulPanelErrorFeedback(true);
+            if (soulPanelErrorTimeoutRef.current !== null) {
+                window.clearTimeout(soulPanelErrorTimeoutRef.current);
+            }
+
+            soulPanelErrorTimeoutRef.current = window.setTimeout(() => {
+                setIsSoulPanelErrorFeedback(false);
+                soulPanelErrorTimeoutRef.current = null;
+            }, 500);
+        });
+    }, []);
+
+    const launchEnhanceSoulFlight = useCallback(() => {
+        const soulsPanel = document.querySelector("#Game .player-stats-dock .player-souls-panel") as HTMLElement | null;
+        const enhanceSlot = enhanceSlotRef.current;
+        if (!soulsPanel || !enhanceSlot) {
+            return;
+        }
+
+        const soulsIcon = soulsPanel.querySelector(".player-souls-icon") as HTMLElement | null;
+        const startRect = (soulsIcon ?? soulsPanel).getBoundingClientRect();
+        const targetRect = enhanceSlot.getBoundingClientRect();
+        const startX = startRect.left + startRect.width / 2;
+        const startY = startRect.top + startRect.height / 2;
+
+        const shot: EnhanceSoulFlight = {
+            id: enhanceSoulFlightIdRef.current++,
+            startX,
+            startY,
+            toX: targetRect.left + targetRect.width / 2 - startX,
+            toY: targetRect.top + targetRect.height / 2 - startY,
+        };
+
+        setEnhanceSoulFlights((previous) => [...previous, shot]);
+
+        const cleanupTimeoutId = window.setTimeout(() => {
+            setEnhanceSoulFlights((previous) => previous.filter((item) => item.id !== shot.id));
+        }, 420);
+        enhanceSoulFlightTimeoutsRef.current.push(cleanupTimeoutId);
+    }, []);
+
     const triggerPotionBrewFlash = useCallback(() => {
         setIsPotionBrewedFlash(false);
         window.requestAnimationFrame(() => {
@@ -689,6 +754,9 @@ function Game() {
     const activeDropZoneRefs = zoneOccupants.length === 3
         ? [dropZoneRefA, dropZoneRefB, dropZoneRefC]
         : [dropZoneRefA, dropZoneRefB];
+    const allDropZoneRefs = isEnhanceStationUnlocked
+        ? [...activeDropZoneRefs, enhanceSlotRef]
+        : activeDropZoneRefs;
 
     const getDraggableById = useCallback((draggableId: number | null) => {
         if (draggableId === null) {
@@ -1094,6 +1162,12 @@ function Game() {
                     ? occupantId
                     : null,
             ),
+        );
+
+        setEnhanceSlotOccupantId((previous) =>
+            previous !== null && playerProgress.elements.some((element) => element.id === previous)
+                ? previous
+                : null,
         );
 
         const maxId = playerProgress.elements.reduce(
@@ -1531,6 +1605,7 @@ function Game() {
     };
 
     const handleSnapChange = (draggableId: number, zoneIndex: number | null) => {
+        const enhanceZoneIndex = zoneOccupants.length;
         if (newChestElementIds.has(draggableId)) {
             setNewChestElementIds((prev) => {
                 const next = new Set(prev);
@@ -1550,12 +1625,22 @@ function Game() {
             }
         }
 
+        if (zoneIndex === enhanceZoneIndex && isEnhanceStationUnlocked) {
+            setEnhanceSlotOccupantId(draggableId);
+            setZoneOccupants((previous) => normalizeZoneOccupants(
+                previous.map((occupantId) => (occupantId === draggableId ? null : occupantId)),
+            ));
+            return;
+        }
+
+        setEnhanceSlotOccupantId((previous) => (previous === draggableId ? null : previous));
+
         setZoneOccupants((previous) => {
             const next = previous.map((occupantId) =>
                 occupantId === draggableId ? null : occupantId,
             );
 
-            if (zoneIndex !== null) {
+            if (zoneIndex !== null && zoneIndex < enhanceZoneIndex) {
                 next[zoneIndex] = draggableId;
             }
 
@@ -1582,6 +1667,15 @@ function Game() {
             return false;
         }
 
+        const enhanceZoneIndex = zoneOccupants.length;
+        if (zoneIndex === enhanceZoneIndex) {
+            if (!isEnhanceStationUnlocked) {
+                return false;
+            }
+
+            return enhanceSlotOccupantId === null || enhanceSlotOccupantId === draggableId;
+        }
+
         // Spells cannot be combined — block snapping entirely
         if (draggable.category === "spell") {
             return false;
@@ -1602,6 +1696,23 @@ function Game() {
         const occupantId = zoneOccupants[zoneIndex];
         return occupantId === null || occupantId === draggableId;
     };
+
+    const enhanceSlottedDraggable = getDraggableById(enhanceSlotOccupantId);
+    const isEnhanceDisabled = !enhanceSlottedDraggable;
+
+    const handleEnhanceClick = useCallback(() => {
+        if (!enhanceSlottedDraggable) {
+            return;
+        }
+
+        if (playerProgress.souls <= 0) {
+            triggerSoulPanelErrorFeedback();
+            return;
+        }
+
+        spendSouls(1);
+        launchEnhanceSoulFlight();
+    }, [enhanceSlottedDraggable, launchEnhanceSoulFlight, playerProgress.souls, spendSouls, triggerSoulPanelErrorFeedback]);
 
     const handleCombine = () => {
         if (!previewCombination) {
@@ -2179,6 +2290,24 @@ function Game() {
                     ))}
                 </div>
             ) : null}
+            {enhanceSoulFlights.length > 0 ? (
+                <div className="enhance-soul-flight-layer" aria-hidden="true">
+                    {enhanceSoulFlights.map((flight) => (
+                        <img
+                            key={flight.id}
+                            src={soulIcon}
+                            alt=""
+                            className="enhance-soul-flight"
+                            style={{
+                                left: `${flight.startX}px`,
+                                top: `${flight.startY}px`,
+                                ["--enhance-soul-fly-x" as string]: `${flight.toX}px`,
+                                ["--enhance-soul-fly-y" as string]: `${flight.toY}px`,
+                            }}
+                        />
+                    ))}
+                </div>
+            ) : null}
             {isFightVictoryCueVisible ? (
                 <div className="fight-victory-cue" role="status" aria-live="polite">
                     Victory! Claim your reward.
@@ -2295,7 +2424,7 @@ function Game() {
                     level={draggable.level}
                     category={draggable.category}
                     containerRef={gameRef}
-                    dropZoneRefs={activeDropZoneRefs}
+                    dropZoneRefs={allDropZoneRefs}
                     initialPosition={draggable.initialPosition}
                     onSnapChange={handleSnapChange}
                     canSnapToZone={canSnapToZone}
@@ -2424,10 +2553,18 @@ function Game() {
 
                     {isEnhanceStationUnlocked ? (
                         <div className="enhance-station" aria-label="Enhance station">
-                            <div className="enhance-slot-shell">
-                                <div className="enhance-slot" aria-hidden="true">1</div>
+                            <div className={`enhance-slot${enhanceSlottedDraggable ? " has-element" : ""}`} ref={enhanceSlotRef} aria-label="Enhance slot">
+                                {enhanceSlottedDraggable ? <ElementIcon name={enhanceSlottedDraggable.letter} /> : "1"}
                             </div>
-                            <button type="button" className="enhance-button">ENHANCE</button>
+                            <div className={`enhance-button-wrap ${isEnhanceDisabled ? "is-disabled" : ""}`}>
+                                <button type="button" className="enhance-button" disabled={isEnhanceDisabled} onClick={handleEnhanceClick}>
+                                    <img src={soulIcon} alt="" aria-hidden="true" className="enhance-button-icon" />
+                                    <span>ENHANCE</span>
+                                </button>
+                                <div className="enhance-button-tooltip" role="tooltip">
+                                    Please insert an element
+                                </div>
+                            </div>
                         </div>
                     ) : null}
 
@@ -2443,7 +2580,7 @@ function Game() {
                             isPotionBrewedFlash={isPotionBrewedFlash}
                             souls={playerProgress.souls}
                             statuses={playerStatuses}
-                            className={`player-stats-dock${isSoulCounterPopping ? " is-soul-counter-pop" : ""}${isPostBattleSoulSequenceActive ? " is-soul-fill-sequence" : ""}`}
+                            className={`player-stats-dock${isSoulCounterPopping ? " is-soul-counter-pop" : ""}${isPostBattleSoulSequenceActive ? " is-soul-fill-sequence" : ""}${isSoulPanelErrorFeedback ? " is-soul-panel-error" : ""}`}
                         />
                         <button className="feed-button" onClick={handleFeedClick}>
                             FEED
