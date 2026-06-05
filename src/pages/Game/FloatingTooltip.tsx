@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { SpellEffectConfig } from "../../combat/spellEffects";
 import { statusEffectsRegistry } from "../../combat/statusEffectsRegistry";
@@ -18,8 +18,8 @@ type FloatingTooltipProps = {
     open: boolean;
     className: string;
     interactive?: boolean;
-    onTooltipMouseEnter?: () => void;
-    onTooltipMouseLeave?: () => void;
+    onTooltipMouseEnter?: (event: MouseEvent<HTMLDivElement>) => void;
+    onTooltipMouseLeave?: (event: MouseEvent<HTMLDivElement>) => void;
     children?: ReactNode;
     elementDetails?: {
         letter: string;

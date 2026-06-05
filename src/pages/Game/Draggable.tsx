@@ -60,11 +60,13 @@ function Draggable({
 	const [isHovered, setIsHovered] = useState(false);
 	const [isTooltipHovered, setIsTooltipHovered] = useState(false);
 	const [isTooltipGraceOpen, setIsTooltipGraceOpen] = useState(false);
+	const [isAltLockActive, setIsAltLockActive] = useState(false);
 	const [isAltHeld, setIsAltHeld] = useState(false);
 	const [mouseOffset, setMouseOffset] = useState({ x: 0, y: 0 });
 	const [position, setPosition] = useState<Position>(initialPosition);
 	const draggableRef = useRef<HTMLDivElement | null>(null);
 	const tooltipGraceTimeoutRef = useRef<number | null>(null);
+	const altHeldRef = useRef(false);
 
 	const clearTooltipGraceTimeout = () => {
 		if (tooltipGraceTimeoutRef.current !== null) {
@@ -79,7 +81,17 @@ function Draggable({
 		tooltipGraceTimeoutRef.current = window.setTimeout(() => {
 			setIsTooltipGraceOpen(false);
 			tooltipGraceTimeoutRef.current = null;
-		}, 250);
+		}, 450);
+	};
+
+	const releaseAltLock = (preserveTooltipHover = false) => {
+		setIsAltLockActive(false);
+		setIsAltHeld(false);
+		if (!preserveTooltipHover) {
+			setIsTooltipHovered(false);
+		}
+		setIsTooltipGraceOpen(false);
+		clearTooltipGraceTimeout();
 	};
 
 	useEffect(() => () => {
@@ -87,29 +99,59 @@ function Draggable({
 	}, []);
 
 	useEffect(() => {
-		const handleKeyDown = (event: KeyboardEvent) => {
-			if (event.key === "Alt") {
-				setIsAltHeld(true);
+		const syncAltState = (isAltPressed: boolean) => {
+			altHeldRef.current = isAltPressed;
+			setIsAltHeld(isAltPressed);
+
+			if (!isAltPressed) {
+				releaseAltLock(true);
 			}
+		};
+
+		const handleKeyDown = (event: KeyboardEvent) => {
+			syncAltState(event.altKey || event.key === "Alt");
 		};
 
 		const handleKeyUp = (event: KeyboardEvent) => {
-			if (event.key === "Alt") {
-				setIsAltHeld(false);
-				setIsTooltipHovered(false);
-				setIsTooltipGraceOpen(false);
-				clearTooltipGraceTimeout();
+			syncAltState(event.altKey);
+		};
+
+		const handlePointerMove = (event: PointerEvent) => {
+			syncAltState(event.altKey);
+		};
+
+		const handleWindowBlur = () => {
+			syncAltState(false);
+		};
+
+		const handleVisibilityChange = () => {
+			if (document.visibilityState !== "visible") {
+				syncAltState(false);
 			}
 		};
 
-		window.addEventListener("keydown", handleKeyDown);
-		window.addEventListener("keyup", handleKeyUp);
+		window.addEventListener("keydown", handleKeyDown, true);
+		document.addEventListener("keydown", handleKeyDown, true);
+		window.addEventListener("keyup", handleKeyUp, true);
+		document.addEventListener("keyup", handleKeyUp, true);
+		window.addEventListener("pointermove", handlePointerMove, true);
+		window.addEventListener("blur", handleWindowBlur);
+		document.addEventListener("visibilitychange", handleVisibilityChange);
 
 		return () => {
-			window.removeEventListener("keydown", handleKeyDown);
-			window.removeEventListener("keyup", handleKeyUp);
+			window.removeEventListener("keydown", handleKeyDown, true);
+			document.removeEventListener("keydown", handleKeyDown, true);
+			window.removeEventListener("keyup", handleKeyUp, true);
+			document.removeEventListener("keyup", handleKeyUp, true);
+			window.removeEventListener("pointermove", handlePointerMove, true);
+			window.removeEventListener("blur", handleWindowBlur);
+			document.removeEventListener("visibilitychange", handleVisibilityChange);
 		};
 	}, []);
+
+	useEffect(() => {
+		altHeldRef.current = isAltHeld;
+	}, [isAltHeld]);
 
 	useEffect(() => {
 		if (!isDragging) return;
@@ -240,15 +282,26 @@ function Draggable({
 		setIsDragging(true);
 	};
 
-	const handleDraggableMouseEnter = () => {
+	const handleDraggableMouseEnter = (event: React.MouseEvent<HTMLDivElement>) => {
 		clearTooltipGraceTimeout();
 		setIsTooltipGraceOpen(false);
 		setIsHovered(true);
+
+		if (event.altKey || isAltHeld || altHeldRef.current) {
+			altHeldRef.current = true;
+			setIsAltHeld(true);
+			setIsAltLockActive(true);
+		}
 	};
 
-	const handleDraggableMouseLeave = () => {
+	const handleDraggableMouseLeave = (event: React.MouseEvent<HTMLDivElement>) => {
 		setIsHovered(false);
-		if (isAltHeld) {
+
+		if (isAltLockActive && (isAltHeld || altHeldRef.current || event.altKey)) {
+			return;
+		}
+
+		if (isAltHeld || altHeldRef.current || event.altKey) {
 			startTooltipGraceClose();
 			return;
 		}
@@ -258,8 +311,14 @@ function Draggable({
 		clearTooltipGraceTimeout();
 	};
 
-	const handleTooltipMouseEnter = () => {
-		if (!isAltHeld) {
+	const handleTooltipMouseEnter = (event: React.MouseEvent<HTMLDivElement>) => {
+		if (event.altKey || isAltHeld || altHeldRef.current) {
+			altHeldRef.current = true;
+			setIsAltHeld(true);
+			setIsAltLockActive(true);
+		}
+
+		if (!isAltHeld && !altHeldRef.current && !event.altKey) {
 			return;
 		}
 
@@ -270,10 +329,16 @@ function Draggable({
 
 	const handleTooltipMouseLeave = () => {
 		setIsTooltipHovered(false);
+
+		if (isAltLockActive && (isAltHeld || altHeldRef.current)) {
+			return;
+		}
+
 		startTooltipGraceClose();
 	};
 
-	const isTooltipOpen = !isDragging && (isHovered || isTooltipHovered || isTooltipGraceOpen);
+	const isAltStickyOpen = isAltLockActive && isAltHeld;
+	const isTooltipOpen = !isDragging && (isHovered || isTooltipHovered || isTooltipGraceOpen || isAltStickyOpen);
 	const isTooltipClosing = isTooltipGraceOpen && !isHovered && !isTooltipHovered;
 
 	return (
