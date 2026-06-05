@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import EnemyInfoSprite from "./EnemyInfoSprite";
 import ElementDetailsTooltip from "./ElementDetailsTooltip";
 import ElementIcon from "./ElementIcon";
@@ -61,12 +61,98 @@ function EnemyStage({
     soakStatus = null,
     freezeStatus = null,
 }: EnemyStageProps) {
+    const stageRef = useRef<HTMLDivElement | null>(null);
     const [hoveredElementIndex, setHoveredElementIndex] = useState<number | null>(null);
+    const [isElementChipHovered, setIsElementChipHovered] = useState(false);
+    const [isElementTooltipHovered, setIsElementTooltipHovered] = useState(false);
+    const [isElementTooltipGraceOpen, setIsElementTooltipGraceOpen] = useState(false);
     const elementRefs = useRef<Record<number, HTMLSpanElement | null>>({});
+    const elementTooltipGraceTimeoutRef = useRef<number | null>(null);
+
+    const clearElementTooltipGraceTimeout = () => {
+        if (elementTooltipGraceTimeoutRef.current !== null) {
+            window.clearTimeout(elementTooltipGraceTimeoutRef.current);
+            elementTooltipGraceTimeoutRef.current = null;
+        }
+    };
+
+    const startElementTooltipGraceClose = () => {
+        setIsElementTooltipGraceOpen(true);
+        clearElementTooltipGraceTimeout();
+        elementTooltipGraceTimeoutRef.current = window.setTimeout(() => {
+            setIsElementTooltipGraceOpen(false);
+            setHoveredElementIndex(null);
+            elementTooltipGraceTimeoutRef.current = null;
+        }, 250);
+    };
+
+    useEffect(() => () => {
+        clearElementTooltipGraceTimeout();
+    }, []);
+
+    useEffect(() => {
+        if (hoveredElementIndex === null) {
+            return;
+        }
+
+        if (!elements[hoveredElementIndex]) {
+            setHoveredElementIndex(null);
+            setIsElementChipHovered(false);
+            setIsElementTooltipHovered(false);
+            setIsElementTooltipGraceOpen(false);
+            clearElementTooltipGraceTimeout();
+        }
+    }, [elements, hoveredElementIndex]);
+
+    const handleElementChipMouseEnter = (index: number) => {
+        clearElementTooltipGraceTimeout();
+        setIsElementTooltipGraceOpen(false);
+        setHoveredElementIndex(index);
+        setIsElementChipHovered(true);
+    };
+
+    const handleElementChipMouseLeave = () => {
+        setIsElementChipHovered(false);
+        startElementTooltipGraceClose();
+    };
+
+    const handleElementTooltipMouseEnter = () => {
+        clearElementTooltipGraceTimeout();
+        setIsElementTooltipGraceOpen(false);
+        setIsElementTooltipHovered(true);
+    };
+
+    const handleElementTooltipMouseLeave = () => {
+        setIsElementTooltipHovered(false);
+        startElementTooltipGraceClose();
+    };
+
+    const isElementTooltipOpen =
+        hoveredElementIndex !== null && (isElementChipHovered || isElementTooltipHovered || isElementTooltipGraceOpen);
+    const isElementTooltipClosing = isElementTooltipGraceOpen && !isElementChipHovered && !isElementTooltipHovered;
+
+    useEffect(() => {
+        const stageElement = stageRef.current;
+        const enemyCardElement = stageElement?.closest(".game-enemy-card");
+        if (!enemyCardElement) {
+            return;
+        }
+
+        const lockClassName = "is-enemy-sub-tooltip-active";
+        if (isElementTooltipOpen) {
+            enemyCardElement.classList.add(lockClassName);
+        } else {
+            enemyCardElement.classList.remove(lockClassName);
+        }
+
+        return () => {
+            enemyCardElement.classList.remove(lockClassName);
+        };
+    }, [isElementTooltipOpen]);
 
     return (
         <>
-            <div className={`enemy-stage${className ? ` ${className}` : ""}`}>
+            <div ref={stageRef} className={`enemy-stage${className ? ` ${className}` : ""}`}>
                 <div
                     ref={spriteRef}
                     className={`enemy-sprite-card ${isHitFlashing ? "is-hit-flash" : ""}`}
@@ -151,10 +237,8 @@ function EnemyStage({
                                                 elementRefs.current[index] = entry;
                                             }}
                                             className="enemy-meta-chip enemy-meta-chip-attack"
-                                            onMouseEnter={() => setHoveredElementIndex(index)}
-                                            onMouseLeave={() => {
-                                                setHoveredElementIndex((current) => (current === index ? null : current));
-                                            }}
+                                            onMouseEnter={() => handleElementChipMouseEnter(index)}
+                                            onMouseLeave={handleElementChipMouseLeave}
                                         >
                                             <ElementIcon name={element.letter} /> ({element.damage})
                                         </span>
@@ -171,15 +255,18 @@ function EnemyStage({
                     </div>
                 </div>
             </div>
-            {hoveredElementIndex !== null ? (() => {
+            {isElementTooltipOpen && hoveredElementIndex !== null ? (() => {
                 const hoveredElement = elements[hoveredElementIndex];
                 if (!hoveredElement) return null;
                 return (
                     <ElementDetailsTooltip
                         element={hoveredElement}
                         anchorElement={elementRefs.current[hoveredElementIndex]}
-                        open
-                        className="reward-element-tooltip-shell"
+                        open={isElementTooltipOpen}
+                        className={`reward-element-tooltip-shell${isElementTooltipClosing ? " is-closing" : ""}`}
+                        interactive
+                        onTooltipMouseEnter={handleElementTooltipMouseEnter}
+                        onTooltipMouseLeave={handleElementTooltipMouseLeave}
                     />
                 );
             })() : null}

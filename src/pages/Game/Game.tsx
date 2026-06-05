@@ -2026,7 +2026,6 @@ function Game() {
                     ) : null}
                 </div>
                 <div className="game-controls-stack">
-                    <div className="element-start" ref={elementStartRef}></div>
                     {isCombinationStationUnlocked ? (
                         <div className="combination-station">
                             <div className="combination-equation">
@@ -2057,6 +2056,9 @@ function Game() {
                     ) : null}
 
                     <div className="battle-station">
+                        <button className="feed-button" onClick={handleFeedClick}>
+                            FEED
+                        </button>
                         <PlayerStats
                             playerName={playerName}
                             level={playerProgress.level}
@@ -2070,12 +2072,15 @@ function Game() {
                             statuses={playerStatuses}
                             className={`player-stats-dock${isSoulCounterPopping ? " is-soul-counter-pop" : ""}`}
                         />
-                        <button className="feed-button" onClick={handleFeedClick}>
-                            FEED
-                        </button>
                     </div>
+                    <div className="element-start" ref={elementStartRef}></div>
                 </div>
                 <div className="game-scene-col game-scene-col--right">
+                    <div className="game-enemy-actions">
+                        <button className="fight-button" onClick={handleFight}>
+                            FIGHT!
+                        </button>
+                    </div>
                     <div className="game-enemy-card">
                         <div className="next-enemy-text">Next Enemy</div>
                         <div className="game-enemy-card-header">
@@ -2092,11 +2097,6 @@ function Game() {
                             souls={nextEnemy?.souls ?? 0}
                         />
                         <div className="game-enemy-card-footer">Hover for details</div>
-                    </div>
-                    <div className="game-enemy-actions">
-                        <button className="fight-button" onClick={handleFight}>
-                            FIGHT!
-                        </button>
                     </div>
                 </div>
             </div>

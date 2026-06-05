@@ -3,7 +3,6 @@ import { createPortal } from "react-dom";
 import type { SpellEffectConfig } from "../../combat/spellEffects";
 import { statusEffectsRegistry } from "../../combat/statusEffectsRegistry";
 import "./FloatingTooltip.scss";
-import ElementIcon from "../../components/ElementIcon";
 
 type TooltipLayout = {
     left: number;
@@ -143,10 +142,12 @@ function FloatingTooltip({
 
     const effectKinds = (elementDetails?.effects ?? []).map((effect, index) => {
         const descriptor = effect.kind === "multi_hit" ? undefined : statusEffectsRegistry.get(effect.kind);
+        const detail = statusEffectsRegistry.getEffectDetail(effect);
 
         return {
             key: `${effect.kind}-${index}`,
             label: effect.kind,
+            detail,
             chipClass: effect.kind === "multi_hit"
                 ? "effect-multi-hit"
                 : (descriptor?.chipClass ?? "effect-default"),
@@ -247,6 +248,11 @@ function FloatingTooltip({
                                         className={`effect-chip ${effectKind.chipClass}`}
                                     >
                                         {effectKind.label}
+                                        {effectKind.detail ? (
+                                            <span className="effect-chip-popup" role="tooltip">
+                                                {effectKind.detail}
+                                            </span>
+                                        ) : null}
                                     </span>
                                 ))}
                             </span>

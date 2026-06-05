@@ -488,10 +488,49 @@
 
     .player-hp-row {
         display: flex;
+        position: relative;
         flex-direction: row;
         align-items: center;
         gap: 0.5rem;
         width: 100%;
+    }
+
+    .player-damage-popup {
+        position: absolute;
+        left: var(--player-popup-left, 50%);
+        top: calc(-0.25rem - var(--player-popup-offset, 0rem));
+        transform: translateX(-50%);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 2.2rem;
+        padding: 0.12rem 0.45rem;
+        border-radius: 999px;
+        border: 1px solid rgba(10, 10, 10, 0.35);
+        background: rgba(0, 0, 0, 0.76);
+        color: #ffd6d6;
+        font-size: 0.92rem;
+        font-weight: 800;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: 0;
+        line-height: 1.1;
+        text-shadow: 0 1px 1px rgba(0, 0, 0, 0.6);
+        pointer-events: none;
+        z-index: 5;
+        animation: playerDamageFloat 300ms ease-out forwards;
+    }
+
+    .player-damage-popup--burn {
+        border-color: rgba(255, 190, 120, 0.72);
+        background: linear-gradient(180deg, rgba(80, 33, 10, 0.92) 0%, rgba(35, 12, 4, 0.94) 100%);
+        color: #ffcf9a;
+        text-shadow:
+            0 0 4px rgba(255, 152, 60, 0.65),
+            0 1px 1px rgba(0, 0, 0, 0.6);
+        box-shadow:
+            0 0 0 1px rgba(255, 155, 68, 0.34),
+            0 0 12px rgba(255, 122, 41, 0.45);
     }
 
     .player-status-strip {
@@ -506,7 +545,6 @@
         right: clamp(0.55rem, 2vw, 1.2rem);
         top: clamp(0.55rem, 2vw, 1.2rem);
         width: min(22.5rem, calc(100vw - 1.1rem));
-        max-height: min(36vh, 17rem);
         display: flex;
         flex-direction: column;
         border-radius: 4px;
@@ -518,12 +556,23 @@
             0 9px 0 rgba(0, 0, 0, 0.36);
         z-index: 20;
         overflow: hidden;
+
+        &.is-collapsed {
+            max-height: none;
+        }
+
+        &.is-expanded {
+            max-height: min(36vh, 17rem);
+        }
     }
 
     .event-log-title {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
         margin: 0;
         padding: 0.56rem 0.72rem;
-        border-bottom: 2px solid rgba(229, 235, 255, 0.64);
         font-size: 0.94rem;
         font-family: "Trebuchet MS", "Segoe UI", sans-serif;
         letter-spacing: 0.04em;
@@ -531,6 +580,19 @@
         color: #fff7ab;
         background: linear-gradient(180deg, rgba(84, 102, 230, 0.95) 0%, rgba(38, 52, 166, 0.95) 100%);
         text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.85);
+        cursor: pointer;
+        appearance: none;
+        text-align: left;
+
+        &:hover {
+            filter: brightness(1.05);
+        }
+    }
+
+    .event-log-title-toggle {
+        font-size: 1rem;
+        line-height: 1;
+        color: #ffffff;
     }
 
     .event-log-list {
@@ -859,7 +921,7 @@
         width: 100%;
         min-width: 14rem;
         min-height: 2rem;
-        overflow: hidden;
+        overflow: visible;
         border: 2px solid #e7ecff;
         border-radius: 4px;
         background: linear-gradient(180deg, #0a0a0a 0%, #383838 100%);
@@ -882,6 +944,16 @@
 
         &.is-shield-gain {
             animation: shieldGainPulse 225ms ease-out;
+        }
+
+        &.is-burn-hit {
+            border-color: rgba(255, 174, 120, 0.88);
+            box-shadow: 0 0 0.92rem rgba(255, 132, 66, 0.58);
+            animation: burnHitPulse 225ms ease-out;
+
+            .player-hp-fill--health {
+                animation: burnFillPulse 225ms ease-out;
+            }
         }
 
         &.is-healing .player-hp-fill--health {
@@ -1030,10 +1102,10 @@
         }
 
         > button {
+            border-radius: 0px !important;
             margin-top: 0.3rem;
             height: 2.6rem;
             min-width: 10rem;
-            border-radius: 4px;
             border: 2px solid #ecf0ff;
             background: linear-gradient(180deg, #5a71e3 0%, #2b3ea9 100%);
             color: #fff7aa;
@@ -1041,6 +1113,10 @@
             font-size: 1rem;
             font-weight: 700;
             cursor: pointer;
+
+            :focus{
+                outline: unset;
+            }
         }
     }
 }
@@ -1259,6 +1335,23 @@
     }
 }
 
+@keyframes playerDamageFloat {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, 8px) scale(0.92);
+    }
+
+    20% {
+        opacity: 1;
+        transform: translate(-50%, 0) scale(1.04);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -20px) scale(0.96);
+    }
+}
+
 @keyframes healFillPulse {
     0% {
         filter: brightness(1);
@@ -1305,6 +1398,40 @@
 
     100% {
         box-shadow: 0 0 0.62rem rgba(103, 218, 196, 0.38);
+    }
+}
+
+@keyframes burnHitPulse {
+    0% {
+        box-shadow: 0 0 0.72rem rgba(255, 132, 66, 0.45);
+        border-color: rgba(255, 168, 108, 0.76);
+    }
+
+    50% {
+        box-shadow: 0 0 1.08rem rgba(255, 132, 66, 0.7);
+        border-color: rgba(255, 194, 146, 0.94);
+    }
+
+    100% {
+        box-shadow: 0 0 0.72rem rgba(255, 132, 66, 0.45);
+        border-color: rgba(255, 168, 108, 0.76);
+    }
+}
+
+@keyframes burnFillPulse {
+    0% {
+        background: linear-gradient(90deg, #59db79 0%, #45b95eb6 100%);
+        filter: brightness(1);
+    }
+
+    45% {
+        background: linear-gradient(90deg, #ffb46e 0%, #f0743ec4 100%);
+        filter: brightness(1.12);
+    }
+
+    100% {
+        background: linear-gradient(90deg, #59db79 0%, #45b95eb6 100%);
+        filter: brightness(1);
     }
 }
 

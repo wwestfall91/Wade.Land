@@ -7,6 +7,9 @@ type ElementDetailsTooltipProps = {
     open: boolean;
     className?: string;
     clampHorizontal?: boolean;
+    interactive?: boolean;
+    onTooltipMouseEnter?: () => void;
+    onTooltipMouseLeave?: () => void;
 };
 
 function ElementDetailsTooltip({
@@ -15,6 +18,9 @@ function ElementDetailsTooltip({
     open,
     className = "reward-element-tooltip-shell",
     clampHorizontal = true,
+    interactive = false,
+    onTooltipMouseEnter,
+    onTooltipMouseLeave,
 }: ElementDetailsTooltipProps) {
     return (
         <FloatingTooltip
@@ -22,6 +28,9 @@ function ElementDetailsTooltip({
             open={open}
             className={className}
             clampHorizontal={clampHorizontal}
+            interactive={interactive}
+            onTooltipMouseEnter={onTooltipMouseEnter}
+            onTooltipMouseLeave={onTooltipMouseLeave}
             elementDetails={{
                 letter: element.letter,
                 damage: element.damage,

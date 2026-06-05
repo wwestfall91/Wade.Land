@@ -7,6 +7,7 @@ type StatusEffectDescriptor = {
     label: string;
     chipClass: string;
     formatLine: (effect: SpellEffectConfig) => string | null;
+    formatDetail: (effect: SpellEffectConfig) => string;
 };
 
 const formatComboType = (value?: string): string => {
@@ -28,6 +29,12 @@ const STATUS_EFFECT_DESCRIPTORS: StatusEffectDescriptor[] = [
             const amount = Math.max(0, effect.amount ?? 0);
             return amount > 0 ? `Heal: +${amount}` : null;
         },
+        formatDetail: (effect) => {
+            const amount = Math.max(0, effect.amount ?? 0);
+            return amount > 0
+                ? `Restore ${amount} HP when this effect triggers.`
+                : "Restores HP when this effect triggers.";
+        },
     },
     {
         kind: "burn",
@@ -37,6 +44,7 @@ const STATUS_EFFECT_DESCRIPTORS: StatusEffectDescriptor[] = [
             const amount = Math.max(0, effect.amount ?? 0);
             return amount > 0 ? `Burn: +${amount}` : null;
         },
+        formatDetail: () => "Each stack deals damage at the end of turn",
     },
     {
         kind: "shield",
@@ -46,6 +54,7 @@ const STATUS_EFFECT_DESCRIPTORS: StatusEffectDescriptor[] = [
             const amount = Math.max(0, effect.amount ?? 0);
             return amount > 0 ? `Shield: +${amount}` : null;
         },
+        formatDetail: () => "Absorbs incoming damage.",
     },
     {
         kind: "lifesteal",
@@ -60,6 +69,7 @@ const STATUS_EFFECT_DESCRIPTORS: StatusEffectDescriptor[] = [
             const percent = amount > 1 ? amount : Math.round(amount * 100);
             return `Lifesteal: ${percent}%`;
         },
+        formatDetail: () => "Heal yourself based on damage dealt by the hit.",
     },
     {
         kind: "soak",
@@ -69,6 +79,7 @@ const STATUS_EFFECT_DESCRIPTORS: StatusEffectDescriptor[] = [
             const amount = Math.max(1, effect.amount ?? 1);
             return `Soak: +${amount}`;
         },
+        formatDetail: () => "Each stack increases LIGHTNING damage; Reduces FIRE damage.",
     },
     {
         kind: "energize",
@@ -78,6 +89,7 @@ const STATUS_EFFECT_DESCRIPTORS: StatusEffectDescriptor[] = [
             const amount = Math.max(1, effect.amount ?? 1);
             return `Energize: +${amount}`;
         },
+        formatDetail: () => "Stacks provide +1 energy at the start of your next turn!",
     },
     {
         kind: "freeze",
@@ -87,6 +99,7 @@ const STATUS_EFFECT_DESCRIPTORS: StatusEffectDescriptor[] = [
             const amount = Math.max(1, effect.amount ?? 1);
             return `Freeze: +${amount}`;
         },
+        formatDetail: () => "Each stack significantly increases damage from FIRE attacks.",
     },
     {
         kind: "thorns",
@@ -96,6 +109,7 @@ const STATUS_EFFECT_DESCRIPTORS: StatusEffectDescriptor[] = [
             const amount = Math.max(1, effect.amount ?? 1);
             return `Thorns: +${amount}`;
         },
+        formatDetail: () => "Reflect a portion of incoming damage to the attacker.",
     },
     {
         kind: "float",
@@ -105,12 +119,17 @@ const STATUS_EFFECT_DESCRIPTORS: StatusEffectDescriptor[] = [
             const amount = Math.max(1, effect.amount ?? 1);
             return `Float: +${amount}`;
         },
+        formatDetail: () => "Reduce EARTH damage taken; Increase LIGHTNING damage taken.",
     },
     {
         kind: "combo",
         label: "Combo",
         chipClass: "effect-combo",
         formatLine: (effect) => `Combo: ${formatComboType(effect.targetType)} costs -1 energy`,
+        formatDetail: (effect) => {
+            const typeText = effect.targetType?.trim().toUpperCase();
+            return `If your next attack is a ${typeText} attack, it costs 1 less energy.`;
+        },
     },
 ];
 
@@ -142,6 +161,22 @@ export class StatusEffectsRegistry {
         }
 
         return descriptor.formatLine(effect);
+    }
+
+    getEffectDetail(effect: SpellEffectConfig): string | null {
+        if (effect.kind === "multi_hit") {
+            const hits = Math.max(1, Math.floor(effect.hits ?? 1));
+            return hits > 1
+                ? `This cast strikes ${hits} times.`
+                : "This cast can strike multiple times.";
+        }
+
+        const descriptor = this.descriptorsByKind.get(effect.kind);
+        if (!descriptor) {
+            return null;
+        }
+
+        return descriptor.formatDetail(effect);
     }
 
     getChipClass(line: string): string {

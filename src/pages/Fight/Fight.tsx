@@ -39,7 +39,6 @@ import ElementIcon from "../../components/ElementIcon";
 import shieldIcon from "../../assets/icons/Shield.png";
 import soulIcon from "../../assets/icons/Soul.png";
 import energizeIcon from "../../assets/icons/Energize.png";
-import leafIcon from "../../assets/spells/Leaf.png";
 
 type EventLogEntry = {
     id: number;
@@ -64,6 +63,12 @@ type EnergyFlight = {
     dy: number;
     delay: number;
     duration: number;
+};
+
+type PlayerDamagePopup = {
+    id: number;
+    text: string;
+    kind?: "default" | "burn";
 };
 
 const wait = (ms: number) => new Promise<void>((resolve) => {
@@ -130,12 +135,17 @@ type ComboStatus = {
 function Fight() {
     const location = useLocation();
     const navigate = useNavigate();
-    const { player, playerName, levels, applyEnemyAttack, healPlayer, resetGame, typeMultipliers, playerStatuses, setPlayerStatuses, shieldMultiplier, soakMultiplier, burnMultiplier, maxHpMultiplier } = usePlayer();
+    const { player, playerName, levels, applyEnemyAttack, healPlayer, resetGame, typeMultipliers, playerStatuses, setPlayerStatuses, shieldMultiplier, soakMultiplier, burnMultiplier, maxHpMultiplier, battleEnergyCarryover, setBattleEnergyCarryover } = usePlayer();
     const [flashingSlotId, setFlashingSlotId] = useState<number | null>(null);
     const [hoveredSpellId, setHoveredSpellId] = useState<number | null>(null);
+    const [hoveredSpellTooltipId, setHoveredSpellTooltipId] = useState<number | null>(null);
+    const [spellTooltipGraceId, setSpellTooltipGraceId] = useState<number | null>(null);
     const [hoveredEnemyAttack, setHoveredEnemyAttack] = useState(false);
-    const [remainingEnergy, setRemainingEnergy] = useState(ENERGY_PER_TURN);
+    const [isEnemyIntentTooltipHovered, setIsEnemyIntentTooltipHovered] = useState(false);
+    const [isEnemyIntentTooltipGraceOpen, setIsEnemyIntentTooltipGraceOpen] = useState(false);
+    const [remainingEnergy, setRemainingEnergy] = useState(() => Math.min(MAX_TURN_ENERGY, ENERGY_PER_TURN + battleEnergyCarryover));
     const [eventLogEntries, setEventLogEntries] = useState<EventLogEntry[]>([]);
+    const [isBattleLogExpanded, setIsBattleLogExpanded] = useState(false);
     const [isGameOver, setIsGameOver] = useState(false);
     const [isPlayerHit, setIsPlayerHit] = useState(false);
     const [isScreenFlashing, setIsScreenFlashing] = useState(false);
@@ -178,7 +188,9 @@ function Fight() {
     const [enemyDamagePopups, setEnemyDamagePopups] = useState<EnemyDamagePopup[]>([]);
     const [isPlayerHealingFlash, setIsPlayerHealingFlash] = useState(false);
     const [isPlayerShieldFlash, setIsPlayerShieldFlash] = useState(false);
+    const [isPlayerBurnHitFlash, setIsPlayerBurnHitFlash] = useState(false);
     const [isShieldExpiring, setIsShieldExpiring] = useState(false);
+    const [playerDamagePopups, setPlayerDamagePopups] = useState<PlayerDamagePopup[]>([]);
     const [playerEnergizeStatus, setPlayerEnergizeStatus] = useState<ActiveEnergizeStatus | null>(playerStatuses.energize);
     const [energizeFlights, setEnergizeFlights] = useState<EnergyFlight[]>([]);
     const [leafFlights, setLeafFlights] = useState<EnergyFlight[]>([]);
@@ -187,6 +199,7 @@ function Fight() {
     const previousPlayerShieldRef = useRef(playerShield);
     const playerShieldRef = useRef(playerShield);
     const enemyDamagePopupIdRef = useRef(1);
+    const playerDamagePopupIdRef = useRef(1);
     const eventLogIdRef = useRef(1);
     const eventLogContainerRef = useRef<HTMLDivElement | null>(null);
     const spellSlotRefs = useRef<Record<number, HTMLButtonElement | null>>({});
@@ -206,8 +219,91 @@ function Fight() {
     const playerHitTimeoutRef = useRef<number | null>(null);
     const screenFlashTimeoutRef = useRef<number | null>(null);
     const spellCastFlashTimeoutRef = useRef<number | null>(null);
+    const playerBurnHitFlashTimeoutRef = useRef<number | null>(null);
     const enemySteamTimeoutRef = useRef<number | null>(null);
     const enemyIntentReadyingTimeoutRef = useRef<number | null>(null);
+    const spellTooltipGraceTimeoutRef = useRef<number | null>(null);
+    const enemyIntentTooltipGraceTimeoutRef = useRef<number | null>(null);
+
+    const clearSpellTooltipGraceTimeout = () => {
+        if (spellTooltipGraceTimeoutRef.current !== null) {
+            window.clearTimeout(spellTooltipGraceTimeoutRef.current);
+            spellTooltipGraceTimeoutRef.current = null;
+        }
+    };
+
+    const clearEnemyIntentTooltipGraceTimeout = () => {
+        if (enemyIntentTooltipGraceTimeoutRef.current !== null) {
+            window.clearTimeout(enemyIntentTooltipGraceTimeoutRef.current);
+            enemyIntentTooltipGraceTimeoutRef.current = null;
+        }
+    };
+
+    const startSpellTooltipGraceClose = (spellId: number) => {
+        setSpellTooltipGraceId(spellId);
+        clearSpellTooltipGraceTimeout();
+        spellTooltipGraceTimeoutRef.current = window.setTimeout(() => {
+            setSpellTooltipGraceId((current) => (current === spellId ? null : current));
+            spellTooltipGraceTimeoutRef.current = null;
+        }, 250);
+    };
+
+    const startEnemyIntentTooltipGraceClose = () => {
+        setIsEnemyIntentTooltipGraceOpen(true);
+        clearEnemyIntentTooltipGraceTimeout();
+        enemyIntentTooltipGraceTimeoutRef.current = window.setTimeout(() => {
+            setIsEnemyIntentTooltipGraceOpen(false);
+            enemyIntentTooltipGraceTimeoutRef.current = null;
+        }, 250);
+    };
+
+    const handleSpellCardMouseEnter = (spellId: number) => {
+        clearSpellTooltipGraceTimeout();
+        setSpellTooltipGraceId((current) => (current === spellId ? null : current));
+        setHoveredSpellId(spellId);
+    };
+
+    const handleSpellCardMouseLeave = (spellId: number) => {
+        setHoveredSpellId((current) => (current === spellId ? null : current));
+        startSpellTooltipGraceClose(spellId);
+    };
+
+    const handleSpellTooltipMouseEnter = (spellId: number) => {
+        clearSpellTooltipGraceTimeout();
+        setSpellTooltipGraceId((current) => (current === spellId ? null : current));
+        setHoveredSpellTooltipId(spellId);
+    };
+
+    const handleSpellTooltipMouseLeave = (spellId: number) => {
+        setHoveredSpellTooltipId((current) => (current === spellId ? null : current));
+        startSpellTooltipGraceClose(spellId);
+    };
+
+    const handleEnemyIntentMouseEnter = () => {
+        if (!queuedEnemyAttack) {
+            return;
+        }
+
+        clearEnemyIntentTooltipGraceTimeout();
+        setIsEnemyIntentTooltipGraceOpen(false);
+        setHoveredEnemyAttack(true);
+    };
+
+    const handleEnemyIntentMouseLeave = () => {
+        setHoveredEnemyAttack(false);
+        startEnemyIntentTooltipGraceClose();
+    };
+
+    const handleEnemyIntentTooltipMouseEnter = () => {
+        clearEnemyIntentTooltipGraceTimeout();
+        setIsEnemyIntentTooltipGraceOpen(false);
+        setIsEnemyIntentTooltipHovered(true);
+    };
+
+    const handleEnemyIntentTooltipMouseLeave = () => {
+        setIsEnemyIntentTooltipHovered(false);
+        startEnemyIntentTooltipGraceClose();
+    };
 
     const enemy = useMemo(() => {
         const state = location.state as FightLocationState | null;
@@ -334,6 +430,44 @@ function Fight() {
         }, scaleCombatAnimationMs(480));
     };
 
+    const triggerPlayerDamagePopup = (
+        damage: number,
+        popupText?: string,
+        popupKind: PlayerDamagePopup["kind"] = "default",
+    ) => {
+        if (damage <= 0) {
+            return;
+        }
+
+        const popupId = playerDamagePopupIdRef.current++;
+        setPlayerDamagePopups((previous) => [
+            ...previous,
+            {
+                id: popupId,
+                text: popupText ?? `-${damage}`,
+                kind: popupKind,
+            },
+        ]);
+
+        window.setTimeout(() => {
+            setPlayerDamagePopups((previous) => previous.filter((popup) => popup.id !== popupId));
+        }, scaleCombatAnimationMs(500));
+    };
+
+    const triggerPlayerBurnHitFlash = () => {
+        setIsPlayerBurnHitFlash(false);
+        window.requestAnimationFrame(() => {
+            setIsPlayerBurnHitFlash(true);
+            if (playerBurnHitFlashTimeoutRef.current !== null) {
+                window.clearTimeout(playerBurnHitFlashTimeoutRef.current);
+            }
+
+            playerBurnHitFlashTimeoutRef.current = window.setTimeout(() => {
+                setIsPlayerBurnHitFlash(false);
+            }, scaleCombatAnimationMs(320));
+        });
+    };
+
     const getSpellEnergyCost = (spell: { energy?: number; type1?: string; type2?: string }, comboType: string | null = playerComboStatus?.requiredType ?? null) => {
         const baseCost = Math.max(0, spell.energy ?? 0);
         if (!comboType) {
@@ -406,12 +540,17 @@ function Fight() {
             if (spellCastFlashTimeoutRef.current !== null) {
                 window.clearTimeout(spellCastFlashTimeoutRef.current);
             }
+            if (playerBurnHitFlashTimeoutRef.current !== null) {
+                window.clearTimeout(playerBurnHitFlashTimeoutRef.current);
+            }
             if (enemySteamTimeoutRef.current !== null) {
                 window.clearTimeout(enemySteamTimeoutRef.current);
             }
             if (enemyIntentReadyingTimeoutRef.current !== null) {
                 window.clearTimeout(enemyIntentReadyingTimeoutRef.current);
             }
+            clearSpellTooltipGraceTimeout();
+            clearEnemyIntentTooltipGraceTimeout();
         };
     }, []);
 
@@ -463,6 +602,7 @@ function Fight() {
     useEffect(() => {
         if (enemyHealth <= 0 && !hasResolvedVictory.current) {
             hasResolvedVictory.current = true;
+            setBattleEnergyCarryover(Math.min(MAX_TURN_ENERGY, remainingEnergy));
             const shuffled = [...elementPool].sort(() => Math.random() - 0.5);
             const chosen = shuffled.slice(0, Math.min(3, shuffled.length));
             setPlayerStatuses({
@@ -485,7 +625,7 @@ function Fight() {
                 } as GameLocationState,
             });
         }
-    }, [elementPool, enemy.souls, enemyHealth, navigate, playerBurnStatus, playerSoakStatus, playerFreezeStatus, playerEnergizeStatus, setPlayerStatuses]);
+    }, [elementPool, enemy.souls, enemyHealth, navigate, playerBurnStatus, playerSoakStatus, playerFreezeStatus, playerEnergizeStatus, remainingEnergy, setBattleEnergyCarryover, setPlayerStatuses]);
 
     useEffect(() => {
         if (levels.length === 0 || enemyHealth <= 0 || player.hp > 0) {
@@ -499,17 +639,23 @@ function Fight() {
         if (enemy.elements.length === 0) {
             setQueuedEnemyAttack(null);
             setHoveredEnemyAttack(false);
+            setIsEnemyIntentTooltipHovered(false);
+            setIsEnemyIntentTooltipGraceOpen(false);
             setIsReadyingNextAttack(false);
             if (enemyIntentReadyingTimeoutRef.current !== null) {
                 window.clearTimeout(enemyIntentReadyingTimeoutRef.current);
             }
+            clearEnemyIntentTooltipGraceTimeout();
             return;
         }
 
         const initialAttack = pickEnemyAttack();
         setQueuedEnemyAttack(initialAttack);
         setHoveredEnemyAttack(false);
+        setIsEnemyIntentTooltipHovered(false);
+        setIsEnemyIntentTooltipGraceOpen(false);
         setIsReadyingNextAttack(false);
+        clearEnemyIntentTooltipGraceTimeout();
 
         if (enemyIntentReadyingTimeoutRef.current !== null) {
             window.clearTimeout(enemyIntentReadyingTimeoutRef.current);
@@ -533,6 +679,9 @@ function Fight() {
 
         const attack = queuedEnemyAttack ?? pickEnemyAttack();
         setHoveredEnemyAttack(false);
+        setIsEnemyIntentTooltipHovered(false);
+        setIsEnemyIntentTooltipGraceOpen(false);
+        clearEnemyIntentTooltipGraceTimeout();
         if (!attack) {
             setQueuedEnemyAttack(null);
             return;
@@ -548,27 +697,6 @@ function Fight() {
         let currentPlayerFreeze = playerFreezeStatus;
         const currentPlayerThorns = playerThornsStatus;
         const currentPlayerFloat = playerFloatStatus;
-
-        if (currentPlayerBurn) {
-            const burnDamage = getBurnTickDamage(currentPlayerBurn.stacks);
-            if (burnDamage > 0) {
-                simulatedPlayerHp = Math.max(0, simulatedPlayerHp - burnDamage);
-                applyEnemyAttack(burnDamage);
-                pushEventLog(`Burn deals ${burnDamage} damage (${currentPlayerBurn.stacks} stack${currentPlayerBurn.stacks === 1 ? "" : "s"})`, "status");
-                await wait(EFFECT_STEP_DELAY_MS);
-            }
-
-            const nextDuration = currentPlayerBurn.remainingTurns - 1;
-            currentPlayerBurn = nextDuration > 0
-                ? { ...currentPlayerBurn, remainingTurns: nextDuration }
-                : null;
-            setPlayerBurnStatus(currentPlayerBurn);
-
-            if (simulatedPlayerHp <= 0) {
-                setQueuedEnemyAttack(null);
-                return;
-            }
-        }
 
         const attackTypes = [attack.type1, attack.type2].map(normalizeType).filter(Boolean);
         const isWaterAttack = attackTypes.includes("water");
@@ -627,6 +755,7 @@ function Fight() {
                 totalDamageTaken += remainingDamage;
                 simulatedPlayerHp = Math.max(0, simulatedPlayerHp - remainingDamage);
                 applyEnemyAttack(remainingDamage);
+                triggerPlayerDamagePopup(remainingDamage);
 
                 // Thorns: reflect a portion of damage back to the enemy
                 const thornsStacks = currentPlayerThorns?.stacks ?? 0;
@@ -939,6 +1068,31 @@ function Fight() {
             }, scaleCombatAnimationMs(420));
         });
 
+        if (currentPlayerBurn) {
+            await wait(220);
+
+            const burnDamage = getBurnTickDamage(currentPlayerBurn.stacks);
+            if (burnDamage > 0) {
+                simulatedPlayerHp = Math.max(0, simulatedPlayerHp - burnDamage);
+                applyEnemyAttack(burnDamage);
+                triggerPlayerDamagePopup(burnDamage, `-${burnDamage}`, "burn");
+                triggerPlayerBurnHitFlash();
+                pushEventLog(`Burn deals ${burnDamage} damage (${currentPlayerBurn.stacks} stack${currentPlayerBurn.stacks === 1 ? "" : "s"})`, "status");
+                await wait(EFFECT_STEP_DELAY_MS);
+            }
+
+            const nextDuration = currentPlayerBurn.remainingTurns - 1;
+            currentPlayerBurn = nextDuration > 0 && simulatedPlayerHp > 0
+                ? { ...currentPlayerBurn, remainingTurns: nextDuration }
+                : null;
+            setPlayerBurnStatus(currentPlayerBurn);
+
+            if (simulatedPlayerHp <= 0) {
+                setQueuedEnemyAttack(null);
+                return;
+            }
+        }
+
         const nextAttack = pickEnemyAttack();
         setQueuedEnemyAttack(nextAttack);
         if (nextAttack) {
@@ -952,6 +1106,11 @@ function Fight() {
     const handleEndTurn = async () => {
         if (enemyHealth <= 0 || isGameOver || isResolvingTurn) {
             return;
+        }
+
+        if (playerComboStatus) {
+            setPlayerComboStatus(null);
+            pushEventLog("Combo fades", "status", { isDetail: true });
         }
 
         setIsResolvingTurn(true);
@@ -1553,6 +1712,11 @@ function Fight() {
         }
     };
 
+    const isEnemyIntentTooltipOpen =
+        hoveredEnemyAttack || isEnemyIntentTooltipHovered || isEnemyIntentTooltipGraceOpen;
+    const isEnemyIntentTooltipClosing =
+        isEnemyIntentTooltipGraceOpen && !hoveredEnemyAttack && !isEnemyIntentTooltipHovered;
+
     const handlePlayAgain = () => {
         resetGame();
         navigate("/game", {
@@ -1608,9 +1772,12 @@ function Fight() {
                     <ElementDetailsTooltip
                         element={queuedEnemyAttack}
                         anchorElement={enemyIntentIconRef.current ?? enemyAttackMarkerRef.current}
-                        open={hoveredEnemyAttack && Boolean(enemyIntentIconRef.current ?? enemyAttackMarkerRef.current)}
-                        className="reward-element-tooltip-shell"
+                        open={isEnemyIntentTooltipOpen && Boolean(enemyIntentIconRef.current ?? enemyAttackMarkerRef.current)}
+                        className={`reward-element-tooltip-shell${isEnemyIntentTooltipClosing ? " is-closing" : ""}`}
                         clampHorizontal={false}
+                        interactive
+                        onTooltipMouseEnter={handleEnemyIntentTooltipMouseEnter}
+                        onTooltipMouseLeave={handleEnemyIntentTooltipMouseLeave}
                     />
                 ) : null}
 
@@ -1620,8 +1787,8 @@ function Fight() {
                     className={`enemy-intent-badge ${queuedEnemyAttack ? "" : "is-hidden"} ${isReadyingNextAttack ? "is-readying" : ""}`}
                     aria-label={queuedEnemyAttack ? `Enemy intends to attack with ${queuedEnemyAttack.letter}` : "Enemy attack not yet queued"}
                     aria-hidden={!queuedEnemyAttack}
-                    onMouseEnter={() => { if (queuedEnemyAttack) setHoveredEnemyAttack(true); }}
-                    onMouseLeave={() => setHoveredEnemyAttack(false)}
+                    onMouseEnter={handleEnemyIntentMouseEnter}
+                    onMouseLeave={handleEnemyIntentMouseLeave}
                 >
                     <div ref={enemyIntentIconRef} className="enemy-intent-icon">
                         {queuedEnemyAttack ? (
@@ -1633,22 +1800,6 @@ function Fight() {
                 </div>
             </div>{/* end .enemy-zone */}
 
-            {/* ─── Energy Row ─── */}
-            <div className="energy-row" aria-live="polite" aria-label={`Turn energy ${remainingEnergy} out of ${MAX_TURN_ENERGY}`}>
-                <span className="energy-row-label">{isEnemyTurnActive ? "ENEMY TURN" : "YOUR TURN"}</span>
-                <div className="energy-pips">
-                    {Array.from({ length: MAX_TURN_ENERGY }).map((_, i) => (
-                        <span
-                            key={i}
-                            ref={(el) => { pipRefs.current[i] = el; }}
-                            className={`energy-pip ${i < remainingEnergy ? "is-active" : "is-spent"}`}
-                            aria-hidden="true"
-                        />
-                    ))}
-                </div>
-                <span className="energy-row-count">{remainingEnergy}/{MAX_TURN_ENERGY}</span>
-            </div>
-
             {/* ─── Spell Hand ─── */}
             <div className="spell-hand">
                 <div className="spell-hand-scroll">
@@ -1659,6 +1810,11 @@ function Fight() {
                             const comboReady = Boolean(activeComboType && spellTypes.includes(activeComboType));
                             const displayedEnergyCost = getSpellEnergyCost(spell, activeComboType);
                             const isWeapon = spell.category?.toLowerCase() === "weapon";
+                            const isSpellCardHovered = hoveredSpellId === spell.id;
+                            const isSpellTooltipHovered = hoveredSpellTooltipId === spell.id;
+                            const isSpellTooltipGraceOpen = spellTooltipGraceId === spell.id;
+                            const isSpellTooltipOpen = isSpellCardHovered || isSpellTooltipHovered || isSpellTooltipGraceOpen;
+                            const isSpellTooltipClosing = isSpellTooltipGraceOpen && !isSpellCardHovered && !isSpellTooltipHovered;
 
                             return (
                         <button
@@ -1675,9 +1831,14 @@ function Fight() {
                                 (isWeapon && usedWeaponThisTurn)
                             }
                             style={getSpellSlotStyle(spell.type1, spell.type2)}
-                            onMouseEnter={() => setHoveredSpellId(spell.id)}
-                            onMouseLeave={() => setHoveredSpellId((current) => (current === spell.id ? null : current))}
+                            onMouseEnter={() => handleSpellCardMouseEnter(spell.id)}
+                            onMouseLeave={() => handleSpellCardMouseLeave(spell.id)}
                             onClick={(e) => {
+                                const clickTarget = e.target as Node | null;
+                                if (!clickTarget || !e.currentTarget.contains(clickTarget)) {
+                                    return;
+                                }
+
                                 const btn = e.currentTarget as HTMLButtonElement;
                                 launchProjectiles(
                                     { letter: spell.letter, effects: spell.effects },
@@ -1701,8 +1862,11 @@ function Fight() {
                         >
                             <FloatingTooltip
                                 anchorElement={spellSlotRefs.current[spell.id]}
-                                open={hoveredSpellId === spell.id}
-                                className="drag-description-popup"
+                                open={isSpellTooltipOpen}
+                                className={`drag-description-popup${isSpellTooltipClosing ? " is-closing" : ""}`}
+                                interactive
+                                onTooltipMouseEnter={() => handleSpellTooltipMouseEnter(spell.id)}
+                                onTooltipMouseLeave={() => handleSpellTooltipMouseLeave(spell.id)}
                                 clampHorizontal={false}
                                 typeMultipliers={typeMultipliers}
                                 elementDetails={{
@@ -1714,6 +1878,7 @@ function Fight() {
                                     type2: spell.type2,
                                     effects: spell.effects,
                                     level: spell.level,
+                                    category: spell.category,
                                 }}
                             />
                             <span className={`spell-card-energy${comboReady ? " is-combo-discounted" : ""}`}>{displayedEnergyCost}</span>
@@ -1808,7 +1973,7 @@ function Fight() {
                         ) : null}
                         <div
                             ref={playerHpBarRef}
-                            className={`player-hp-bar ${playerShield > 0 ? "has-shield" : ""} ${isPlayerHealingFlash ? "is-healing" : ""} ${isPlayerShieldFlash ? "is-shield-gain" : ""}`}
+                            className={`player-hp-bar ${playerShield > 0 ? "has-shield" : ""} ${isPlayerHealingFlash ? "is-healing" : ""} ${isPlayerShieldFlash ? "is-shield-gain" : ""} ${isPlayerBurnHitFlash ? "is-burn-hit" : ""}`}
                             role="progressbar"
                             aria-valuemin={0}
                             aria-valuemax={playerMaxHp}
@@ -1825,6 +1990,18 @@ function Fight() {
                                     width: `${playerShieldTailFillPercent}%`,
                                 }}
                             />
+                            {playerDamagePopups.map((popup, index) => (
+                                <span
+                                    key={popup.id}
+                                    className={`player-damage-popup ${popup.kind === "burn" ? "player-damage-popup--burn" : ""}`}
+                                    style={{
+                                        ["--player-popup-offset" as string]: `${index * 0.58}rem`,
+                                        ["--player-popup-left" as string]: `${Math.max(4, Math.min(96, playerHealthFillPercent))}%`,
+                                    }}
+                                >
+                                    {popup.text}
+                                </span>
+                            ))}
                             <span className={`player-hp-label ${playerShield > 0 ? "has-shield" : ""}`}>
                                 {displayedPlayerHp} / {playerMaxHp} HP
                             </span>
@@ -1842,27 +2019,54 @@ function Fight() {
                     </button>
                 </div>
             </div>{/* end .player-hud */}
+
+            {/* ─── Energy Row ─── */}
+            <div className="energy-row" aria-live="polite" aria-label={`Turn energy ${remainingEnergy} out of ${MAX_TURN_ENERGY}`}>
+                <span className="energy-row-label">{isEnemyTurnActive ? "ENEMY TURN" : "YOUR TURN"}</span>
+                <div className="energy-pips">
+                    {Array.from({ length: MAX_TURN_ENERGY }).map((_, i) => (
+                        <span
+                            key={i}
+                            ref={(el) => { pipRefs.current[i] = el; }}
+                            className={`energy-pip ${i < remainingEnergy ? "is-active" : "is-spent"}`}
+                            aria-hidden="true"
+                        />
+                    ))}
+                </div>
+                <span className="energy-row-count">{remainingEnergy}/{MAX_TURN_ENERGY}</span>
+            </div>
             </div>{/* end .fight-arena */}
 
-            <aside className="event-log-panel" aria-live="polite" aria-label="Fight event log">
-                <h3 className="event-log-title">Battle Log</h3>
-                <div className="event-log-list" ref={eventLogContainerRef}>
-                    {eventLogEntries.length === 0 ? (
-                        <p className="event-log-empty">Actions will appear here.</p>
-                    ) : (
-                        eventLogEntries.map((entry) => (
-                            <p
-                                key={entry.id}
-                                className={`event-log-entry event-log-entry--${entry.kind}${entry.isDetail ? " event-log-entry--detail" : ""}`}
-                            >
-                                <span className={`event-log-tag event-log-tag--${entry.kind}`}>
-                                    {entry.kind}
-                                </span>
-                                <span className="event-log-text">{entry.text}</span>
-                            </p>
-                        ))
-                    )}
-                </div>
+            <aside className={`event-log-panel${isBattleLogExpanded ? " is-expanded" : " is-collapsed"}`} aria-label="Fight event log">
+                <button
+                    type="button"
+                    className="event-log-title"
+                    onClick={() => setIsBattleLogExpanded((current) => !current)}
+                    aria-expanded={isBattleLogExpanded}
+                    aria-controls="fight-battle-log-list"
+                >
+                    <span>BATTLE LOG</span>
+                    <span className="event-log-title-toggle" aria-hidden="true">{isBattleLogExpanded ? "-" : "+"}</span>
+                </button>
+                {isBattleLogExpanded ? (
+                    <div id="fight-battle-log-list" className="event-log-list" ref={eventLogContainerRef} aria-live="polite">
+                        {eventLogEntries.length === 0 ? (
+                            <p className="event-log-empty">Actions will appear here.</p>
+                        ) : (
+                            eventLogEntries.map((entry) => (
+                                <p
+                                    key={entry.id}
+                                    className={`event-log-entry event-log-entry--${entry.kind}${entry.isDetail ? " event-log-entry--detail" : ""}`}
+                                >
+                                    <span className={`event-log-tag event-log-tag--${entry.kind}`}>
+                                        {entry.kind}
+                                    </span>
+                                    <span className="event-log-text">{entry.text}</span>
+                                </p>
+                            ))
+                        )}
+                    </div>
+                ) : null}
             </aside>
 
             {isGameOver ? (
@@ -1920,30 +2124,8 @@ function Fight() {
                     </>,
                     document.body,
                 )
-                : null}
-            {leafFlights.length > 0
-                ? createPortal(
-                    <>
-                        {leafFlights.map((flight) => (
-                            <span
-                                key={flight.id}
-                                className="leaf-flight"
-                                aria-hidden="true"
-                                style={{
-                                    left: flight.x,
-                                    top: flight.y,
-                                    ["--proj-dx" as string]: `${flight.dx}px`,
-                                    ["--proj-dy" as string]: `${flight.dy}px`,
-                                    animationDuration: `${flight.duration}ms`,
-                                }}
-                            >
-                                <img src={leafIcon} alt="" />
-                            </span>
-                        ))}
-                    </>,
-                    document.body,
-                )
-                : null}
+                : null
+            }
         </div>
     );
 }

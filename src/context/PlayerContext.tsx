@@ -126,6 +126,8 @@ type PlayerContextValue = {
     applyBurnMultiplier: (multiplier: number) => void;
     potionBrewMultiplier: number;
     applyPotionBrewMultiplier: (multiplier: number) => void;
+    battleEnergyCarryover: number;
+    setBattleEnergyCarryover: (amount: number) => void;
 };
 
 const DEFAULT_PLAYER_PROGRESS: PlayerProgress = {
@@ -221,6 +223,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
     const [soakMultiplier, setSoakMultiplier] = useState(1);
     const [burnMultiplier, setBurnMultiplier] = useState(1);
     const [potionBrewMultiplier, setPotionBrewMultiplier] = useState(1);
+    const [battleEnergyCarryover, setBattleEnergyCarryoverState] = useState(0);
 
     useEffect(() => {
         fetch("/levels.xlsx")
@@ -356,6 +359,10 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
         setPotionBrewMultiplier((previous) => previous + (multiplier - 1));
     }, []);
 
+    const setBattleEnergyCarryover = useCallback((amount: number) => {
+        setBattleEnergyCarryoverState(Math.max(0, Math.floor(amount)));
+    }, []);
+
     const resetGame = useCallback(() => {
         setSouls(0);
         setElements([]);
@@ -371,6 +378,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
         setSoakMultiplier(1);
         setBurnMultiplier(1);
         setPotionBrewMultiplier(1);
+        setBattleEnergyCarryoverState(0);
         setDiscoveredCraftedLetters(new Set());
     }, []);
 
@@ -427,6 +435,8 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             applyBurnMultiplier,
             potionBrewMultiplier,
             applyPotionBrewMultiplier,
+            battleEnergyCarryover,
+            setBattleEnergyCarryover,
             discoveredCraftedLetters,
             addDiscoveredCraftedLetter,
         }),
@@ -465,6 +475,8 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             applyBurnMultiplier,
             potionBrewMultiplier,
             applyPotionBrewMultiplier,
+            battleEnergyCarryover,
+            setBattleEnergyCarryover,
             discoveredCraftedLetters,
             addDiscoveredCraftedLetter,
         ],

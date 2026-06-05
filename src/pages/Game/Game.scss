@@ -560,8 +560,8 @@
 
     .game-scene-col--right {
         align-items: flex-start;
-        gap: 0.8rem;
-        align-self: flex-end;
+        gap: 1rem;
+        align-self: flex-start;
     }
 
     .game-controls-stack {
@@ -1499,6 +1499,8 @@
 }
 
 .game-enemy-card {
+    position: relative;
+    overflow: hidden;
     display: flex;
     flex-direction: column;
     width: 14rem;
@@ -1570,6 +1572,8 @@
     }
 
     .game-enemy-stage {
+        position: static;
+        z-index: auto;
         flex-grow: 1;
         justify-content: center;
         background: radial-gradient(circle at 38% 30%, rgba(156, 180, 255, 0.25), rgba(20, 30, 104, 0.94));
@@ -1579,6 +1583,12 @@
             border: none;
             box-shadow: none;
             background: none;
+        }
+    }
+
+    &:hover {
+        .game-enemy-stage {
+            z-index: auto;
         }
     }
 

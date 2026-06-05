@@ -60,6 +60,7 @@ function Draggable({
 	const [isHovered, setIsHovered] = useState(false);
 	const [isTooltipHovered, setIsTooltipHovered] = useState(false);
 	const [isTooltipGraceOpen, setIsTooltipGraceOpen] = useState(false);
+	const [isAltHeld, setIsAltHeld] = useState(false);
 	const [mouseOffset, setMouseOffset] = useState({ x: 0, y: 0 });
 	const [position, setPosition] = useState<Position>(initialPosition);
 	const draggableRef = useRef<HTMLDivElement | null>(null);
@@ -83,6 +84,31 @@ function Draggable({
 
 	useEffect(() => () => {
 		clearTooltipGraceTimeout();
+	}, []);
+
+	useEffect(() => {
+		const handleKeyDown = (event: KeyboardEvent) => {
+			if (event.key === "Alt") {
+				setIsAltHeld(true);
+			}
+		};
+
+		const handleKeyUp = (event: KeyboardEvent) => {
+			if (event.key === "Alt") {
+				setIsAltHeld(false);
+				setIsTooltipHovered(false);
+				setIsTooltipGraceOpen(false);
+				clearTooltipGraceTimeout();
+			}
+		};
+
+		window.addEventListener("keydown", handleKeyDown);
+		window.addEventListener("keyup", handleKeyUp);
+
+		return () => {
+			window.removeEventListener("keydown", handleKeyDown);
+			window.removeEventListener("keyup", handleKeyUp);
+		};
 	}, []);
 
 	useEffect(() => {
@@ -222,10 +248,21 @@ function Draggable({
 
 	const handleDraggableMouseLeave = () => {
 		setIsHovered(false);
-		startTooltipGraceClose();
+		if (isAltHeld) {
+			startTooltipGraceClose();
+			return;
+		}
+
+		setIsTooltipHovered(false);
+		setIsTooltipGraceOpen(false);
+		clearTooltipGraceTimeout();
 	};
 
 	const handleTooltipMouseEnter = () => {
+		if (!isAltHeld) {
+			return;
+		}
+
 		clearTooltipGraceTimeout();
 		setIsTooltipGraceOpen(false);
 		setIsTooltipHovered(true);
@@ -271,7 +308,7 @@ function Draggable({
 				anchorElement={draggableRef.current}
 				open={isTooltipOpen}
 				className={`drag-description-popup${isTooltipClosing ? " is-closing" : ""}`}
-				interactive
+				interactive={isAltHeld}
 				onTooltipMouseEnter={handleTooltipMouseEnter}
 				onTooltipMouseLeave={handleTooltipMouseLeave}
 				clampHorizontal={false}

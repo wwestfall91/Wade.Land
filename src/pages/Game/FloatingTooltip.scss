@@ -526,6 +526,8 @@
 .floating-tooltip .effect-chip {
     display: inline-flex;
     align-items: center;
+    position: relative;
+    cursor: default;
     border: 2px solid rgba(0, 0, 0, 0.25);
     border-radius: 999px;
     padding: 0.04rem 0.28rem;
@@ -536,6 +538,56 @@
     box-shadow:
         0 2px 0 rgba(0, 0, 0, 0.29),
         0 4px 24px rgba(11, 16, 48, 0.24);
+}
+
+.floating-tooltip .effect-chip * {
+    cursor: default;
+}
+
+.floating-tooltip .effect-chip-popup {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 0.45rem);
+    transform: translateX(-50%) translateY(2px);
+    min-width: 10rem;
+    max-width: min(16rem, 70vw);
+    padding: 0.34rem 0.42rem;
+    border: 2px solid #102060;
+    border-radius: 6px;
+    background: linear-gradient(180deg, #fff6d6 0%, #f1dcaa 100%);
+    color: #1b1b1b;
+    font-size: 0.66rem;
+    font-weight: 700;
+    line-height: 1.32;
+    text-transform: none;
+    text-align: center;
+    white-space: normal;
+    box-shadow:
+        inset 0 0 0 1px #ffe7b6,
+        inset 0 0 0 2px #c9b071,
+        0 7px 0 rgba(0, 0, 0, 0.32);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease, transform 120ms ease;
+    z-index: 15;
+}
+
+.floating-tooltip .effect-chip-popup::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: calc(100% - 1px);
+    width: 0;
+    height: 0;
+    margin-left: -0.4rem;
+    border-left: 0.4rem solid transparent;
+    border-right: 0.4rem solid transparent;
+    border-top: 0.45rem solid #102060;
+}
+
+.floating-tooltip .effect-chip:hover .effect-chip-popup {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
 }
 
 .floating-tooltip .effect-combo {
