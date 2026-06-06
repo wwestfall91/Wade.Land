@@ -24,6 +24,8 @@ type FloatingTooltipProps = {
     elementDetails?: {
         letter: string;
         damage: number;
+        isDamageEnhanced?: boolean;
+        baseDamageBeforeEnhance?: number;
         energy?: number;
         description: string;
         type1?: string;
@@ -188,6 +190,12 @@ function FloatingTooltip({
         : 1;
     const finalDamage = Math.round(baseDamage * masteryMultiplier);
     const masteryBonus = finalDamage - baseDamage;
+    const hasEnhanceDamagePreview = Boolean(
+        elementDetails?.isDamageEnhanced && typeof elementDetails.baseDamageBeforeEnhance === "number",
+    );
+    const enhancedDamageBefore = hasEnhanceDamagePreview
+        ? Math.round((elementDetails?.baseDamageBeforeEnhance ?? 0) * masteryMultiplier)
+        : 0;
 
     return createPortal(
         <div
@@ -231,7 +239,15 @@ function FloatingTooltip({
 
                         <span className="damage-details">
                             <span className="damage-label">Damage:</span>
-                            <span className="damage-value">{finalDamage}</span>
+                            <span className={`damage-value${elementDetails.isDamageEnhanced ? " damage-value--enhanced" : ""}`}>
+                                {hasEnhanceDamagePreview ? (
+                                    <>
+                                        <span className="damage-value-before">{enhancedDamageBefore}</span>
+                                        <span className="damage-value-arrow" aria-hidden="true">➔</span>
+                                        <span className="damage-value-after">{finalDamage}</span>
+                                    </>
+                                ) : finalDamage}
+                            </span>
                         </span>
                         {masteryBonus > 0 ? (
                             <span className="damage-mastery-breakdown">

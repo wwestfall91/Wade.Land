@@ -83,10 +83,6 @@ function EnemyInfo({
                         )}
                     </span>
                 </div>
-                <div className="enemy-souls-footer">
-                    <img src={soulIcon} alt="" aria-hidden="true" className="enemy-souls-icon" />
-                    <span>Rewards {enemySouls} Souls</span>
-                </div>
             </div>
             {hoveredEnemyElementIndex !== null ? (() => {
                 const hoveredElement = enemyElements[hoveredEnemyElementIndex];

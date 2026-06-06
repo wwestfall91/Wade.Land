@@ -248,10 +248,6 @@ function EnemyStage({
                                 )}
                             </div>
                         </div>
-                        <div className="enemy-meta-footer">
-                            <img src={soulIcon} alt="" aria-hidden="true" className="enemy-meta-souls-icon" />
-                            <span>Rewards {souls} Souls</span>
-                        </div>
                     </div>
                 </div>
             </div>

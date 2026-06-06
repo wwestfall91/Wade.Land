@@ -1,4 +1,25 @@
-export type SpellEffectKind = "heal" | "multi_hit" | "burn" | "shield" | "lifesteal" | "soak" | "energize" | "freeze" | "thorns" | "float" | "combo";
+export type SpellEffectKind =
+    | "heal"
+    | "multi_hit"
+    | "burn"
+    | "shield"
+    | "lifesteal"
+    | "soak"
+    | "energize"
+    | "freeze"
+    | "thorns"
+    | "float"
+    | "combo"
+    | "explode"
+    | "poison"
+    | "energy_combo"
+    | "power_combo"
+    | "follow_up"
+    | "charge"
+    | "exhaust"
+    | "consume"
+    | "hardened"
+    | "rage";
 
 export type SpellEffectTarget = "self" | "enemy";
 
@@ -57,6 +78,23 @@ const readFirstString = (row: Record<string, unknown>, keys: string[]): string =
     return String(value ?? "").trim();
 };
 
+const SELF_TARGET_EFFECT_KINDS: SpellEffectKind[] = [
+    "heal",
+    "shield",
+    "lifesteal",
+    "energize",
+    "thorns",
+    "float",
+    "combo",
+    "energy_combo",
+    "power_combo",
+    "follow_up",
+    "charge",
+    "consume",
+    "hardened",
+    "rage",
+];
+
 const normalizeEffectKind = (value: string): SpellEffectKind | null => {
     const normalized = value.trim().toLowerCase().replace(/[\s-]+/g, "_");
 
@@ -83,6 +121,29 @@ const normalizeEffectKind = (value: string): SpellEffectKind | null => {
             return "float";
         case "combo":
             return "combo";
+        case "explode":
+            return "explode";
+        case "poison":
+            return "poison";
+        case "energy_combo":
+        case "energycombo":
+            return "energy_combo";
+        case "power_combo":
+        case "powercombo":
+            return "power_combo";
+        case "follow_up":
+        case "followup":
+            return "follow_up";
+        case "charge":
+            return "charge";
+        case "exhaust":
+            return "exhaust";
+        case "consume":
+            return "consume";
+        case "hardened":
+            return "hardened";
+        case "rage":
+            return "rage";
         default:
             return null;
     }
@@ -133,15 +194,13 @@ export const parseSpellEffectsFromRow = (
             const amount = safeNumber(readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Amount")));
             const hits = safeNumber(readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Hits")));
             const duration = safeNumber(readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Duration")));
-            const defaultTarget: SpellEffectTarget = ["heal", "shield", "lifesteal", "energize", "thorns", "float", "combo"].includes(kind)
-            ? "self"
-            : "enemy";
+            const defaultTarget: SpellEffectTarget = SELF_TARGET_EFFECT_KINDS.includes(kind) ? "self" : "enemy";
             const rawTarget = readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Target"));
             const target = normalizeTarget(rawTarget, defaultTarget);
 
         const effect: SpellEffectConfig = { kind, target };
 
-            if (kind === "combo" && rawTarget.length > 0 && target === defaultTarget) {
+            if ((kind === "combo" || kind === "energy_combo" || kind === "power_combo") && rawTarget.length > 0 && target === defaultTarget) {
                 effect.targetType = normalizeBattleType(rawTarget);
             }
 

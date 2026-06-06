@@ -20,6 +20,11 @@ const formatComboType = (value?: string): string => {
     return `next ${label} attack`;
 };
 
+const formatAmountLine = (label: string, effect: SpellEffectConfig): string | null => {
+    const amount = Math.max(0, effect.amount ?? 0);
+    return amount > 0 ? `${label}: +${amount}` : null;
+};
+
 const STATUS_EFFECT_DESCRIPTORS: StatusEffectDescriptor[] = [
     {
         kind: "heal",
@@ -89,7 +94,7 @@ const STATUS_EFFECT_DESCRIPTORS: StatusEffectDescriptor[] = [
             const amount = Math.max(1, effect.amount ?? 1);
             return `Energize: +${amount}`;
         },
-        formatDetail: () => "Stacks provide +1 energy at the start of your next turn!",
+        formatDetail: () => "Gain +1 energy at the start of your next turn",
     },
     {
         kind: "freeze",
@@ -130,6 +135,82 @@ const STATUS_EFFECT_DESCRIPTORS: StatusEffectDescriptor[] = [
             const typeText = effect.targetType?.trim().toUpperCase();
             return `If your next attack is a ${typeText} attack, it costs 1 less energy.`;
         },
+    },
+    {
+        kind: "explode",
+        label: "Explode",
+        chipClass: "effect-explode",
+        formatLine: (effect) => formatAmountLine("Explode", effect),
+        formatDetail: () => "Deals a burst of damage when it resolves.",
+    },
+    {
+        kind: "poison",
+        label: "Poison",
+        chipClass: "effect-poison",
+        formatLine: (effect) => formatAmountLine("Poison", effect),
+        formatDetail: () => "Deals damage over time at the end of each turn.",
+    },
+    {
+        kind: "energy_combo",
+        label: "Energy Combo",
+        chipClass: "effect-energy-combo",
+        formatLine: (effect) => `Energy Combo: ${formatComboType(effect.targetType)} costs -1 energy`,
+        formatDetail: (effect) => {
+            const typeText = effect.targetType?.trim().toUpperCase() || "MATCHING";
+            return `If your next attack is a ${typeText} attack, it costs 1 less energy.`;
+        },
+    },
+    {
+        kind: "power_combo",
+        label: "Power Combo",
+        chipClass: "effect-power-combo",
+        formatLine: (effect) => `Power Combo: ${formatComboType(effect.targetType)} costs -1 energy`,
+        formatDetail: (effect) => {
+            const typeText = effect.targetType?.trim().toUpperCase() || "MATCHING";
+            return `If your next attack is a ${typeText} attack, it costs 1 less energy.`;
+        },
+    },
+    {
+        kind: "follow_up",
+        label: "Follow Up",
+        chipClass: "effect-follow-up",
+        formatLine: (effect) => formatAmountLine("Follow Up", effect),
+        formatDetail: () => "Sets up a follow-up attack or bonus effect.",
+    },
+    {
+        kind: "charge",
+        label: "Charge",
+        chipClass: "effect-charge",
+        formatLine: (effect) => formatAmountLine("Charge", effect),
+        formatDetail: () => "Builds momentum for a later action.",
+    },
+    {
+        kind: "exhaust",
+        label: "Exhaust",
+        chipClass: "effect-exhaust",
+        formatLine: (effect) => formatAmountLine("Exhaust", effect),
+        formatDetail: () => "Saps stamina and makes the target less effective.",
+    },
+    {
+        kind: "consume",
+        label: "Consume",
+        chipClass: "effect-consume",
+        formatLine: (effect) => formatAmountLine("Consume", effect),
+        formatDetail: () => "Consumes this effect to trigger its payoff.",
+    },
+    {
+        kind: "hardened",
+        label: "Hardened",
+        chipClass: "effect-hardened",
+        formatLine: (effect) => formatAmountLine("Hardened", effect),
+        formatDetail: () => "Reduces incoming damage while it is active.",
+    },
+    {
+        kind: "rage",
+        label: "Rage",
+        chipClass: "effect-rage",
+        formatLine: (effect) => formatAmountLine("Rage", effect),
+        formatDetail: () => "Increases damage while it is active.",
     },
 ];
 

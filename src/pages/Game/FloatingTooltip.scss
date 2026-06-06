@@ -118,6 +118,27 @@
         font-size: 14px;
         line-height: 1.2;
         color: #1d1d1d;
+
+        &.damage-value--enhanced {
+            color: #000000;
+            font-weight: bold;
+
+            .damage-value-before {
+                color: #2f2f2f;
+                opacity: 0.85;
+                font-weight: 700;
+            }
+
+            .damage-value-arrow {
+                margin: 0 0.28rem;
+                color: #2f2f2f;
+            }
+
+            .damage-value-after {
+                color: #000000;
+                font-weight: bolder;
+            }
+        }
     }
 }
 

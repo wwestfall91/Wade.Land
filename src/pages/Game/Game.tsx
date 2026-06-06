@@ -126,6 +126,8 @@ type PreviewCombination = {
     consumedIds: number[];
     letter: string;
     damage: number;
+    isDamageEnhanced?: boolean;
+    baseDamageBeforeEnhance?: number;
     energy?: number;
     level: number;
     description: string;
@@ -246,6 +248,49 @@ type PotionSparkle = {
 
 const normalizeType = (value?: string): string => value?.trim().toLowerCase() ?? "";
 const normalizeElementName = (value?: string): string => value?.trim().toLowerCase() ?? "";
+
+export type CombinationStationState = {
+    key: "idle" | "cleanse" | "polish" | "purify" | "refine" | "enhance";
+    actionLabel: string;
+    elementKey?: string;
+};
+
+type CombinationStationActionStateKey = Exclude<CombinationStationState["key"], "idle" | "enhance">;
+
+type CombinationStateWorkbookRow = {
+    Element?: string;
+    Effect?: string;
+    ["Effect Amt"]?: string | number;
+    ["Effect Hits"]?: string | number;
+    ["Effect Dur"]?: string | number;
+    ["Effect Target"]?: string;
+};
+
+type CombinationStateEffectsLookup = Partial<Record<CombinationStationActionStateKey, Map<string, SpellEffectConfig[]>>>;
+
+const COMBINATION_STATE_WORKBOOK_PATHS: Record<CombinationStationActionStateKey, string> = {
+    cleanse: "/cleanse.xlsx",
+    polish: "/polish.xlsx",
+    purify: "/purify.xlsx",
+    refine: "/refine.xlsx",
+};
+
+const COMBINATION_STATION_STATE_BY_FIRST_ELEMENT: Record<string, CombinationStationState> = {
+    fire: { key: "purify", actionLabel: "Purify", elementKey: "fire" },
+    earth: { key: "refine", actionLabel: "Refine", elementKey: "earth" },
+    water: { key: "cleanse", actionLabel: "Cleanse", elementKey: "water" },
+    air: { key: "polish", actionLabel: "Polish", elementKey: "air" },
+    soul: { key: "enhance", actionLabel: "Enhance", elementKey: "soul" },
+};
+
+const IDLE_COMBINATION_STATION_STATE: CombinationStationState = {
+    key: "idle",
+    actionLabel: "-",
+};
+
+export const getCombinationStationState = (firstSlotElementKey: string): CombinationStationState =>
+    COMBINATION_STATION_STATE_BY_FIRST_ELEMENT[firstSlotElementKey] ?? IDLE_COMBINATION_STATION_STATE;
+
 const isPlasmaName = (value?: string): boolean => normalizeElementName(value) === "plasma";
 const isUnstableName = (value?: string): boolean => {
     const normalized = normalizeElementName(value).replace(/[^a-z0-9]+/g, "");
@@ -256,6 +301,17 @@ const wait = (ms: number) => new Promise<void>((resolve) => {
 });
 
 type IntroPhase = "hidden" | "line1" | "line2" | "input" | "line3" | "line4" | "fadeout";
+
+type CombineStationTooltipProps = {
+    message: string;
+    className?: string;
+};
+
+const CombineStationTooltip = ({ message, className = "" }: CombineStationTooltipProps) => (
+    <div className={`combine-station-tooltip ${className}`.trim()} role="tooltip">
+        {message}
+    </div>
+);
 
 const getRandomUniqueElements = (elements: RewardElement[], count: number): RewardElement[] => {
     const shuffled = [...elements].sort(() => Math.random() - 0.5);
@@ -312,6 +368,7 @@ function Game() {
     const dropZoneRefC = useRef<HTMLDivElement | null>(null);
     const outputRef = useRef<HTMLDivElement | null>(null);
     const enhanceSlotRef = useRef<HTMLDivElement | null>(null);
+    const machineSlotRef = useRef<HTMLDivElement | null>(null);
     const previewRef = useRef<HTMLDivElement | null>(null);
     const feedAnimCounterRef = useRef(0);
     const eyesFlashTimerRef = useRef<number | null>(null);
@@ -319,6 +376,7 @@ function Game() {
 
     const [draggables, setDraggables] = useState<DraggableItem[]>([]);
     const [recipes, setRecipes] = useState<CombinationRecipe[]>([]);
+    const [combinationStateEffectsLookup, setCombinationStateEffectsLookup] = useState<CombinationStateEffectsLookup>({});
     const [enemies, setEnemies] = useState<Enemy[]>([]);
     const [baseElements, setBaseElements] = useState<RewardElement[]>([]);
     const [allElementOptions, setAllElementOptions] = useState<RewardElement[]>([]);
@@ -337,6 +395,7 @@ function Game() {
     const [isOldOneStirsModalFadingOut, setIsOldOneStirsModalFadingOut] = useState(false);
     const [isEnhanceStationUnlocked, setIsEnhanceStationUnlocked] = useState(false);
     const [enhanceSlotOccupantId, setEnhanceSlotOccupantId] = useState<number | null>(null);
+    const [machineSlotOccupantId, setMachineSlotOccupantId] = useState<number | null>(null);
     const [eyesFlashRevision, setEyesFlashRevision] = useState(0);
     const [monsterThresholds, setMonsterThresholds] = useState<MonsterRewardThreshold[]>([]);
     const [rewardGlowRevision, setRewardGlowRevision] = useState(0);
@@ -361,6 +420,10 @@ function Game() {
     const [plasmaForcedSnap, setPlasmaForcedSnap] = useState<{ zone: number; version: number } | null>(null);
     const [isPreviewDragging, setIsPreviewDragging] = useState(false);
     const [isPreviewHovered, setIsPreviewHovered] = useState(false);
+    const [isPreviewTooltipHovered, setIsPreviewTooltipHovered] = useState(false);
+    const [isPreviewTooltipGraceOpen, setIsPreviewTooltipGraceOpen] = useState(false);
+    const [isPreviewAltLockActive, setIsPreviewAltLockActive] = useState(false);
+    const [isPreviewAltHeld, setIsPreviewAltHeld] = useState(false);
     const [previewHomePosition, setPreviewHomePosition] = useState<Position | null>(null);
     const [previewPosition, setPreviewPosition] = useState<Position | null>(null);
     const [previewPointerOffset, setPreviewPointerOffset] = useState<Position>({ x: 0, y: 0 });
@@ -369,7 +432,7 @@ function Game() {
     const [introNameInput, setIntroNameInput] = useState("");
     const [isIntroInputFadingOut, setIsIntroInputFadingOut] = useState(false);
     const [fightReward, setFightReward] = useState<FightRewardState | null>(null);
-    const [isCombinationStationUnlocked, setIsCombinationStationUnlocked] = useState(false);
+    const [isCombinationStationUnlocked, setIsCombinationStationUnlocked] = useState(true);
     const [isFightVictoryCueVisible, setIsFightVictoryCueVisible] = useState(false);
     const [isPotionUnavailableFeedback, setIsPotionUnavailableFeedback] = useState(false);
     const [isPotionBrewedFlash, setIsPotionBrewedFlash] = useState(false);
@@ -378,6 +441,8 @@ function Game() {
     const [soulPulseAmount, setSoulPulseAmount] = useState(0);
     const [isSoulCounterPopping, setIsSoulCounterPopping] = useState(false);
     const [isSoulPanelErrorFeedback, setIsSoulPanelErrorFeedback] = useState(false);
+    const [hoveredInsertSlot, setHoveredInsertSlot] = useState<1 | 2 | null>(null);
+    const [isCombineButtonHovered, setIsCombineButtonHovered] = useState(false);
     const [isPostBattleSoulSequenceActive, setIsPostBattleSoulSequenceActive] = useState(false);
     const [postBattleSoulFillDurationMs, setPostBattleSoulFillDurationMs] = useState(0);
     const [isOldOnePreludeActive, setIsOldOnePreludeActive] = useState(false);
@@ -400,6 +465,8 @@ function Game() {
     const [starterChoiceNameRevision, setStarterChoiceNameRevision] = useState(0);
     const previewPositionRef = useRef<Position | null>(null);
     const previewPointerClientRef = useRef<Position>({ x: 0, y: 0 });
+    const previewAltHeldRef = useRef(false);
+    const previewTooltipGraceTimeoutRef = useRef<number | null>(null);
     const introChosenNameRef = useRef("");
     const nextId = useRef(1);
     const soulFlightIdRef = useRef(1);
@@ -425,6 +492,33 @@ function Game() {
     const starterChoiceButtonRefs = useRef<(HTMLButtonElement | null)[]>([]);
     const starterChoiceLabelTimeoutRef = useRef<number | null>(null);
     const oldOneSequenceTimeoutsRef = useRef<number[]>([]);
+
+    const clearPreviewTooltipGraceTimeout = useCallback(() => {
+        if (previewTooltipGraceTimeoutRef.current !== null) {
+            window.clearTimeout(previewTooltipGraceTimeoutRef.current);
+            previewTooltipGraceTimeoutRef.current = null;
+        }
+    }, []);
+
+    const startPreviewTooltipGraceClose = useCallback(() => {
+        setIsPreviewTooltipGraceOpen(true);
+        clearPreviewTooltipGraceTimeout();
+        previewTooltipGraceTimeoutRef.current = window.setTimeout(() => {
+            setIsPreviewTooltipGraceOpen(false);
+            previewTooltipGraceTimeoutRef.current = null;
+        }, 450);
+    }, [clearPreviewTooltipGraceTimeout]);
+
+    const releasePreviewAltLock = useCallback((preserveTooltipHover = false) => {
+        setIsPreviewAltLockActive(false);
+        setIsPreviewAltHeld(false);
+        previewAltHeldRef.current = false;
+        if (!preserveTooltipHover) {
+            setIsPreviewTooltipHovered(false);
+        }
+        setIsPreviewTooltipGraceOpen(false);
+        clearPreviewTooltipGraceTimeout();
+    }, [clearPreviewTooltipGraceTimeout]);
 
     useEffect(() => () => {
         if (rewardCueTimeoutRef.current !== null) {
@@ -456,6 +550,9 @@ function Game() {
         }
         if (starterChoiceLabelTimeoutRef.current !== null) {
             window.clearTimeout(starterChoiceLabelTimeoutRef.current);
+        }
+        if (previewTooltipGraceTimeoutRef.current !== null) {
+            window.clearTimeout(previewTooltipGraceTimeoutRef.current);
         }
         oldOneSequenceTimeoutsRef.current.forEach((timeoutId) => {
             window.clearTimeout(timeoutId);
@@ -689,6 +786,57 @@ function Game() {
     }, [clearSoulAnimationTimeouts]);
 
     useEffect(() => {
+        const syncAltState = (isAltPressed: boolean) => {
+            previewAltHeldRef.current = isAltPressed;
+            setIsPreviewAltHeld(isAltPressed);
+
+            if (!isAltPressed) {
+                releasePreviewAltLock(true);
+            }
+        };
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+            syncAltState(event.altKey || event.key === "Alt");
+        };
+
+        const handleKeyUp = (event: KeyboardEvent) => {
+            syncAltState(event.altKey);
+        };
+
+        const handlePointerMove = (event: PointerEvent) => {
+            syncAltState(event.altKey);
+        };
+
+        const handleWindowBlur = () => {
+            syncAltState(false);
+        };
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState !== "visible") {
+                syncAltState(false);
+            }
+        };
+
+        window.addEventListener("keydown", handleKeyDown, true);
+        document.addEventListener("keydown", handleKeyDown, true);
+        window.addEventListener("keyup", handleKeyUp, true);
+        document.addEventListener("keyup", handleKeyUp, true);
+        window.addEventListener("pointermove", handlePointerMove, true);
+        window.addEventListener("blur", handleWindowBlur);
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+
+        return () => {
+            window.removeEventListener("keydown", handleKeyDown, true);
+            document.removeEventListener("keydown", handleKeyDown, true);
+            window.removeEventListener("keyup", handleKeyUp, true);
+            document.removeEventListener("keyup", handleKeyUp, true);
+            window.removeEventListener("pointermove", handlePointerMove, true);
+            window.removeEventListener("blur", handleWindowBlur);
+            document.removeEventListener("visibilitychange", handleVisibilityChange);
+        };
+    }, [releasePreviewAltLock]);
+
+    useEffect(() => {
         if (!isStarterChoiceOpen) {
             return;
         }
@@ -714,7 +862,7 @@ function Game() {
     useEffect(() => {
         const state = location.state as GameLocationState | null;
         if (state?.battleEnded || state?.fightReward) {
-            setIsCombinationStationUnlocked(false);
+            setIsCombinationStationUnlocked(true);
         }
 
         if (state?.fightReward) {
@@ -757,9 +905,11 @@ function Game() {
     const activeDropZoneRefs = zoneOccupants.length === 3
         ? [dropZoneRefA, dropZoneRefB, dropZoneRefC]
         : [dropZoneRefA, dropZoneRefB];
-    const allDropZoneRefs = isEnhanceStationUnlocked
-        ? [...activeDropZoneRefs, enhanceSlotRef]
-        : activeDropZoneRefs;
+    const allDropZoneRefs = [
+        ...activeDropZoneRefs,
+        ...(isEnhanceStationUnlocked ? [enhanceSlotRef] : []),
+        machineSlotRef,
+    ];
 
     const getDraggableById = useCallback((draggableId: number | null) => {
         if (draggableId === null) {
@@ -1021,6 +1171,44 @@ function Game() {
 
             loadElements(elementsBuffer);
 
+            const stateLookup: CombinationStateEffectsLookup = {};
+            for (const [stateKey, workbookPath] of Object.entries(COMBINATION_STATE_WORKBOOK_PATHS) as Array<[CombinationStationActionStateKey, string]>) {
+                const workbookBuffer = await fetch(workbookPath).then((res) => (res.ok ? res.arrayBuffer() : null));
+                if (isCancelled) {
+                    return;
+                }
+
+                if (!workbookBuffer) {
+                    continue;
+                }
+
+                const workbook = XLSX.read(workbookBuffer, { type: "array" });
+                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                const workbookRows = XLSX.utils.sheet_to_json<CombinationStateWorkbookRow>(worksheet);
+
+                const effectsMap = new Map<string, SpellEffectConfig[]>();
+                workbookRows.forEach((row) => {
+                    const elementName = String(row.Element ?? "").trim();
+                    if (elementName.length === 0) {
+                        return;
+                    }
+
+                    const mappedEffectRow: Record<string, unknown> = {
+                        "Effect 1 Kind": String(row.Effect ?? "").trim(),
+                        "Effect 1 Amount": row["Effect Amt"] ?? "",
+                        "Effect 1 Hits": row["Effect Hits"] ?? "",
+                        "Effect 1 Duration": row["Effect Dur"] ?? "",
+                        "Effect 1 Target": String(row["Effect Target"] ?? "").trim(),
+                    };
+
+                    const parsedEffects = parseSpellEffectsFromRow(mappedEffectRow, 1);
+                    effectsMap.set(normalizeElementName(elementName), parsedEffects);
+                });
+
+                stateLookup[stateKey] = effectsMap;
+            }
+            setCombinationStateEffectsLookup(stateLookup);
+
             const enemiesBuffer = await fetch("/enemies.xlsx").then((res) => res.arrayBuffer());
             if (isCancelled) {
                 return;
@@ -1168,6 +1356,12 @@ function Game() {
         );
 
         setEnhanceSlotOccupantId((previous) =>
+            previous !== null && playerProgress.elements.some((element) => element.id === previous)
+                ? previous
+                : null,
+        );
+
+        setMachineSlotOccupantId((previous) =>
             previous !== null && playerProgress.elements.some((element) => element.id === previous)
                 ? previous
                 : null,
@@ -1353,38 +1547,84 @@ function Game() {
             return buildUnstableCloneResult(unstableItem, otherItem);
         }
 
-        const occupantLetters = occupantItems.map((item) => item?.letter ?? "");
-        const occupantDamage = occupantItems.reduce((total, item) => total + (item?.damage ?? 0), 0);
-        const [leftElement, rightElement] = occupantLetters;
+        if (!leftItem || !rightItem) {
+            return null;
+        }
 
-        const matchingRecipe = recipes.find(
-            (recipe) =>
-                (recipe.element1 === leftElement && recipe.element2 === rightElement) ||
-                (recipe.element1 === rightElement && recipe.element2 === leftElement),
-        );
+        const state = getCombinationStationState(normalizeElementName(leftItem.letter));
+        if (state.key === "idle") {
+            return null;
+        }
 
-        const combinedLetter = matchingRecipe ? matchingRecipe.result : occupantLetters.join("");
-        if (combinedLetter.length === 0) {
+        if (state.key === "enhance") {
+            return {
+                consumedIds: [leftItem.id],
+                letter: rightItem.letter,
+                damage: Math.round(rightItem.damage * 1.5),
+                isDamageEnhanced: true,
+                baseDamageBeforeEnhance: rightItem.damage,
+                energy: rightItem.energy,
+                level: rightItem.level,
+                description: rightItem.description,
+                type1: rightItem.type1,
+                type2: rightItem.type2,
+                effects: rightItem.effects,
+                category: rightItem.category,
+            };
+        }
+
+        const stateEffects = combinationStateEffectsLookup[state.key];
+        const rightElementKey = normalizeElementName(rightItem.letter);
+        const mappedEffects = stateEffects?.get(rightElementKey);
+        if (!mappedEffects) {
             return null;
         }
 
         return {
             consumedIds,
-            letter: combinedLetter,
-            damage: matchingRecipe ? matchingRecipe.damage : occupantDamage,
-            energy: matchingRecipe ? matchingRecipe.energy : 0,
-            level: matchingRecipe ? matchingRecipe.level : 2,
-            description: matchingRecipe
-                ? matchingRecipe.description
-                : "Unstable fusion of two primal forces.",
-            type1: matchingRecipe?.type1,
-            type2: matchingRecipe?.type2,
-            effects: matchingRecipe?.effects,
-            category: matchingRecipe?.category,
+            letter: rightItem.letter,
+            damage: rightItem.damage,
+            energy: rightItem.energy,
+            level: rightItem.level,
+            description: rightItem.description,
+            type1: rightItem.type1,
+            type2: rightItem.type2,
+            effects: mappedEffects,
+            category: rightItem.category,
         };
-    }, [draggables, recipes, zoneOccupants]);
+    }, [combinationStateEffectsLookup, draggables, zoneOccupants]);
 
     const canCombine = previewCombination !== null;
+    const firstSlottedDraggable = getDraggableById(zoneOccupants[0] ?? null);
+    const firstSlotElementKey = normalizeElementName(firstSlottedDraggable?.letter);
+    const firstSlotConnectorKey = normalizeType(firstSlottedDraggable?.type1) || firstSlotElementKey;
+    const combinationStationState = getCombinationStationState(firstSlotElementKey);
+    const hasActiveCombinationState = combinationStationState.key !== "idle";
+    const combineButtonElementClass = hasActiveCombinationState && combinationStationState.elementKey
+        ? `combine-button--${combinationStationState.elementKey}`
+        : "";
+    const slotConnectorClassName = [
+        "slot-connector",
+        "slot-connector--between",
+        zoneOccupants[0] !== null ? "is-lit" : "",
+        zoneOccupants[0] !== null ? `slot-connector--${firstSlotConnectorKey || "default"}` : "",
+    ].filter((name) => name.length > 0).join(" ");
+    const secondSlotConnectorClassName = [
+        "slot-connector",
+        "slot-connector--between",
+        zoneOccupants[0] !== null && zoneOccupants[1] !== null ? "is-lit" : "",
+        zoneOccupants[0] !== null && zoneOccupants[1] !== null ? "slot-connector--yellow" : "",
+    ].filter((name) => name.length > 0).join(" ");
+    const combinationStationClassName = [
+        "combination-station",
+        zoneOccupants[0] !== null ? "is-lit" : "",
+        zoneOccupants[0] !== null ? `combination-station--${firstSlotConnectorKey || "default"}` : "",
+    ].filter((name) => name.length > 0).join(" ");
+    const isCombineButtonDisabled = !canCombine || !hasActiveCombinationState;
+    const shouldShowSlotOneInsertPrompt = (hoveredInsertSlot === 1 && zoneOccupants[0] === null)
+        || (isCombineButtonHovered && hoveredInsertSlot === null && zoneOccupants[0] === null);
+    const shouldShowSlotTwoInsertPrompt = (hoveredInsertSlot === 2 && zoneOccupants[1] === null)
+        || (isCombineButtonHovered && hoveredInsertSlot === null && zoneOccupants[0] !== null && zoneOccupants[1] === null);
 
     const getOutputCenterPosition = useCallback((): Position | null => {
         const containerRect = gameRef.current?.getBoundingClientRect();
@@ -1470,7 +1710,13 @@ function Game() {
             ];
         });
 
-        setZoneOccupants([null, null]);
+        setZoneOccupants((previous) =>
+            previous.map((occupantId) =>
+                occupantId !== null && previewCombination.consumedIds.includes(occupantId)
+                    ? null
+                    : occupantId,
+            ),
+        );
         setIsPreviewDragging(false);
         setPreviewPosition(null);
         previewPositionRef.current = null;
@@ -1492,10 +1738,14 @@ function Game() {
 
         setIsPreviewDragging(false);
         setIsPreviewHovered(false);
+        setIsPreviewTooltipHovered(false);
+        setIsPreviewTooltipGraceOpen(false);
+        setIsPreviewAltLockActive(false);
+        clearPreviewTooltipGraceTimeout();
         setPreviewHomePosition(null);
         setPreviewPosition(null);
         previewPositionRef.current = null;
-    }, [previewCombination]);
+    }, [clearPreviewTooltipGraceTimeout, previewCombination]);
 
     useLayoutEffect(() => {
         if (!previewCombination || isPreviewDragging) {
@@ -1602,13 +1852,76 @@ function Game() {
         previewPointerClientRef.current = { x: event.clientX, y: event.clientY };
         setPreviewPointerOffset(offset);
         setPreviewPosition(initial);
+        setIsPreviewTooltipGraceOpen(false);
+        clearPreviewTooltipGraceTimeout();
         setIsPreviewHovered(false);
+        setIsPreviewTooltipHovered(false);
+        setIsPreviewAltLockActive(false);
         previewPositionRef.current = initial;
         setIsPreviewDragging(true);
     };
 
+    const handlePreviewMouseEnter = (event: React.MouseEvent<HTMLDivElement>) => {
+        clearPreviewTooltipGraceTimeout();
+        setIsPreviewTooltipGraceOpen(false);
+        setIsPreviewHovered(true);
+
+        if (event.altKey || isPreviewAltHeld || previewAltHeldRef.current) {
+            previewAltHeldRef.current = true;
+            setIsPreviewAltHeld(true);
+            setIsPreviewAltLockActive(true);
+        }
+    };
+
+    const handlePreviewMouseLeave = (event: React.MouseEvent<HTMLDivElement>) => {
+        setIsPreviewHovered(false);
+
+        if (isPreviewAltLockActive && (isPreviewAltHeld || previewAltHeldRef.current || event.altKey)) {
+            return;
+        }
+
+        if (isPreviewAltHeld || previewAltHeldRef.current || event.altKey) {
+            startPreviewTooltipGraceClose();
+            return;
+        }
+
+        setIsPreviewTooltipHovered(false);
+        setIsPreviewTooltipGraceOpen(false);
+        clearPreviewTooltipGraceTimeout();
+    };
+
+    const handlePreviewTooltipMouseEnter = (event: React.MouseEvent<HTMLDivElement>) => {
+        if (event.altKey || isPreviewAltHeld || previewAltHeldRef.current) {
+            previewAltHeldRef.current = true;
+            setIsPreviewAltHeld(true);
+            setIsPreviewAltLockActive(true);
+        }
+
+        if (!isPreviewAltHeld && !previewAltHeldRef.current && !event.altKey) {
+            return;
+        }
+
+        clearPreviewTooltipGraceTimeout();
+        setIsPreviewTooltipGraceOpen(false);
+        setIsPreviewTooltipHovered(true);
+    };
+
+    const handlePreviewTooltipMouseLeave = () => {
+        setIsPreviewTooltipHovered(false);
+
+        if (isPreviewAltLockActive && (isPreviewAltHeld || previewAltHeldRef.current)) {
+            return;
+        }
+
+        startPreviewTooltipGraceClose();
+    };
+
+    const isPreviewAltStickyOpen = isPreviewAltLockActive && isPreviewAltHeld;
+    const isPreviewTooltipOpen = !isPreviewDragging && (isPreviewHovered || isPreviewTooltipHovered || isPreviewTooltipGraceOpen || isPreviewAltStickyOpen);
+
     const handleSnapChange = (draggableId: number, zoneIndex: number | null) => {
         const enhanceZoneIndex = zoneOccupants.length;
+        const machineZoneIndex = zoneOccupants.length + (isEnhanceStationUnlocked ? 1 : 0);
         if (newChestElementIds.has(draggableId)) {
             setNewChestElementIds((prev) => {
                 const next = new Set(prev);
@@ -1630,6 +1943,16 @@ function Game() {
 
         if (zoneIndex === enhanceZoneIndex && isEnhanceStationUnlocked) {
             setEnhanceSlotOccupantId(draggableId);
+            setMachineSlotOccupantId((previous) => (previous === draggableId ? null : previous));
+            setZoneOccupants((previous) => normalizeZoneOccupants(
+                previous.map((occupantId) => (occupantId === draggableId ? null : occupantId)),
+            ));
+            return;
+        }
+
+        if (zoneIndex === machineZoneIndex) {
+            setMachineSlotOccupantId(draggableId);
+            setEnhanceSlotOccupantId((previous) => (previous === draggableId ? null : previous));
             setZoneOccupants((previous) => normalizeZoneOccupants(
                 previous.map((occupantId) => (occupantId === draggableId ? null : occupantId)),
             ));
@@ -1637,6 +1960,7 @@ function Game() {
         }
 
         setEnhanceSlotOccupantId((previous) => (previous === draggableId ? null : previous));
+        setMachineSlotOccupantId((previous) => (previous === draggableId ? null : previous));
 
         setZoneOccupants((previous) => {
             const next = previous.map((occupantId) =>
@@ -1671,12 +1995,17 @@ function Game() {
         }
 
         const enhanceZoneIndex = zoneOccupants.length;
-        if (zoneIndex === enhanceZoneIndex) {
-            if (!isEnhanceStationUnlocked) {
+        const machineZoneIndex = zoneOccupants.length + (isEnhanceStationUnlocked ? 1 : 0);
+        if (isEnhanceStationUnlocked && zoneIndex === enhanceZoneIndex) {
+            return enhanceSlotOccupantId === null || enhanceSlotOccupantId === draggableId;
+        }
+
+        if (zoneIndex === machineZoneIndex) {
+            if (draggable.category !== "soul") {
                 return false;
             }
 
-            return enhanceSlotOccupantId === null || enhanceSlotOccupantId === draggableId;
+            return machineSlotOccupantId === null || machineSlotOccupantId === draggableId;
         }
 
         // Spells cannot be combined — block snapping entirely
@@ -1701,6 +2030,7 @@ function Game() {
     };
 
     const enhanceSlottedDraggable = getDraggableById(enhanceSlotOccupantId);
+    const machineSlottedDraggable = getDraggableById(machineSlotOccupantId);
     const isEnhanceDisabled = !enhanceSlottedDraggable;
 
     const handleEnhanceClick = useCallback(() => {
@@ -2164,6 +2494,7 @@ function Game() {
         hoveredStarterChoiceIndex !== null
             ? (starterChoiceElements[hoveredStarterChoiceIndex] ?? null)
             : null;
+    const hasActiveUpgrades = Object.keys(typeMultipliers).length > 0 || shieldMultiplier > 1 || soakMultiplier > 1 || burnMultiplier > 1 || potionBrewMultiplier > 1;
     const selectedStarterChoiceElement =
         selectedStarterChoiceIndex !== null
             ? (starterChoiceElements[selectedStarterChoiceIndex] ?? null)
@@ -2478,8 +2809,8 @@ function Game() {
                             previewCombination.category === "weapon" ? "is-weapon" : "",
                         ].filter(Boolean).join(" ")}
                         onPointerDown={handlePreviewPointerDown}
-                        onMouseEnter={() => setIsPreviewHovered(true)}
-                        onMouseLeave={() => setIsPreviewHovered(false)}
+                        onMouseEnter={handlePreviewMouseEnter}
+                        onMouseLeave={handlePreviewMouseLeave}
                         style={{
                             top: (isPreviewDragging ? previewPosition : previewHomePosition)?.y ?? 0,
                             left: (isPreviewDragging ? previewPosition : previewHomePosition)?.x ?? 0,
@@ -2494,13 +2825,18 @@ function Game() {
                     </div>
                     <FloatingTooltip
                         anchorElement={previewRef.current}
-                        open={isPreviewHovered && !isPreviewDragging}
+                        open={isPreviewTooltipOpen}
                         className="drag-description-popup"
+                        interactive={isPreviewAltHeld}
+                        onTooltipMouseEnter={handlePreviewTooltipMouseEnter}
+                        onTooltipMouseLeave={handlePreviewTooltipMouseLeave}
                         clampHorizontal={false}
                         typeMultipliers={typeMultipliers}
                         elementDetails={{
                             letter: previewCombination.letter,
                             damage: previewCombination.damage,
+                            isDamageEnhanced: previewCombination.isDamageEnhanced,
+                            baseDamageBeforeEnhance: previewCombination.baseDamageBeforeEnhance,
                             description: previewCombination.description,
                             type1: previewCombination.type1,
                             type2: previewCombination.type2,
@@ -2510,78 +2846,124 @@ function Game() {
                     />
                 </>
             ) : null}
-
+            <div className="element-start" ref={elementStartRef}></div>
             <div className="game-scene-row">
+                {hasActiveUpgrades ? (
                 <div className="game-scene-col game-scene-col--left">
-                    {(Object.keys(typeMultipliers).length > 0 || shieldMultiplier > 1 || soakMultiplier > 1 || burnMultiplier > 1 || potionBrewMultiplier > 1) ? (
-                        <div className="upgrades-panel" aria-label="Active upgrades">
-                            <div className="upgrades-panel-title">Upgrades</div>
-                            <ul className="upgrades-panel-list">
-                                {Object.entries(typeMultipliers).map(([type, mult]) => (
-                                    <li key={type} className={`upgrades-panel-item type-${type}`}>
-                                        <span className="upgrades-item-type">{type}</span>
-                                        <span className="upgrades-item-value">×{mult.toFixed(1)}</span>
-                                    </li>
-                                ))}
-                                {shieldMultiplier > 1 ? (
-                                    <li className="upgrades-panel-item type-shield">
-                                        <span className="upgrades-item-type">shield gain</span>
-                                        <span className="upgrades-item-value">×{shieldMultiplier.toFixed(1)}</span>
-                                    </li>
-                                ) : null}
-                                {soakMultiplier > 1 ? (
-                                    <li className="upgrades-panel-item type-soak">
-                                        <span className="upgrades-item-type">soak stacks</span>
-                                        <span className="upgrades-item-value">×{soakMultiplier.toFixed(1)}</span>
-                                    </li>
-                                ) : null}
-                                {burnMultiplier > 1 ? (
-                                    <li className="upgrades-panel-item type-burn">
-                                        <span className="upgrades-item-type">burn stacks</span>
-                                        <span className="upgrades-item-value">×{burnMultiplier.toFixed(1)}</span>
-                                    </li>
-                                ) : null}
-                                {potionBrewMultiplier > 1 ? (
-                                    <li className="upgrades-panel-item type-water">
-                                        <span className="upgrades-item-type">potion brewing</span>
-                                        <span className="upgrades-item-value">×{potionBrewMultiplier.toFixed(1)}</span>
-                                    </li>
-                                ) : null}
-                            </ul>
-                        </div>
-                    ) : null}
+                    <div className="upgrades-panel" aria-label="Active upgrades">
+                        <div className="upgrades-panel-title">Upgrades</div>
+                        <ul className="upgrades-panel-list">
+                            {Object.entries(typeMultipliers).map(([type, mult]) => (
+                                <li key={type} className={`upgrades-panel-item type-${type}`}>
+                                    <span className="upgrades-item-type">{type}</span>
+                                    <span className="upgrades-item-value">×{mult.toFixed(1)}</span>
+                                </li>
+                            ))}
+                            {shieldMultiplier > 1 ? (
+                                <li className="upgrades-panel-item type-shield">
+                                    <span className="upgrades-item-type">shield gain</span>
+                                    <span className="upgrades-item-value">×{shieldMultiplier.toFixed(1)}</span>
+                                </li>
+                            ) : null}
+                            {soakMultiplier > 1 ? (
+                                <li className="upgrades-panel-item type-soak">
+                                    <span className="upgrades-item-type">soak stacks</span>
+                                    <span className="upgrades-item-value">×{soakMultiplier.toFixed(1)}</span>
+                                </li>
+                            ) : null}
+                            {burnMultiplier > 1 ? (
+                                <li className="upgrades-panel-item type-burn">
+                                    <span className="upgrades-item-type">burn stacks</span>
+                                    <span className="upgrades-item-value">×{burnMultiplier.toFixed(1)}</span>
+                                </li>
+                            ) : null}
+                            {potionBrewMultiplier > 1 ? (
+                                <li className="upgrades-panel-item type-water">
+                                    <span className="upgrades-item-type">potion brewing</span>
+                                    <span className="upgrades-item-value">×{potionBrewMultiplier.toFixed(1)}</span>
+                                </li>
+                            ) : null}
+                        </ul>
+                    </div>
                 </div>
+                ) : null}
+                
                 <div className="game-controls-stack">
                     {isCombinationStationUnlocked ? (
-                        <div className="combination-station">
+                        <div className={combinationStationClassName}>
                             <div className="combination-equation">
                                 <div className="drop-zone-area">
-                                    <div className={`drop-zone ${hasStartedDraggingElement && !hasSeenDropZoneOneTutorial ? "is-discoverable" : ""}`} ref={dropZoneRefA}>1</div>
-                                    <div>+</div>
-                                    <div className="drop-zone" ref={dropZoneRefB}>2</div>
+                                    <div
+                                        className={`drop-zone ${hasStartedDraggingElement && !hasSeenDropZoneOneTutorial ? "is-discoverable" : ""}`}
+                                        ref={dropZoneRefA}
+                                        onMouseEnter={() => {
+                                            setHoveredInsertSlot(1);
+                                        }}
+                                        onMouseLeave={() => {
+                                            setHoveredInsertSlot((previous) => (previous === 1 ? null : previous));
+                                        }}
+                                    >
+                                        1
+                                        {shouldShowSlotOneInsertPrompt ? (
+                                            <CombineStationTooltip
+                                                className="combine-station-tooltip--slot-one"
+                                                message="Please insert element"
+                                            />
+                                        ) : null}
+                                    </div>
+                                    <div className={slotConnectorClassName} aria-hidden="true" />
+                                    <div
+                                        className="drop-zone"
+                                        ref={dropZoneRefB}
+                                        onMouseEnter={() => {
+                                            setHoveredInsertSlot(2);
+                                        }}
+                                        onMouseLeave={() => {
+                                            setHoveredInsertSlot((previous) => (previous === 2 ? null : previous));
+                                        }}
+                                    >
+                                        2
+                                        {shouldShowSlotTwoInsertPrompt ? (
+                                            <CombineStationTooltip
+                                                className="combine-station-tooltip--slot-two"
+                                                message="Please insert element"
+                                            />
+                                        ) : null}
+                                    </div>
                                     {zoneOccupants.length === 3 ? (
-                                        <>
-                                            <div>+</div>
-                                            <div className="drop-zone" ref={dropZoneRefC}>3</div>
-                                        </>
+                                        <div className="drop-zone" ref={dropZoneRefC}>3</div>
+                                        
                                     ) : null}
-                                    <div>=</div>
+                                    <div className={secondSlotConnectorClassName} aria-hidden="true" />
                                 </div>
                                 <div className="output" ref={outputRef} />
                             </div>
 
-                            <div className={`combine-button-wrap ${!canCombine ? "is-disabled" : ""}`}>
-                                <button className="combine-button" disabled={!canCombine} onClick={handleCombine}>
-                                    COMBINE!
+                            <div
+                                className={`combine-button-wrap ${isCombineButtonDisabled ? "is-disabled" : ""}`}
+                                onMouseEnter={() => {
+                                    setIsCombineButtonHovered(true);
+                                }}
+                                onMouseLeave={() => {
+                                    setIsCombineButtonHovered(false);
+                                }}
+                                onFocusCapture={() => {
+                                    setIsCombineButtonHovered(true);
+                                }}
+                                onBlurCapture={() => {
+                                    setIsCombineButtonHovered(false);
+                                }}
+                            >
+                                <button
+                                    className={`combine-button ${combineButtonElementClass}`.trim()}
+                                    disabled={isCombineButtonDisabled}
+                                    onClick={handleCombine}
+                                >
+                                    {combinationStationState.actionLabel}
                                 </button>
-                                <div className="combine-button-tooltip" role="tooltip">
-                                    Please insert two base elements to start combining
-                                </div>
                             </div>
                         </div>
                     ) : null}
-
-                    <div className="element-start" ref={elementStartRef}></div>
 
                     {isEnhanceStationUnlocked ? (
                         <div className="enhance-station" aria-label="Enhance station">
@@ -2652,9 +3034,9 @@ function Game() {
                     </div>
                     <p className="dev-element-panel__hint">Drag an element onto the game scene to spawn a copy.</p>
                     <div className="dev-element-panel__list">
-                        {allElementOptions.map((element) => (
+                        {allElementOptions.map((element, index) => (
                             <button
-                                key={`${element.letter}-${element.level}-${element.damage}`}
+                                key={`${element.letter}-${element.level}-${element.damage}-${index}`}
                                 type="button"
                                 className="dev-element-panel__item"
                                 draggable
