@@ -174,6 +174,7 @@ const ELEMENT_FLIGHT_TRAVEL_MS = 520;
 const ELEMENT_FLIGHT_STAGGER_MS = 130;
 const CHEST_REVEAL_FADEOUT_MS = 320;
 const STARTER_LABEL_ANIM_MS = 520;
+const ENABLE_FIRST_BATTLE_OLD_ONE_SCENE = false;
 
 type StarterButtonTheme = {
     top: string;
@@ -726,7 +727,9 @@ function Game() {
             rewardCueTimeoutRef.current = window.setTimeout(() => {
                 const reward = state.fightReward;
                 const soulsGained = reward?.soulsGained ?? 0;
-                const shouldTriggerOldOneIntro = Boolean(state?.battleEnded && !isOldOneIntroTriggered);
+                const shouldTriggerOldOneIntro = Boolean(
+                    ENABLE_FIRST_BATTLE_OLD_ONE_SCENE && state?.battleEnded && !isOldOneIntroTriggered,
+                );
 
                 if (soulsGained > 0) {
                     startSoulCollectionAnimation(soulsGained, {
@@ -1864,80 +1867,109 @@ function Game() {
         clearSoulAnimationTimeouts();
         setSoulFlightIcons([]);
 
-        const soulsTarget = document.querySelector("#Game .player-stats-dock .player-souls-copy") as HTMLElement | null;
-        if (!soulsTarget) {
-            addSouls(normalizedSouls);
-            triggerSoulCounterPop();
-            setIsPostBattleSoulSequenceActive(false);
-            onComplete?.();
-            return;
-        }
+        // Souls become individual draggable items in the element-start area.
+        // Show a single centred soul icon, then animate each soul to its spawn position.
+        const containerRect = gameRef.current?.getBoundingClientRect();
+        const startRect = elementStartRef.current?.getBoundingClientRect();
 
-        const targetRect = soulsTarget.getBoundingClientRect();
-        const startX = window.innerWidth / 2;
-        const startY = window.innerHeight / 2;
-        const targetX = targetRect.left + targetRect.width / 2;
-        const targetY = targetRect.top + targetRect.height / 2;
-        const iconCount = Math.max(1, Math.ceil(normalizedSouls / SOULS_PER_FLYING_ICON));
-        const baseAmount = Math.floor(normalizedSouls / iconCount);
-        const remainder = normalizedSouls - baseAmount * iconCount;
-        const gainsPerIcon = Array.from({ length: iconCount }, (_, index) => (
-            baseAmount + (index < remainder ? 1 : 0)
-        ));
-        const collectionDurationMs = SOUL_COLLECTION_PULSE_MS + (iconCount - 1) * SOUL_COLLECTION_STAGGER_MS + SOUL_COLLECTION_TRAVEL_MS + 140;
+        const SOUL_CENTRE_LINGER_MS = 420;
+        const SOUL_FLIGHT_DURATION_MS = 520;
+        const SOUL_STAGGER_MS = 90;
+
+        const totalDurationMs = SOUL_CENTRE_LINGER_MS + (normalizedSouls - 1) * SOUL_STAGGER_MS + SOUL_FLIGHT_DURATION_MS + 100;
 
         if (isPostBattleSequence) {
-            setPostBattleSoulFillDurationMs(collectionDurationMs);
+            setPostBattleSoulFillDurationMs(totalDurationMs);
             setIsPostBattleSoulSequenceActive(true);
         }
-
-        const nextIcons: SoulFlightIcon[] = gainsPerIcon.map((_, index) => {
-            const delayMs = index * SOUL_COLLECTION_STAGGER_MS;
-            const horizontalJitter = (Math.random() - 0.5) * 170;
-            const verticalArcLift = -70 - Math.random() * 120;
-            return {
-                id: soulFlightIdRef.current++,
-                startX,
-                startY,
-                midX: (targetX - startX) * 0.56 + horizontalJitter,
-                midY: (targetY - startY) * 0.5 + verticalArcLift,
-                toX: targetX - startX,
-                toY: targetY - startY,
-                delayMs,
-            };
-        });
 
         setSoulPulseAmount(normalizedSouls);
         setIsSoulPulseVisible(true);
 
-        const pulseTimeoutId = window.setTimeout(() => {
-            setSoulFlightIcons(nextIcons);
+        const currentElementCount = playerProgress.elements.length;
 
-            gainsPerIcon.forEach((amount, index) => {
-                const hitTimeoutId = window.setTimeout(() => {
-                    addSouls(amount);
-                    triggerSoulCounterPop();
-                }, index * SOUL_COLLECTION_STAGGER_MS + SOUL_COLLECTION_TRAVEL_MS);
-                soulAnimationTimeoutsRef.current.push(hitTimeoutId);
-            });
+        for (let i = 0; i < normalizedSouls; i++) {
+            const spawnIndex = currentElementCount + i;
+            let spawnPos: Position;
 
-            const cleanupTimeoutId = window.setTimeout(() => {
-                setSoulFlightIcons([]);
-                if (isPostBattleSequence) {
-                    setIsPostBattleSoulSequenceActive(false);
-                }
-                onComplete?.();
-                soulAnimationTimeoutsRef.current = [];
-            }, (iconCount - 1) * SOUL_COLLECTION_STAGGER_MS + SOUL_COLLECTION_TRAVEL_MS + 140);
-            soulAnimationTimeoutsRef.current.push(cleanupTimeoutId);
-        }, SOUL_COLLECTION_PULSE_MS);
-        soulAnimationTimeoutsRef.current.push(pulseTimeoutId);
+            if (containerRect && startRect) {
+                const step = 44;
+                const padding = 10;
+                const columns = Math.max(1, Math.floor((startRect.width - padding * 2) / step));
+                const row = Math.floor(spawnIndex / columns);
+                spawnPos = {
+                    x: startRect.left - containerRect.left + padding + (spawnIndex % columns) * step,
+                    y: startRect.bottom - containerRect.top - padding - step - row * step,
+                };
+            } else {
+                spawnPos = {
+                    x: (spawnIndex % 3) * SPREAD_X,
+                    y: Math.floor(spawnIndex / 3) * SPREAD_Y,
+                };
+            }
+
+            const startX = window.innerWidth / 2;
+            const startY = window.innerHeight / 2;
+            const toX = containerRect
+                ? (spawnPos.x + containerRect.left + 16) - startX
+                : spawnPos.x - startX;
+            const toY = containerRect
+                ? (spawnPos.y + containerRect.top + 16) - startY
+                : spawnPos.y - startY;
+
+            const flightIcon: SoulFlightIcon = {
+                id: soulFlightIdRef.current++,
+                startX,
+                startY,
+                midX: toX * 0.5 + (Math.random() - 0.5) * 80,
+                midY: toY * 0.5 - 60 - Math.random() * 60,
+                toX,
+                toY,
+                delayMs: SOUL_CENTRE_LINGER_MS + i * SOUL_STAGGER_MS,
+            };
+
+            const launchTimeoutId = window.setTimeout(() => {
+                setSoulFlightIcons((prev) => [...prev, flightIcon]);
+
+                const landTimeoutId = window.setTimeout(() => {
+                    setSoulFlightIcons((prev) => prev.filter((icon) => icon.id !== flightIcon.id));
+
+                    const soulElement: RewardElement = {
+                        letter: "Soul",
+                        damage: 0,
+                        energy: 0,
+                        level: 1,
+                        description: "A captured soul.",
+                        category: "soul",
+                    };
+
+                    pendingDropSpawnByIdRef.current.set(
+                        nextId.current,
+                        spawnPos,
+                    );
+                    addElement(soulElement);
+                }, SOUL_FLIGHT_DURATION_MS);
+
+                soulAnimationTimeoutsRef.current.push(landTimeoutId);
+            }, SOUL_CENTRE_LINGER_MS + i * SOUL_STAGGER_MS);
+
+            soulAnimationTimeoutsRef.current.push(launchTimeoutId);
+        }
 
         const textHideTimeoutId = window.setTimeout(() => {
             setIsSoulPulseVisible(false);
-        }, SOUL_COLLECTION_PULSE_MS + SOUL_COLLECTION_TEXT_EXTRA_MS);
+        }, SOUL_CENTRE_LINGER_MS + 600);
         soulAnimationTimeoutsRef.current.push(textHideTimeoutId);
-    }, [addSouls, clearSoulAnimationTimeouts, triggerSoulCounterPop]);
+
+        const doneTimeoutId = window.setTimeout(() => {
+            if (isPostBattleSequence) {
+                setIsPostBattleSoulSequenceActive(false);
+            }
+            onComplete?.();
+            soulAnimationTimeoutsRef.current = [];
+        }, totalDurationMs);
+        soulAnimationTimeoutsRef.current.push(doneTimeoutId);
+    }, [addElement, clearSoulAnimationTimeouts, playerProgress.elements.length]);
 
     const handleRewardConfirm = ({ elements, bonusSoulsMultiplier, sourceRect }: { elements: RewardElement[]; bonusSoulsMultiplier?: number; sourceRect?: DOMRect }) => {
         if (!fightReward) {

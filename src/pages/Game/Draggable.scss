@@ -48,6 +48,27 @@
         border: 2px solid #dce3ff;
         background: linear-gradient(180deg, #5f76ee 0%, #354ebf 100%);
         color: #fff7ab;
+
+        &.is-soul {
+            border-radius: 4px;
+            border: 2px solid #69ffc3;
+            background: linear-gradient(180deg, #113d2b 0%, #081e16 100%);
+            box-shadow:
+                inset 0 0 0 1px #48e89e,
+                inset 0 0 0 2px #061610;
+
+            .element-glisten-shell {
+                width: 100%;
+                height: 100%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+
+            .element-icon {
+                filter: drop-shadow(0 0 0.3rem rgba(95, 255, 186, 0.72));
+            }
+        }
         font-family: "Trebuchet MS", "Segoe UI", sans-serif;
         font-size: 1.08rem;
         font-weight: 700;
