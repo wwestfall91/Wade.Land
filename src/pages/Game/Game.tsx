@@ -1553,6 +1553,12 @@ function Game() {
         || (isCombineButtonHovered && hoveredInsertSlot === null && zoneOccupants[0] === null);
     const shouldShowSlotTwoInsertPrompt = (hoveredInsertSlot === 2 && zoneOccupants[1] === null)
         || (isCombineButtonHovered && hoveredInsertSlot === null && zoneOccupants[0] !== null && zoneOccupants[1] === null);
+    const areBothCombinationSlotsFilled = zoneOccupants[0] !== null && zoneOccupants[1] !== null;
+    const isEnhanceCombinationReady = combinationStationState.key === "enhance"
+        && areBothCombinationSlotsFilled;
+    const isNonEnhanceCombinationReady = hasActiveCombinationState
+        && combinationStationState.key !== "enhance"
+        && areBothCombinationSlotsFilled;
 
     const getOutputCenterPosition = useCallback((): Position | null => {
         const containerRect = gameRef.current?.getBoundingClientRect();
@@ -2722,7 +2728,7 @@ function Game() {
                             <div className="combination-equation">
                                 <div className="drop-zone-area">
                                     <div
-                                        className={`drop-zone ${hasStartedDraggingElement && !hasSeenDropZoneOneTutorial ? "is-discoverable" : ""}`}
+                                        className={`drop-zone ${hasStartedDraggingElement && !hasSeenDropZoneOneTutorial ? "is-discoverable" : ""} ${isEnhanceCombinationReady ? "is-enhance-ready-primary" : ""} ${isNonEnhanceCombinationReady ? "is-combination-ready-primary" : ""}`}
                                         ref={dropZoneRefA}
                                         onMouseEnter={() => {
                                             setHoveredInsertSlot(1);
@@ -2741,7 +2747,7 @@ function Game() {
                                     </div>
                                     <div className={slotConnectorClassName} aria-hidden="true" />
                                     <div
-                                        className="drop-zone"
+                                        className={`drop-zone ${isEnhanceCombinationReady ? "is-enhance-ready-secondary" : ""} ${isNonEnhanceCombinationReady ? "is-combination-ready-secondary" : ""}`}
                                         ref={dropZoneRefB}
                                         onMouseEnter={() => {
                                             setHoveredInsertSlot(2);

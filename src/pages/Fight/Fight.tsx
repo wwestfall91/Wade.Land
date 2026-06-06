@@ -13,6 +13,7 @@ import {
     type ActiveThornsStatus,
     type SpellEffectConfig,
 } from "../../combat/spellEffects";
+import { effectFactory } from "../../combat/effectFactory";
 import {
     BURN_DAMAGE_PER_STACK,
     ENERGY_PER_TURN,
@@ -845,83 +846,15 @@ function Fight() {
             await wait(HIT_STEP_DELAY_MS);
 
             perHitEffects.forEach((effect) => {
-                switch (effect.kind) {
-                    case "heal": {
-                        const amount = Math.max(0, effect.amount ?? 0);
-                        if (amount > 0 && effect.target === "enemy") {
-                            totalPlayerBurnApplied += 0;
-                            // Enemy-target heal is applied after the loop as player healing.
-                        }
-                        break;
-                    }
-                    case "burn": {
-                        if (effect.target !== "enemy") {
-                            return;
-                        }
-
-                        const amount = Math.max(0, effect.amount ?? 0);
-                        const duration = Math.max(1, effect.duration ?? 1);
-                        totalPlayerBurnApplied += amount;
-                        playerBurnDuration = Math.max(playerBurnDuration, duration);
-                        break;
-                    }
-                    case "shield": {
-                        if (effect.target !== "enemy") {
-                            return;
-                        }
-
-                        const amount = Math.max(0, effect.amount ?? 0);
-                        totalPlayerShieldGranted += amount;
-                        break;
-                    }
-                    case "lifesteal": {
-                        if (effect.target !== "self") {
-                            return;
-                        }
-
-                        const amount = Math.max(0, effect.amount ?? 0);
-                        const multiplier = amount > 1 ? amount / 100 : amount;
-                        const healing = Math.max(0, Math.round(remainingDamage * multiplier));
-                        if (healing > 0) {
-                            totalEnemyHealing += healing;
-                        }
-                        break;
-                    }
-                    case "soak": {
-                        if (effect.target !== "enemy") {
-                            return;
-                        }
-
-                        totalPlayerSoakApplied += Math.max(1, effect.amount ?? 1);
-                        break;
-                    }
-                    case "freeze": {
-                        if (effect.target !== "enemy") {
-                            return;
-                        }
-
-                        totalPlayerFreezeApplied += Math.max(1, effect.amount ?? 1);
-                        break;
-                    }
-                    case "thorns": {
-                        if (effect.target !== "enemy") {
-                            return;
-                        }
-
-                        totalPlayerThornsApplied += Math.max(1, effect.amount ?? 1);
-                        break;
-                    }
-                    case "float": {
-                        if (effect.target !== "enemy") {
-                            return;
-                        }
-
-                        totalPlayerFloatApplied += Math.max(1, effect.amount ?? 1);
-                        break;
-                    }
-                    default:
-                        break;
-                }
+                const delta = effectFactory.resolveEnemyAttackEffect(effect, remainingDamage);
+                totalPlayerBurnApplied += delta.playerBurnApplied;
+                playerBurnDuration = Math.max(playerBurnDuration, delta.playerBurnDuration);
+                totalPlayerShieldGranted += delta.playerShieldGranted;
+                totalEnemyHealing += delta.enemyHealing;
+                totalPlayerSoakApplied += delta.playerSoakApplied;
+                totalPlayerFreezeApplied += delta.playerFreezeApplied;
+                totalPlayerThornsApplied += delta.playerThornsApplied;
+                totalPlayerFloatApplied += delta.playerFloatApplied;
             });
 
             if (simulatedPlayerHp <= 0) {
@@ -1495,94 +1428,20 @@ function Fight() {
             await wait(HIT_STEP_DELAY_MS);
 
             perHitEffects.forEach((effect) => {
-                switch (effect.kind) {
-                    case "heal": {
-                        if (effect.target === "enemy") {
-                            return;
-                        }
-
-                        const amount = Math.max(0, effect.amount ?? 0);
-                        if (amount > 0) {
-                            healPlayer(amount);
-                            totalHealing += amount;
-                        }
-                        break;
-                    }
-                    case "burn": {
-                        if (effect.target === "self") {
-                            return;
-                        }
-
-                        const amount = Math.max(0, effect.amount ?? 0);
-                        const duration = Math.max(1, effect.duration ?? 1);
-                        totalBurnApplied += amount;
-                        burnDuration = Math.max(burnDuration, duration);
-                        break;
-                    }
-                    case "shield": {
-                        if (effect.target === "enemy") {
-                            return;
-                        }
-
-                        const amount = Math.max(0, effect.amount ?? 0);
-                        totalShieldGranted += amount;
-                        break;
-                    }
-                    case "lifesteal": {
-                        if (effect.target === "enemy") {
-                            return;
-                        }
-
-                        const amount = Math.max(0, effect.amount ?? 0);
-                        const multiplier = amount > 1 ? amount / 100 : amount;
-                        const healing = Math.max(0, Math.round(hitDamage * multiplier));
-                        if (healing > 0) {
-                            healPlayer(healing);
-                            totalHealing += healing;
-                        }
-                        break;
-                    }
-                    case "soak": {
-                        if (effect.target === "self") {
-                            return;
-                        }
-
-                        totalSoakApplied += Math.max(1, effect.amount ?? 1);
-                        break;
-                    }
-                    case "energize": {
-                        if (effect.target === "enemy") {
-                            return;
-                        }
-
-                        totalEnergizeApplied += Math.max(1, effect.amount ?? 1);
-                        break;
-                    }
-                    case "freeze": {
-                        // freeze targeting the enemy: if they have soak, convert it; otherwise apply directly
-                        if (effect.target === "self") {
-                            return;
-                        }
-
-                        totalEnemyFreezeApplied += Math.max(1, effect.amount ?? 1);
-                        break;
-                    }
-                    case "thorns": {
-                        // thorns targeting self = buff the player; targeting enemy = debuff the enemy
-                        if (effect.target === "enemy") {
-                            totalEnemyThornsApplied += Math.max(1, effect.amount ?? 1);
-                        }
-                        break;
-                    }
-                    case "float": {
-                        if (effect.target === "enemy") {
-                            totalEnemyFloatApplied += Math.max(1, effect.amount ?? 1);
-                        }
-                        break;
-                    }
-                    default:
-                        break;
+                const delta = effectFactory.resolvePlayerAttackEffect(effect, hitDamage);
+                if (delta.playerHealing > 0) {
+                    healPlayer(delta.playerHealing);
+                    totalHealing += delta.playerHealing;
                 }
+
+                totalBurnApplied += delta.enemyBurnApplied;
+                burnDuration = Math.max(burnDuration, delta.enemyBurnDuration);
+                totalShieldGranted += delta.playerShieldGranted;
+                totalSoakApplied += delta.enemySoakApplied;
+                totalEnergizeApplied += delta.playerEnergizeApplied;
+                totalEnemyFreezeApplied += delta.enemyFreezeApplied;
+                totalEnemyThornsApplied += delta.enemyThornsApplied;
+                totalEnemyFloatApplied += delta.enemyFloatApplied;
             });
 
             if (perHitEffects.length > 0) {
@@ -1930,12 +1789,14 @@ function Fight() {
                                 }
 
                                 const btn = e.currentTarget as HTMLButtonElement;
-                                launchProjectiles(
-                                    { letter: spell.letter, effects: spell.effects },
-                                    btn,
-                                );
-                                if ([spell.type1, spell.type2].map(normalizeType).includes("leaf")) {
-                                    launchLeafFlight(btn, energizeDisplayRef.current);
+                                if (!isHardenedPreparing) {
+                                    launchProjectiles(
+                                        { letter: spell.letter, effects: spell.effects },
+                                        btn,
+                                    );
+                                    if ([spell.type1, spell.type2].map(normalizeType).includes("leaf")) {
+                                        launchLeafFlight(btn, energizeDisplayRef.current);
+                                    }
                                 }
                                 handleSlotClick({
                                     id: spell.id,
