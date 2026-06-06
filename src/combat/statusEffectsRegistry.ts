@@ -203,7 +203,7 @@ const STATUS_EFFECT_DESCRIPTORS: StatusEffectDescriptor[] = [
         label: "Hardened",
         chipClass: "effect-hardened",
         formatLine: (effect) => formatAmountLine("Hardened", effect),
-        formatDetail: () => "Reduces incoming damage while it is active.",
+        formatDetail: () => "Consumes all energy to increase attack power.",
     },
     {
         kind: "rage",

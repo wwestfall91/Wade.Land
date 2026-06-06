@@ -1,8 +1,7 @@
-import React, { type CSSProperties } from "react";
+import { type CSSProperties } from "react";
 import "./PlayerStats.scss";
 import { usePlayer, type PlayerStatuses } from "../context/PlayerContext";
 import soulIcon from "../assets/icons/Soul.png";
-import potionIcon from "../assets/icons/Potion.png";
 import energizeIcon from "../assets/icons/Energize.png";
 import {
     BURN_DAMAGE_PER_STACK,
@@ -17,11 +16,6 @@ type PlayerStatsProps = {
     hp: number;
     maxHp?: number;
     souls: number;
-    potionCount: number;
-    potionFillPercent: number;
-    onPotionClick?: () => void;
-    isPotionUnavailableFeedback?: boolean;
-    isPotionBrewedFlash?: boolean;
     statuses?: PlayerStatuses | null;
     className?: string;
 };
@@ -32,18 +26,12 @@ function PlayerStats({
     hp,
     maxHp,
     souls,
-    potionCount,
-    potionFillPercent,
-    onPotionClick,
-    isPotionUnavailableFeedback,
-    isPotionBrewedFlash,
     statuses,
     className,
 }: PlayerStatsProps) {
-    const { player, levels, maxHpMultiplier, potionRequired } = usePlayer();
+    const { player, levels, maxHpMultiplier } = usePlayer();
     const baseMaxHp = levels.find((levelDef) => levelDef.level === player.level)?.hp ?? Math.max(player.hp, 1);
     const playerMaxHp = Math.round(baseMaxHp * maxHpMultiplier);
-    const currentBrewPoints = Math.floor((potionFillPercent / 100) * potionRequired);
     const hpFillPercent = Math.max(0, Math.min(100, (hp / playerMaxHp) * 100));
     const style = {
         "--hp-fill": `${hpFillPercent}%`,
@@ -61,37 +49,13 @@ function PlayerStats({
                         <span className="player-level-label">LV</span>
                         <span className="player-level-value">{level}</span>
                     </div>
-                    <button
-                        type="button"
-                        className={`player-potion-panel${isPotionUnavailableFeedback ? " is-unavailable" : ""}${isPotionBrewedFlash ? " is-brew-flash" : ""}`}
-                        aria-label={`Potions ${potionCount}. Potion charge ${Math.round(potionFillPercent)} percent`}
-                        onClick={onPotionClick}
-                        style={{ "--potion-fill": `${Math.max(0, Math.min(100, potionFillPercent))}%` } as React.CSSProperties}
-                    >
-                        <img src={potionIcon} alt="" aria-hidden="true" className="player-potion-icon" />
-                        <div className="player-potion-copy">
-                            <span className="player-potion-label">POTION</span>
-                            <span className="player-potion-count">{potionCount}</span>
-                        </div>
-                        <span className="player-potion-tooltip">
-                            <span className="player-potion-tooltip-header">
-                                <span>Drink Potion</span>
-                                <span className="player-potion-brew-progress">{currentBrewPoints}/{potionRequired}</span>
-                            </span>
-                            <span>Create Water elements to brew potions</span>
-                            <br/>
-                            <span>+50% max HP</span>
-                            <span>Fully restores health</span>
-                            
-                        </span>
-                    </button>
-                    <div className="player-souls-panel" aria-label={`Souls ${souls}`} title="Souls are earned from victories and persist between battles.">
+                    {/* <div className="player-souls-panel" aria-label={`Souls ${souls}`} title="Souls are earned from victories and persist between battles.">
                         <img src={soulIcon} alt="" aria-hidden="true" className="player-souls-icon" />
                         <div className="player-souls-copy">
                             <span className="player-souls-label">SOULS</span>
                             <span className="player-souls-value">{souls}</span>
                         </div>
-                    </div>
+                    </div> */}
                 </div>
             </div>
 

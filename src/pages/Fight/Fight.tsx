@@ -96,6 +96,7 @@ const SPELL_TYPE_COLORS: Record<string, SpellColor> = {
 type FightEnemy = {
     name: string;
     hp: number;
+    power: number;
     souls: number;
     weaknesses?: string[];
     sprite?: string;
@@ -130,6 +131,13 @@ type CastableSpell = {
 
 type ComboStatus = {
     requiredType: string;
+};
+
+type HardenedSpellState = {
+    phase: "preparing" | "ready";
+    baseDamage: number;
+    readyDamage: number;
+    consumedEnergy: number;
 };
 
 function Fight() {
@@ -176,6 +184,7 @@ function Fight() {
     const [playerFloatStatus, setPlayerFloatStatus] = useState<ActiveFloatStatus | null>(playerStatuses.float);
     const [playerShield, setPlayerShield] = useState(playerStatuses.shield);
     const [playerComboStatus, setPlayerComboStatus] = useState<ComboStatus | null>(null);
+    const [hardenedSpellStates, setHardenedSpellStates] = useState<Record<number, HardenedSpellState>>({});
     const [enemyShield, setEnemyShield] = useState(0);
     const [isResolvingTurn, setIsResolvingTurn] = useState(false);
     const [isEnemyTurnActive, setIsEnemyTurnActive] = useState(false);
@@ -307,7 +316,7 @@ function Fight() {
 
     const enemy = useMemo(() => {
         const state = location.state as FightLocationState | null;
-        return state?.enemy ?? { name: "Unknown", hp: 0, souls: 0, weaknesses: [], sprite: "", elements: [] };
+        return state?.enemy ?? { name: "Unknown", hp: 0, power: 0, souls: 0, weaknesses: [], sprite: "", elements: [] };
     }, [location.state]);
 
     const elementPool = useMemo(() => {
@@ -330,12 +339,49 @@ function Fight() {
     const formatTypeLabel = (value: string) => value.length > 0 ? value.charAt(0).toUpperCase() + value.slice(1) : value;
     const toTypeClass = (value: string) =>
         `type-${value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
-    const pickEnemyAttack = () => enemy.elements[Math.floor(Math.random() * enemy.elements.length)] ?? null;
+    const pickEnemyAttack = () => {
+        const attack = enemy.elements[Math.floor(Math.random() * enemy.elements.length)] ?? null;
+        return attack
+            ? {
+                ...attack,
+                damage: enemy.power,
+            }
+            : null;
+    };
     const enemyWeaknesses = (enemy.weaknesses ?? []).map((weakness) => weakness.trim()).filter((weakness) => weakness.length > 0);
     const getSpellTypeList = (spell: { type1?: string; type2?: string }) =>
         [spell.type1, spell.type2].map(normalizeType).filter(Boolean);
     const getSpellComboType = (effects?: SpellEffectConfig[]) =>
         effects?.find((effect) => effect.kind === "combo")?.targetType ?? null;
+    const hasHardenedEffect = (effects?: SpellEffectConfig[]) =>
+        Boolean(effects?.some((effect) => effect.kind === "hardened"));
+
+    useEffect(() => {
+        setHardenedSpellStates((previous) => {
+            const next: Record<number, HardenedSpellState> = {};
+
+            player.elements.forEach((spell) => {
+                if (!hasHardenedEffect(spell.effects)) {
+                    return;
+                }
+
+                const existing = previous[spell.id];
+                if (existing?.phase === "ready") {
+                    next[spell.id] = existing;
+                    return;
+                }
+
+                next[spell.id] = {
+                    phase: "preparing",
+                    baseDamage: spell.damage,
+                    readyDamage: spell.damage,
+                    consumedEnergy: 0,
+                };
+            });
+
+            return next;
+        });
+    }, [player.elements]);
 
     const getSpellSlotStyle = (type1?: string, type2?: string) => {
         const normalized = [type1, type2].map(normalizeType).filter(Boolean);
@@ -1296,12 +1342,18 @@ function Fight() {
         const spellComboType = getSpellComboType(spell.effects);
         const comboMatches = Boolean(activeComboType && spellTypes.includes(activeComboType));
         const spellEnergyCost = getSpellEnergyCost(spell, activeComboType);
+        const hardenedState = hardenedSpellStates[spell.id];
+        const isHardenedSpell = hasHardenedEffect(spell.effects);
+        const isHardenedPreparing = isHardenedSpell && (hardenedState?.phase ?? "preparing") === "preparing";
+        const spellDamageForCast = isHardenedSpell && hardenedState?.phase === "ready"
+            ? hardenedState.readyDamage
+            : spell.damage;
         const isWeapon = spell.category?.toLowerCase() === "weapon";
         if (
             enemyHealth <= 0 ||
             isGameOver ||
             isResolvingTurn ||
-            remainingEnergy < spellEnergyCost ||
+            (!isHardenedPreparing && remainingEnergy < spellEnergyCost) ||
             (isWeapon && usedWeaponThisTurn)
         ) {
             return;
@@ -1311,7 +1363,24 @@ function Fight() {
         if (isWeapon) {
             setUsedWeaponThisTurn(true);
         }
-        setRemainingEnergy((previous) => Math.max(0, previous - spellEnergyCost));
+        const energySpent = isHardenedPreparing ? remainingEnergy : spellEnergyCost;
+        setRemainingEnergy((previous) => Math.max(0, previous - energySpent));
+
+        if (isHardenedPreparing) {
+            const readyDamage = Math.max(0, Math.round(spell.damage * (1 + energySpent * 0.5)));
+            setHardenedSpellStates((previous) => ({
+                ...previous,
+                [spell.id]: {
+                    phase: "ready",
+                    baseDamage: spell.damage,
+                    readyDamage,
+                    consumedEnergy: energySpent,
+                },
+            }));
+            pushEventLog(`${spell.letter} hardens: ${spell.damage} -> ${readyDamage} (${energySpent} energy)`, "status");
+            setIsResolvingTurn(false);
+            return;
+        }
 
         setSpellCastFlashBackground(getSpellCastFlashBackground(spell.type1, spell.type2));
         setIsSpellCastFlashing(false);
@@ -1379,7 +1448,7 @@ function Fight() {
                 ...spellTypes.map((t) => typeMultipliers[t] ?? 1),
                 1,
             );
-            const scaledSpellDamage = Math.round(spell.damage * spellTypeMultiplier);
+            const scaledSpellDamage = Math.round(spellDamageForCast * spellTypeMultiplier);
             const enemyFloatEarthReduction = isEarthSpell ? getFloatEarthReduction(enemyFloatStacks, scaledSpellDamage) : 0;
             const enemyFloatLightningBonus = isLightningSpell ? getFloatLightningBonus(enemyFloatStacks, scaledSpellDamage) : 0;
             const baseHitDamage = Math.max(0, scaledSpellDamage + soakBonus - soakPenalty + freezeBonus - enemyFloatEarthReduction + enemyFloatLightningBonus);
@@ -1703,6 +1772,18 @@ function Fight() {
             });
         }
 
+        if (isHardenedSpell && hardenedState?.phase === "ready") {
+            setHardenedSpellStates((previous) => ({
+                ...previous,
+                [spell.id]: {
+                    phase: "preparing",
+                    baseDamage: spell.damage,
+                    readyDamage: spell.damage,
+                    consumedEnergy: 0,
+                },
+            }));
+        }
+
         setIsResolvingTurn(false);
     };
 
@@ -1809,6 +1890,15 @@ function Fight() {
                             const spellTypes = getSpellTypeList(spell);
                             const comboReady = Boolean(activeComboType && spellTypes.includes(activeComboType));
                             const displayedEnergyCost = getSpellEnergyCost(spell, activeComboType);
+                            const hardenedState = hardenedSpellStates[spell.id];
+                            const isHardenedSpell = hasHardenedEffect(spell.effects);
+                            const isHardenedPreparing = isHardenedSpell && (hardenedState?.phase ?? "preparing") === "preparing";
+                            const isHardenedReady = isHardenedSpell && hardenedState?.phase === "ready";
+                            const displayedDamage = hasHardenedEffect(spell.effects) && hardenedState?.phase === "ready"
+                                ? hardenedState.readyDamage
+                                : spell.damage;
+                            const canAffordSpell = isHardenedPreparing ? true : remainingEnergy >= displayedEnergyCost;
+                            const hardenedBoostPercent = Math.max(0, (hardenedState?.consumedEnergy ?? 0) * 50);
                             const isWeapon = spell.category?.toLowerCase() === "weapon";
                             const isSpellCardHovered = hoveredSpellId === spell.id;
                             const isSpellTooltipHovered = hoveredSpellTooltipId === spell.id;
@@ -1823,11 +1913,11 @@ function Fight() {
                                 spellSlotRefs.current[spell.id] = element;
                             }}
                             type="button"
-                            className={`spell-card ${flashingSlotId === spell.id ? "is-flashing" : ""} ${comboReady ? "is-combo-ready" : ""} ${(!isGameOver && !isResolvingTurn && remainingEnergy < displayedEnergyCost) ? "is-unaffordable" : ""} ${(isWeapon && usedWeaponThisTurn) ? "is-used" : ""}`}
+                            className={`spell-card ${flashingSlotId === spell.id ? "is-flashing" : ""} ${comboReady ? "is-combo-ready" : ""} ${(!isGameOver && !isResolvingTurn && !canAffordSpell) ? "is-unaffordable" : ""} ${(isWeapon && usedWeaponThisTurn) ? "is-used" : ""} ${isHardenedReady ? "is-hardened-ready" : ""}`}
                             disabled={
                                 isGameOver ||
                                 isResolvingTurn ||
-                                remainingEnergy < displayedEnergyCost ||
+                                !canAffordSpell ||
                                 (isWeapon && usedWeaponThisTurn)
                             }
                             style={getSpellSlotStyle(spell.type1, spell.type2)}
@@ -1871,7 +1961,7 @@ function Fight() {
                                 typeMultipliers={typeMultipliers}
                                 elementDetails={{
                                     letter: spell.letter,
-                                    damage: spell.damage,
+                                    damage: displayedDamage,
                                     energy: spell.energy,
                                     description: spell.description,
                                     type1: spell.type1,
@@ -1886,13 +1976,19 @@ function Fight() {
                                 <ElementIcon name={spell.letter} />
                             </div>
                             <div className="spell-card-name">{spell.letter}</div>
-                            <div className="spell-card-damage">
-                                {Math.round(spell.damage * Math.max(
+                            <div className={`spell-card-damage${isHardenedReady ? " is-hardened-ready" : ""}`}>
+                                {Math.round(displayedDamage * Math.max(
                                     ...[spell.type1, spell.type2]
                                         .filter((t): t is string => Boolean(t?.trim()))
                                         .map(t => typeMultipliers[normalizeType(t)] ?? 1),
                                     1,
                                 ))}
+                                {isHardenedReady && hardenedState ? (
+                                    <span className="spell-card-power-tooltip" role="tooltip">
+                                        <span>{`${hardenedState.baseDamage} -> ${hardenedState.readyDamage}`}</span>
+                                        <span>{`${hardenedState.consumedEnergy} energy consumed increased power by ${hardenedBoostPercent}%`}</span>
+                                    </span>
+                                ) : null}
                             </div>
                         </button>
                             );
