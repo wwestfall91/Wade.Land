@@ -1453,16 +1453,27 @@
         flex-direction: column;
         gap:1rem;
         padding: 1.5rem 2rem;
-        border: 2px solid #e7ecff;
+        border: 2px solid var(--combination-station-border, #e7ecff);
         border-radius: 4px;
         background:
-            radial-gradient(circle at 14% 10%, rgba(122, 139, 255, 0.2), transparent 34%),
-            linear-gradient(180deg, #3245ce 0%, #1a2b8d 100%);
+            radial-gradient(circle at 14% 10%, var(--combination-station-bg-accent, rgba(122, 139, 255, 0.2)), transparent 34%),
+            linear-gradient(180deg, var(--combination-station-bg-top, #3245ce) 0%, var(--combination-station-bg-bottom, #1a2b8d) 100%);
         box-shadow:
-            inset 0 0 0 1px #7d90ff,
-            inset 0 0 0 2px #0f175a,
+            inset 0 0 0 1px var(--combination-station-inset, #7d90ff),
             0 8px 0 rgba(0, 0, 0, 0.34);
         position: relative;
+
+        --combination-station-border: #e7ecff;
+        --combination-station-inset: #7d90ff;
+        --combination-station-glow: rgba(84, 106, 255, 0.34);
+        --combination-station-bg-accent: rgba(122, 139, 255, 0.2);
+        --combination-station-bg-top: #3245ce;
+        --combination-station-bg-bottom: #1a2b8d;
+        --combination-station-output-border: #d8fff1;
+        --combination-station-output-inset: rgba(178, 245, 232, 0.75);
+        --combination-station-output-inner: rgba(11, 69, 58, 0.92);
+        --combination-station-output-top: rgba(170, 255, 226, 0.4);
+        --combination-station-output-bottom: rgba(25, 103, 88, 0.95);
 
         &::before {
             content: "";
@@ -1485,73 +1496,82 @@
         }
 
         &.is-lit {
-            border-color: #bfffd5;
+            border-color: var(--combination-station-border);
             box-shadow:
-                inset 0 0 0 1px rgba(188, 255, 225, 0.42),
-                inset 0 0 0 2px #0f175a,
+                inset 0 0 0 1px var(--combination-station-inset),
                 0 8px 0 rgba(0, 0, 0, 0.34),
-                0 0 18px rgba(95, 255, 186, 0.34);
+                0 0 18px var(--combination-station-glow);
         }
 
         &.combination-station--fire.is-lit {
-            background:
-                radial-gradient(circle at 14% 10%, var(--element-fire-accent-inset), transparent 34%),
-                linear-gradient(180deg, var(--element-fire-accent-top) 0%, var(--element-fire-accent-bottom) 100%);
-            border-color: var(--element-fire-accent-border);
-            box-shadow:
-                inset 0 0 0 1px var(--element-fire-accent-inset),
-                inset 0 0 0 2px #0f175a,
-                0 8px 0 rgba(0, 0, 0, 0.34),
-                0 0 18px var(--element-fire-accent-glow);
+            --combination-station-border: var(--element-fire-accent-border);
+            --combination-station-inset: var(--element-fire-accent-inset);
+            --combination-station-glow: var(--element-fire-accent-glow);
+            --combination-station-bg-accent: var(--element-fire-accent-inset);
+            --combination-station-bg-top: var(--element-fire-accent-top);
+            --combination-station-bg-bottom: var(--element-fire-accent-bottom);
+            --combination-station-output-border: var(--element-fire-accent-border);
+            --combination-station-output-inset: var(--element-fire-accent-inset);
+            --combination-station-output-inner: rgba(105, 26, 21, 0.84);
+            --combination-station-output-top: rgba(255, 211, 205, 0.42);
+            --combination-station-output-bottom: rgba(170, 54, 46, 0.88);
         }
 
         &.combination-station--earth.is-lit {
-            background:
-                radial-gradient(circle at 14% 10%, var(--element-earth-accent-inset), transparent 34%),
-                linear-gradient(180deg, var(--element-earth-accent-top) 0%, var(--element-earth-accent-bottom) 100%);
-            border-color: var(--element-earth-accent-border);
-            box-shadow:
-                inset 0 0 0 1px var(--element-earth-accent-inset),
-                inset 0 0 0 2px #0f175a,
-                0 8px 0 rgba(0, 0, 0, 0.34),
-                0 0 18px var(--element-earth-accent-glow);
+            --combination-station-border: var(--element-earth-accent-border);
+            --combination-station-inset: var(--element-earth-accent-inset);
+            --combination-station-glow: var(--element-earth-accent-glow);
+            --combination-station-bg-accent: var(--element-earth-accent-inset);
+            --combination-station-bg-top: var(--element-earth-accent-top);
+            --combination-station-bg-bottom: var(--element-earth-accent-bottom);
+            --combination-station-output-border: var(--element-earth-accent-border);
+            --combination-station-output-inset: var(--element-earth-accent-inset);
+            --combination-station-output-inner: rgba(31, 63, 30, 0.86);
+            --combination-station-output-top: rgba(210, 255, 205, 0.42);
+            --combination-station-output-bottom: rgba(72, 157, 121, 0.82);
 
         }
 
         &.combination-station--water.is-lit {
-            background:
-                radial-gradient(circle at 14% 10%, var(--element-water-accent-inset), transparent 34%),
-                linear-gradient(180deg, var(--element-water-accent-top) 0%, var(--element-water-accent-bottom) 100%);
-            border-color: var(--element-water-accent-border);
-            box-shadow:
-                inset 0 0 0 1px var(--element-water-accent-inset),
-                inset 0 0 0 2px #0f175a,
-                0 8px 0 rgba(0, 0, 0, 0.34),
-                0 0 18px var(--element-water-accent-glow);
+            --combination-station-border: var(--element-water-accent-border);
+            --combination-station-inset: var(--element-water-accent-inset);
+            --combination-station-glow: var(--element-water-accent-glow);
+            --combination-station-bg-accent: var(--element-water-accent-inset);
+            --combination-station-bg-top: var(--element-water-accent-top);
+            --combination-station-bg-bottom: var(--element-water-accent-bottom);
+            --combination-station-output-border: var(--element-water-accent-border);
+            --combination-station-output-inset: var(--element-water-accent-inset);
+            --combination-station-output-inner: rgba(17, 52, 97, 0.92);
+            --combination-station-output-top: rgba(174, 220, 255, 0.4);
+            --combination-station-output-bottom: rgba(63, 127, 198, 0.95);
         }
 
         &.combination-station--air.is-lit {
-            background:
-                radial-gradient(circle at 14% 10%, var(--element-air-accent-inset), transparent 34%),
-                linear-gradient(180deg, var(--element-air-accent-top) 0%, var(--element-air-accent-bottom) 100%);
-            border-color: var(--element-air-accent-border);
-            box-shadow:
-                inset 0 0 0 1px var(--element-air-accent-inset),
-                inset 0 0 0 2px #0f175a,
-                0 8px 0 rgba(0, 0, 0, 0.34),
-                0 0 18px var(--element-air-accent-glow);
+            --combination-station-border: var(--element-air-accent-border);
+            --combination-station-inset: var(--element-air-accent-inset);
+            --combination-station-glow: var(--element-air-accent-glow);
+            --combination-station-bg-accent: var(--element-air-accent-inset);
+            --combination-station-bg-top: var(--element-air-accent-top);
+            --combination-station-bg-bottom: var(--element-air-accent-bottom);
+            --combination-station-output-border: var(--element-air-accent-border);
+            --combination-station-output-inset: var(--element-air-accent-inset);
+            --combination-station-output-inner: rgba(31, 63, 81, 0.92);
+            --combination-station-output-top: rgba(188, 236, 255, 0.4);
+            --combination-station-output-bottom: rgba(106, 162, 184, 0.95);
         }
 
         &.combination-station--soul.is-lit {
-            background:
-                radial-gradient(circle at 14% 10%, var(--element-soul-accent-inset), transparent 34%),
-                linear-gradient(180deg, var(--element-soul-accent-top) 0%, var(--element-soul-accent-bottom) 100%);
-            border-color: var(--element-soul-accent-border);
-            box-shadow:
-                inset 0 0 0 1px var(--element-soul-accent-inset),
-                inset 0 0 0 2px #0f175a,
-                0 8px 0 rgba(0, 0, 0, 0.34),
-                0 0 18px var(--element-soul-accent-glow);
+            --combination-station-border: var(--element-soul-accent-border);
+            --combination-station-inset: var(--element-soul-accent-inset);
+            --combination-station-glow: var(--element-soul-accent-glow);
+            --combination-station-bg-accent: var(--element-soul-accent-inset);
+            --combination-station-bg-top: var(--element-soul-accent-top);
+            --combination-station-bg-bottom: var(--element-soul-accent-bottom);
+            --combination-station-output-border: var(--element-soul-accent-border);
+            --combination-station-output-inset: var(--element-soul-accent-inset);
+            --combination-station-output-inner: rgba(6, 55, 38, 0.92);
+            --combination-station-output-top: rgba(188, 255, 225, 0.4);
+            --combination-station-output-bottom: rgba(21, 154, 104, 0.95);
         }
     }
 
@@ -1762,12 +1782,12 @@
             max-width: 3rem;
             height: 3rem;
             border-radius: 4px;
-            border: 2px solid #d8fff1;
+            border: 2px solid var(--combination-station-output-border);
             background:
-                radial-gradient(circle at 35% 30%, rgba(170, 255, 226, 0.4), rgba(25, 103, 88, 0.95));
+                radial-gradient(circle at 35% 30%, var(--combination-station-output-top), var(--combination-station-output-bottom));
             box-shadow:
-                inset 0 0 0 1px rgba(178, 245, 232, 0.75),
-                inset 0 0 0 2px rgba(11, 69, 58, 0.92),
+                inset 0 0 0 1px var(--combination-station-output-inset),
+                inset 0 0 0 2px var(--combination-station-output-inner),
                 0 5px 0 rgba(0, 0, 0, 0.3);
         }
     }
