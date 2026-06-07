@@ -17,6 +17,13 @@ import CombinationStation, {
     type CombinationStateWorkbookRow,
 } from "./CombinationStation";
 import {
+    buildEffectValuesByKey,
+    buildMappedEffectRow,
+    resolveCombinationPreviewFromEffects,
+    type EffectWorkbookRow,
+    type EffectWorkbookValues,
+} from "./combinationEffectLookup";
+import {
     STARTER_BUTTON_THEME_BY_TYPE,
     STARTER_BUTTON_THEME_DEFAULT,
 } from "../../styles/elementThemes";
@@ -875,6 +882,21 @@ function Game() {
 
             loadElements(elementsBuffer);
 
+            const effectsWorkbookBuffer = await fetch("/effects.xlsx")
+                .then((res) => (res.ok ? res.arrayBuffer() : null))
+                .catch(() => null);
+            if (isCancelled) {
+                return;
+            }
+
+            let effectValuesByKey = new Map<string, EffectWorkbookValues>();
+            if (effectsWorkbookBuffer) {
+                const effectsWorkbook = XLSX.read(effectsWorkbookBuffer, { type: "array" });
+                const effectsWorksheet = effectsWorkbook.Sheets[effectsWorkbook.SheetNames[0]];
+                const effectRows = XLSX.utils.sheet_to_json<EffectWorkbookRow>(effectsWorksheet);
+                effectValuesByKey = buildEffectValuesByKey(effectRows);
+            }
+
             const stateLookup: CombinationStateEffectsLookup = {};
             for (const [stateKey, workbookPath] of Object.entries(COMBINATION_STATE_WORKBOOK_PATHS) as Array<[CombinationStationActionStateKey, string]>) {
                 const workbookBuffer = await fetch(workbookPath).then((res) => (res.ok ? res.arrayBuffer() : null));
@@ -897,13 +919,8 @@ function Game() {
                         return;
                     }
 
-                    const mappedEffectRow: Record<string, unknown> = {
-                        "Effect 1 Kind": String(row.Effect ?? "").trim(),
-                        "Effect 1 Amount": row["Effect Amt"] ?? "",
-                        "Effect 1 Hits": row["Effect Hits"] ?? "",
-                        "Effect 1 Duration": row["Effect Dur"] ?? "",
-                        "Effect 1 Target": String(row["Effect Target"] ?? "").trim(),
-                    };
+                    const effectName = String(row.Effect ?? "").trim();
+                    const mappedEffectRow = buildMappedEffectRow(effectName, effectValuesByKey);
 
                     const parsedEffects = parseSpellEffectsFromRow(mappedEffectRow, 1);
                     effectsMap.set(normalizeElementName(elementName), parsedEffects);
@@ -1314,16 +1331,30 @@ function Game() {
             return null;
         }
 
+        const resolvedPreview = resolveCombinationPreviewFromEffects(
+            {
+                damage: rightItem.damage,
+                energy: rightItem.energy,
+                effects: mappedEffects,
+            },
+            [
+                ...(leftItem.effects ?? []),
+                ...(rightItem.effects ?? []),
+            ],
+        );
+
         return applyCombustPreview({
             consumedIds: [rightItem.id],
             letter: rightItem.letter,
-            damage: rightItem.damage,
-            energy: rightItem.energy,
+            damage: resolvedPreview.damage,
+            isDamageEnhanced: resolvedPreview.isDamageEnhanced,
+            baseDamageBeforeEnhance: resolvedPreview.baseDamageBeforeEnhance,
+            energy: resolvedPreview.energy,
             level: rightItem.level,
             description: rightItem.description,
             type1: rightItem.type1,
             type2: rightItem.type2,
-            effects: mappedEffects,
+            effects: resolvedPreview.effects,
             category: rightItem.category,
         });
     }, [combinationStateEffectsLookup, draggables, zoneOccupants]);

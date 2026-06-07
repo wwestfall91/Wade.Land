@@ -19,7 +19,10 @@ export type SpellEffectKind =
     | "exhaust"
     | "consume"
     | "hardened"
-    | "rage";
+    | "rage"
+    | "powerful"
+    | "energetic"
+    | "efficient";
 
 export type SpellEffectTarget = "self" | "enemy";
 
@@ -93,6 +96,9 @@ const SELF_TARGET_EFFECT_KINDS: SpellEffectKind[] = [
     "consume",
     "hardened",
     "rage",
+    "powerful",
+    "energetic",
+    "efficient",
 ];
 
 const normalizeEffectKind = (value: string): SpellEffectKind | null => {
@@ -102,6 +108,7 @@ const normalizeEffectKind = (value: string): SpellEffectKind | null => {
         case "heal":
             return "heal";
         case "multihit":
+        case "multi_hit":
             return "multi_hit";
         case "burn":
             return "burn";
@@ -145,6 +152,12 @@ const normalizeEffectKind = (value: string): SpellEffectKind | null => {
             return "hardened";
         case "rage":
             return "rage";
+        case "powerful":
+            return "powerful";
+        case "energetic":
+            return "energetic";
+        case "efficient":
+            return "efficient";
         default:
             return null;
     }
