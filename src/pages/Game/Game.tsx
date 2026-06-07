@@ -10,6 +10,17 @@ import { getEffectChipClass, getEffectSummaryLines } from "../../combat/effectSu
 import { type RewardElement, usePlayer } from "../../context/PlayerContext";
 import { RewardFactory, type MonsterReward } from "../../combat/rewardFactory";
 import FloatingTooltip from "./FloatingTooltip";
+import CombinationStation, {
+    COMBINATION_STATE_WORKBOOK_PATHS,
+    getCombinationStationState,
+    type CombinationStationActionStateKey,
+    type CombinationStateEffectsLookup,
+    type CombinationStateWorkbookRow,
+} from "./CombinationStation";
+import {
+    STARTER_BUTTON_THEME_BY_TYPE,
+    STARTER_BUTTON_THEME_DEFAULT,
+} from "../../styles/elementThemes";
 import RewardModal from "../Fight/RewardModal";
 import MonsterUpgradeModal from "./MonsterUpgradeModal";
 import soulIcon from "../../assets/icons/Soul.png";
@@ -131,6 +142,8 @@ type PreviewCombination = {
     damage: number;
     isDamageEnhanced?: boolean;
     baseDamageBeforeEnhance?: number;
+    isCombusted?: boolean;
+    baseDamageBeforeCombust?: number;
     isSoulChoiceOutput?: boolean;
     energy?: number;
     level: number;
@@ -178,34 +191,7 @@ const ELEMENT_FLIGHT_STAGGER_MS = 130;
 const CHEST_REVEAL_FADEOUT_MS = 320;
 const STARTER_LABEL_ANIM_MS = 520;
 const ENABLE_FIRST_BATTLE_OLD_ONE_SCENE = false;
-
-type StarterButtonTheme = {
-    top: string;
-    bottom: string;
-    border: string;
-    text: string;
-    glow: string;
-};
-
-const STARTER_BUTTON_THEME_DEFAULT: StarterButtonTheme = {
-    top: "#5a71e3",
-    bottom: "#2b3ea9",
-    border: "#e8edff",
-    text: "#fff6a9",
-    glow: "rgba(164, 179, 255, 0.32)",
-};
-
-const STARTER_BUTTON_THEME_BY_TYPE: Record<string, StarterButtonTheme> = {
-    fire: { top: "#cf5f42", bottom: "#872f20", border: "#ffd1c4", text: "#fff3e8", glow: "rgba(255, 135, 108, 0.34)" },
-    water: { top: "#3f7fc6", bottom: "#1f4f89", border: "#b8daff", text: "#ecf7ff", glow: "rgba(114, 191, 255, 0.34)" },
-    earth: { top: "#8a6a3f", bottom: "#594224", border: "#f1debe", text: "#fff6df", glow: "rgba(216, 176, 118, 0.32)" },
-    air: { top: "#6aa2b8", bottom: "#3d6f84", border: "#d6f2ff", text: "#f3fcff", glow: "rgba(161, 225, 255, 0.34)" },
-    lightning: { top: "#b29225", bottom: "#7b620e", border: "#ffe480", text: "#fffbe2", glow: "rgba(255, 224, 120, 0.35)" },
-    ice: { top: "#4d9abb", bottom: "#2a647f", border: "#c8f2ff", text: "#eefbff", glow: "rgba(146, 224, 255, 0.34)" },
-    light: { top: "#d2b85d", bottom: "#8f7a30", border: "#ffefb4", text: "#fffdf1", glow: "rgba(255, 238, 170, 0.35)" },
-    dark: { top: "#69579a", bottom: "#3f2f67", border: "#d6ccff", text: "#f4efff", glow: "rgba(179, 154, 255, 0.32)" },
-    arcane: { top: "#b4658f", bottom: "#744165", border: "#ffd2e7", text: "#fff0f8", glow: "rgba(255, 171, 214, 0.34)" },
-};
+const COMBUST_DAMAGE_MULTIPLIER = 2.5;
 
 type SoulFlightIcon = {
     id: number;
@@ -239,48 +225,6 @@ type ElementFlightIcon = {
 const normalizeType = (value?: string): string => value?.trim().toLowerCase() ?? "";
 const normalizeElementName = (value?: string): string => value?.trim().toLowerCase() ?? "";
 
-export type CombinationStationState = {
-    key: "idle" | "cleanse" | "polish" | "purify" | "refine" | "enhance";
-    actionLabel: string;
-    elementKey?: string;
-};
-
-type CombinationStationActionStateKey = Exclude<CombinationStationState["key"], "idle" | "enhance">;
-
-type CombinationStateWorkbookRow = {
-    Element?: string;
-    Effect?: string;
-    ["Effect Amt"]?: string | number;
-    ["Effect Hits"]?: string | number;
-    ["Effect Dur"]?: string | number;
-    ["Effect Target"]?: string;
-};
-
-type CombinationStateEffectsLookup = Partial<Record<CombinationStationActionStateKey, Map<string, SpellEffectConfig[]>>>;
-
-const COMBINATION_STATE_WORKBOOK_PATHS: Record<CombinationStationActionStateKey, string> = {
-    cleanse: "/cleanse.xlsx",
-    polish: "/polish.xlsx",
-    purify: "/purify.xlsx",
-    refine: "/refine.xlsx",
-};
-
-const COMBINATION_STATION_STATE_BY_FIRST_ELEMENT: Record<string, CombinationStationState> = {
-    fire: { key: "purify", actionLabel: "Purify", elementKey: "fire" },
-    earth: { key: "refine", actionLabel: "Refine", elementKey: "earth" },
-    water: { key: "cleanse", actionLabel: "Cleanse", elementKey: "water" },
-    air: { key: "polish", actionLabel: "Polish", elementKey: "air" },
-    soul: { key: "enhance", actionLabel: "Enhance", elementKey: "soul" },
-};
-
-const IDLE_COMBINATION_STATION_STATE: CombinationStationState = {
-    key: "idle",
-    actionLabel: "-",
-};
-
-export const getCombinationStationState = (firstSlotElementKey: string): CombinationStationState =>
-    COMBINATION_STATION_STATE_BY_FIRST_ELEMENT[firstSlotElementKey] ?? IDLE_COMBINATION_STATION_STATE;
-
 const isPlasmaName = (value?: string): boolean => normalizeElementName(value) === "plasma";
 const isUnstableName = (value?: string): boolean => {
     const normalized = normalizeElementName(value).replace(/[^a-z0-9]+/g, "");
@@ -291,17 +235,6 @@ const wait = (ms: number) => new Promise<void>((resolve) => {
 });
 
 type IntroPhase = "hidden" | "line1" | "line2" | "input" | "line3" | "line4" | "fadeout";
-
-type CombineStationTooltipProps = {
-    message: string;
-    className?: string;
-};
-
-const CombineStationTooltip = ({ message, className = "" }: CombineStationTooltipProps) => (
-    <div className={`combine-station-tooltip ${className}`.trim()} role="tooltip">
-        {message}
-    </div>
-);
 
 const getRandomUniqueElements = (elements: RewardElement[], count: number): RewardElement[] => {
     const shuffled = [...elements].sort(() => Math.random() - 0.5);
@@ -1370,6 +1303,20 @@ function Game() {
             return null;
         }
 
+        const applyCombustPreview = (combination: PreviewCombination): PreviewCombination => {
+            const hasCombust = combination.effects?.some((effect) => effect.kind === "explode") ?? false;
+            if (!hasCombust) {
+                return combination;
+            }
+
+            return {
+                ...combination,
+                damage: Math.round(combination.damage * COMBUST_DAMAGE_MULTIPLIER),
+                isCombusted: true,
+                baseDamageBeforeCombust: combination.damage,
+            };
+        };
+
         const consumedIds = zoneOccupants.filter(
             (occupantId): occupantId is number => occupantId !== null,
         );
@@ -1399,7 +1346,7 @@ function Game() {
                 return null;
             }
 
-            return {
+            return applyCombustPreview({
                 consumedIds,
                 letter: `${otherItem.letter}+`,
                 damage: otherItem.damage,
@@ -1409,7 +1356,7 @@ function Game() {
                 type1: unstableItem.type1,
                 type2: unstableItem.type2,
                 effects: unstableItem.effects,
-            };
+            });
         };
 
         if (zoneOccupants.length === 3) {
@@ -1437,7 +1384,7 @@ function Game() {
                 return buildUnstableCloneResult(unstableItem, otherItem);
             }
 
-            return {
+            return applyCombustPreview({
                 consumedIds,
                 letter: "Unstable Element",
                 damage: 0,
@@ -1447,7 +1394,7 @@ function Game() {
                 type1: mergedTypes[0],
                 type2: mergedTypes[1],
                 effects: sideEffects,
-            };
+            });
         }
 
         const [leftItem, rightItem] = occupantItems;
@@ -1485,7 +1432,7 @@ function Game() {
         }
 
         if (state.key === "enhance") {
-            return {
+            return applyCombustPreview({
                 consumedIds: [leftItem.id],
                 letter: rightItem.letter,
                 damage: Math.round(rightItem.damage * 1.5),
@@ -1498,7 +1445,7 @@ function Game() {
                 type2: rightItem.type2,
                 effects: rightItem.effects,
                 category: rightItem.category,
-            };
+            });
         }
 
         const stateEffects = combinationStateEffectsLookup[state.key];
@@ -1508,7 +1455,7 @@ function Game() {
             return null;
         }
 
-        return {
+        return applyCombustPreview({
             consumedIds: [rightItem.id],
             letter: rightItem.letter,
             damage: rightItem.damage,
@@ -1519,7 +1466,7 @@ function Game() {
             type2: rightItem.type2,
             effects: mappedEffects,
             category: rightItem.category,
-        };
+        });
     }, [combinationStateEffectsLookup, draggables, zoneOccupants]);
 
     const canCombine = previewCombination !== null;
@@ -1528,31 +1475,6 @@ function Game() {
     const firstSlotConnectorKey = normalizeType(firstSlottedDraggable?.type1) || firstSlotElementKey;
     const combinationStationState = getCombinationStationState(firstSlotElementKey);
     const hasActiveCombinationState = combinationStationState.key !== "idle";
-    const combineButtonElementClass = hasActiveCombinationState && combinationStationState.elementKey
-        ? `combine-button--${combinationStationState.elementKey}`
-        : "";
-    const slotConnectorClassName = [
-        "slot-connector",
-        "slot-connector--between",
-        zoneOccupants[0] !== null ? "is-lit" : "",
-        zoneOccupants[0] !== null ? `slot-connector--${firstSlotConnectorKey || "default"}` : "",
-    ].filter((name) => name.length > 0).join(" ");
-    const secondSlotConnectorClassName = [
-        "slot-connector",
-        "slot-connector--between",
-        zoneOccupants[0] !== null && zoneOccupants[1] !== null ? "is-lit" : "",
-        zoneOccupants[0] !== null && zoneOccupants[1] !== null ? "slot-connector--yellow" : "",
-    ].filter((name) => name.length > 0).join(" ");
-    const combinationStationClassName = [
-        "combination-station",
-        zoneOccupants[0] !== null ? "is-lit" : "",
-        zoneOccupants[0] !== null ? `combination-station--${firstSlotConnectorKey || "default"}` : "",
-    ].filter((name) => name.length > 0).join(" ");
-    const isCombineButtonDisabled = !canCombine || !hasActiveCombinationState;
-    const shouldShowSlotOneInsertPrompt = (hoveredInsertSlot === 1 && zoneOccupants[0] === null)
-        || (isCombineButtonHovered && hoveredInsertSlot === null && zoneOccupants[0] === null);
-    const shouldShowSlotTwoInsertPrompt = (hoveredInsertSlot === 2 && zoneOccupants[1] === null)
-        || (isCombineButtonHovered && hoveredInsertSlot === null && zoneOccupants[0] !== null && zoneOccupants[1] === null);
     const areBothCombinationSlotsFilled = zoneOccupants[0] !== null && zoneOccupants[1] !== null;
     const isEnhanceCombinationReady = combinationStationState.key === "enhance"
         && areBothCombinationSlotsFilled;
@@ -2672,17 +2594,21 @@ function Game() {
                         onTooltipMouseLeave={handlePreviewTooltipMouseLeave}
                         clampHorizontal={false}
                         typeMultipliers={typeMultipliers}
-                        elementDetails={{
-                            letter: previewCombination.letter,
-                            damage: previewCombination.damage,
-                            isDamageEnhanced: previewCombination.isDamageEnhanced,
-                            baseDamageBeforeEnhance: previewCombination.baseDamageBeforeEnhance,
-                            description: previewCombination.description,
-                            type1: previewCombination.type1,
-                            type2: previewCombination.type2,
-                            effects: previewCombination.effects,
-                            category: previewCombination.category,
-                        }}
+                        elementDetails={(() => {
+                            return {
+                                letter: previewCombination.letter,
+                                damage: previewCombination.damage,
+                                isDamageEnhanced: previewCombination.isDamageEnhanced,
+                                baseDamageBeforeEnhance: previewCombination.baseDamageBeforeEnhance,
+                                isCombusted: previewCombination.isCombusted,
+                                baseDamageBeforeCombust: previewCombination.baseDamageBeforeCombust,
+                                description: previewCombination.description,
+                                type1: previewCombination.type1,
+                                type2: previewCombination.type2,
+                                effects: previewCombination.effects,
+                                category: previewCombination.category,
+                            };
+                        })()}
                     />
                 </>
             ) : null}
@@ -2724,79 +2650,26 @@ function Game() {
                 
                 <div className="game-controls-stack">
                     {isCombinationStationUnlocked ? (
-                        <div className={combinationStationClassName}>
-                            <div className="combination-equation">
-                                <div className="drop-zone-area">
-                                    <div
-                                        className={`drop-zone ${hasStartedDraggingElement && !hasSeenDropZoneOneTutorial ? "is-discoverable" : ""} ${isEnhanceCombinationReady ? "is-enhance-ready-primary" : ""} ${isNonEnhanceCombinationReady ? "is-combination-ready-primary" : ""}`}
-                                        ref={dropZoneRefA}
-                                        onMouseEnter={() => {
-                                            setHoveredInsertSlot(1);
-                                        }}
-                                        onMouseLeave={() => {
-                                            setHoveredInsertSlot((previous) => (previous === 1 ? null : previous));
-                                        }}
-                                    >
-                                        1
-                                        {shouldShowSlotOneInsertPrompt ? (
-                                            <CombineStationTooltip
-                                                className="combine-station-tooltip--slot-one"
-                                                message="Please insert element"
-                                            />
-                                        ) : null}
-                                    </div>
-                                    <div className={slotConnectorClassName} aria-hidden="true" />
-                                    <div
-                                        className={`drop-zone ${isEnhanceCombinationReady ? "is-enhance-ready-secondary" : ""} ${isNonEnhanceCombinationReady ? "is-combination-ready-secondary" : ""}`}
-                                        ref={dropZoneRefB}
-                                        onMouseEnter={() => {
-                                            setHoveredInsertSlot(2);
-                                        }}
-                                        onMouseLeave={() => {
-                                            setHoveredInsertSlot((previous) => (previous === 2 ? null : previous));
-                                        }}
-                                    >
-                                        2
-                                        {shouldShowSlotTwoInsertPrompt ? (
-                                            <CombineStationTooltip
-                                                className="combine-station-tooltip--slot-two"
-                                                message="Please insert element"
-                                            />
-                                        ) : null}
-                                    </div>
-                                    {zoneOccupants.length === 3 ? (
-                                        <div className="drop-zone" ref={dropZoneRefC}>3</div>
-                                        
-                                    ) : null}
-                                    <div className={secondSlotConnectorClassName} aria-hidden="true" />
-                                </div>
-                                <div className="output" ref={outputRef} />
-                            </div>
-
-                            <div
-                                className={`combine-button-wrap ${isCombineButtonDisabled ? "is-disabled" : ""}`}
-                                onMouseEnter={() => {
-                                    setIsCombineButtonHovered(true);
-                                }}
-                                onMouseLeave={() => {
-                                    setIsCombineButtonHovered(false);
-                                }}
-                                onFocusCapture={() => {
-                                    setIsCombineButtonHovered(true);
-                                }}
-                                onBlurCapture={() => {
-                                    setIsCombineButtonHovered(false);
-                                }}
-                            >
-                                <button
-                                    className={`combine-button ${combineButtonElementClass}`.trim()}
-                                    disabled={isCombineButtonDisabled}
-                                    onClick={handleCombine}
-                                >
-                                    {combinationStationState.actionLabel}
-                                </button>
-                            </div>
-                        </div>
+                        <CombinationStation
+                            zoneOccupants={zoneOccupants}
+                            hasStartedDraggingElement={hasStartedDraggingElement}
+                            hasSeenDropZoneOneTutorial={hasSeenDropZoneOneTutorial}
+                            isEnhanceCombinationReady={isEnhanceCombinationReady}
+                            isNonEnhanceCombinationReady={isNonEnhanceCombinationReady}
+                            firstSlotConnectorKey={firstSlotConnectorKey}
+                            hasActiveCombinationState={hasActiveCombinationState}
+                            combinationStationState={combinationStationState}
+                            canCombine={canCombine}
+                            onCombine={handleCombine}
+                            dropZoneRefA={dropZoneRefA}
+                            dropZoneRefB={dropZoneRefB}
+                            dropZoneRefC={dropZoneRefC}
+                            outputRef={outputRef}
+                            hoveredInsertSlot={hoveredInsertSlot}
+                            onHoverInsertSlot={setHoveredInsertSlot}
+                            isCombineButtonHovered={isCombineButtonHovered}
+                            onCombineButtonHoverChange={setIsCombineButtonHovered}
+                        />
                     ) : null}
 
                     {isEnhanceStationUnlocked ? (
@@ -2825,9 +2698,9 @@ function Game() {
                             statuses={playerStatuses}
                             className={`player-stats-dock${isSoulCounterPopping ? " is-soul-counter-pop" : ""}${isPostBattleSoulSequenceActive ? " is-soul-fill-sequence" : ""}${isSoulPanelErrorFeedback ? " is-soul-panel-error" : ""}`}
                         />
-                        <button className="feed-button" onClick={handleFeedClick}>
+                        {/* <button className="feed-button" onClick={handleFeedClick}>
                             FEED
-                        </button>
+                        </button> */}
                     </div>
                 </div>
                 <div className="game-scene-col game-scene-col--right">
@@ -2842,6 +2715,7 @@ function Game() {
                             spritePath={nextEnemy?.sprite ?? ""}
                             enemyHealth={nextEnemy?.hp ?? 0}
                             enemyMaxHp={nextEnemy?.hp ?? 0}
+                            enemyPower={nextEnemy?.power ?? 0}
                             weaknesses={nextEnemy?.weaknesses ?? []}
                             elements={nextEnemy?.elements ?? []}
                             souls={nextEnemy?.souls ?? 0}
@@ -2938,14 +2812,14 @@ function Game() {
                                 <span className="player-souls-value">{playerProgress.souls}</span>
                             </div>
                         </div> */}
-                        <button
+                        {/* <button
                             className="feed-button"
                             onClick={handleFeedSpend}
                             disabled={isOldOneSequenceRunning || isOldOneStirsModalVisible}
                             aria-label={isOldOneReturnLocked ? `Feed (${Math.min(oldOneFeedCount, 5)}/5)` : "Feed"}
                         >
                             FEED
-                        </button>
+                        </button> */}
                         {!isOldOneReturnLocked ? (
                             <button className="feed-overlay-return-button" onClick={handleFeedOverlayClose}>
                                 RETURN

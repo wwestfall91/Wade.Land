@@ -1,21 +1,25 @@
 import { describe, expect, it } from "vitest";
 import {
-    BURN_DAMAGE_PER_STACK,
+    BURN_FIRE_BONUS_PERCENT_PER_STACK,
     FREEZE_FIRE_BONUS_PER_STACK,
     SOAK_FIRE_PENALTY_PER_STACK,
     SOAK_LIGHTNING_BONUS_PER_STACK,
-    getBurnTickDamage,
+    getBurnFireBonus,
+    getBurnFireBonusPercent,
     getFreezeFireBonus,
     getSoakFirePenalty,
     getSoakLightningBonus,
 } from "./statusMath";
 
 describe("statusMath", () => {
-    it("burn damage scales by stacks", () => {
-        expect(getBurnTickDamage(0)).toBe(0);
-        expect(getBurnTickDamage(1)).toBe(BURN_DAMAGE_PER_STACK);
-        expect(getBurnTickDamage(3)).toBe(3 * BURN_DAMAGE_PER_STACK);
-        expect(getBurnTickDamage(-2)).toBe(0);
+    it("burn increases fire damage by stack percent", () => {
+        expect(getBurnFireBonusPercent(0)).toBe(0);
+        expect(getBurnFireBonusPercent(1)).toBe(BURN_FIRE_BONUS_PERCENT_PER_STACK);
+        expect(getBurnFireBonusPercent(3)).toBe(3 * BURN_FIRE_BONUS_PERCENT_PER_STACK);
+        expect(getBurnFireBonusPercent(-2)).toBe(0);
+        expect(getBurnFireBonus(10, 10)).toBe(5);
+        expect(getBurnFireBonus(10, 100)).toBe(50);
+        expect(getBurnFireBonus(-2, 100)).toBe(0);
     });
 
     it("soak modifies lightning and fire damage", () => {

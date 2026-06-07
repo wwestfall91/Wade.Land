@@ -15,7 +15,6 @@ import {
 } from "../../combat/spellEffects";
 import { effectFactory } from "../../combat/effectFactory";
 import {
-    BURN_DAMAGE_PER_STACK,
     ENERGY_PER_TURN,
     FREEZE_FIRE_BONUS_PER_STACK,
     MAX_TURN_ENERGY,
@@ -24,7 +23,8 @@ import {
     THORNS_REFLECT_PERCENT_PER_STACK,
     FLOAT_EARTH_REDUCTION_PERCENT_PER_STACK,
     FLOAT_LIGHTNING_BONUS_PERCENT_PER_STACK,
-    getBurnTickDamage,
+    getBurnFireBonus,
+    getBurnFireBonusPercent,
     getFreezeFireBonus,
     getFloatEarthReduction,
     getFloatLightningBonus,
@@ -36,6 +36,7 @@ import EnemyStage, { type EnemyDamagePopup } from "../../components/EnemyStage";
 import ElementDetailsTooltip from "../../components/ElementDetailsTooltip";
 import { usePlayer, type RewardElement } from "../../context/PlayerContext";
 import FloatingTooltip from "../Game/FloatingTooltip";
+import { ELEMENT_SPELL_COLORS, type ElementSpellColor } from "../../styles/elementThemes";
 import ElementIcon from "../../components/ElementIcon";
 import shieldIcon from "../../assets/icons/Shield.png";
 import soulIcon from "../../assets/icons/Soul.png";
@@ -55,6 +56,7 @@ const HIT_FLASH_MS = scaleCombatAnimationMs(190);
 const HIT_STEP_DELAY_MS = scaleCombatAnimationMs(120);
 const EFFECT_STEP_DELAY_MS = scaleCombatAnimationMs(95);
 const EVENT_LOG_MAX_ENTRIES = 60;
+const COMBUST_RECOIL_PERCENT = 0.1;
 
 type EnergyFlight = {
     id: number;
@@ -76,23 +78,7 @@ const wait = (ms: number) => new Promise<void>((resolve) => {
     window.setTimeout(resolve, scaleCombatAnimationMs(ms));
 });
 
-type SpellColor = {
-    bg: string;
-    border: string;
-    text: string;
-};
-
-const SPELL_TYPE_COLORS: Record<string, SpellColor> = {
-    fire: { bg: "#ffb680", border: "#d0652c", text: "#2a140a" },
-    water: { bg: "#9ad6ff", border: "#3c84c4", text: "#081f33" },
-    earth: { bg: "#ccb086", border: "#7d5c37", text: "#26190b" },
-    air: { bg: "#dff6ff", border: "#75a4b8", text: "#0f2832" },
-    lightning: { bg: "#ffe56d", border: "#b59308", text: "#332700" },
-    ice: { bg: "#baf1ff", border: "#5aa8bd", text: "#0f2c34" },
-    light: { bg: "#fff3bd", border: "#b59a36", text: "#312700" },
-    dark: { bg: "#8d84aa", border: "#514569", text: "#faf9ff" },
-    arcane: { bg: "#ffc1e4", border: "#af5f8d", text: "#2f1023" },
-};
+const SPELL_TYPE_COLORS = ELEMENT_SPELL_COLORS;
 
 type FightEnemy = {
     name: string;
@@ -356,6 +342,8 @@ function Fight() {
         effects?.find((effect) => effect.kind === "combo")?.targetType ?? null;
     const hasHardenedEffect = (effects?: SpellEffectConfig[]) =>
         Boolean(effects?.some((effect) => effect.kind === "hardened"));
+    const hasCombustEffect = (effects?: SpellEffectConfig[]) =>
+        Boolean(effects?.some((effect) => effect.kind === "explode"));
 
     useEffect(() => {
         setHardenedSpellStates((previous) => {
@@ -393,7 +381,7 @@ function Fight() {
         const first = SPELL_TYPE_COLORS[normalized[0]];
         const second = normalized[1] ? SPELL_TYPE_COLORS[normalized[1]] : undefined;
 
-        const fallback: SpellColor = { bg: "#e9e9e9", border: "#a9a9a9", text: "#202020" };
+        const fallback: ElementSpellColor = { bg: "#e9e9e9", border: "#a9a9a9", text: "#202020" };
         const primary = first ?? fallback;
         const secondary = second ?? primary;
         const background = normalized.length >= 2
@@ -499,20 +487,6 @@ function Fight() {
         window.setTimeout(() => {
             setPlayerDamagePopups((previous) => previous.filter((popup) => popup.id !== popupId));
         }, scaleCombatAnimationMs(500));
-    };
-
-    const triggerPlayerBurnHitFlash = () => {
-        setIsPlayerBurnHitFlash(false);
-        window.requestAnimationFrame(() => {
-            setIsPlayerBurnHitFlash(true);
-            if (playerBurnHitFlashTimeoutRef.current !== null) {
-                window.clearTimeout(playerBurnHitFlashTimeoutRef.current);
-            }
-
-            playerBurnHitFlashTimeoutRef.current = window.setTimeout(() => {
-                setIsPlayerBurnHitFlash(false);
-            }, scaleCombatAnimationMs(320));
-        });
     };
 
     const getSpellEnergyCost = (spell: { energy?: number; type1?: string; type2?: string }, comboType: string | null = playerComboStatus?.requiredType ?? null) => {
@@ -772,6 +746,7 @@ function Fight() {
         let totalPlayerFloatApplied = 0;
         let nextEnemyHealthForThorns = enemyHealth;
         const enemyAttackSource = enemyIntentIconRef.current ?? enemyAttackMarkerRef.current;
+        const playerBurnStacks = currentPlayerBurn?.stacks ?? 0;
 
         for (let hitIndex = 0; hitIndex < hitCount; hitIndex += 1) {
             if (simulatedPlayerHp <= 0) {
@@ -785,8 +760,10 @@ function Fight() {
             const floatEarthReduction = isEarthAttack ? getFloatEarthReduction(floatStacks, attack.damage) : 0;
             const floatLightningBonus = isLightningAttack ? getFloatLightningBonus(floatStacks, attack.damage) : 0;
             const baseHitDamage = Math.max(0, attack.damage + soakBonus - soakPenalty + freezeBonus - floatEarthReduction + floatLightningBonus);
-            const absorbedDamage = Math.min(currentPlayerShield, baseHitDamage);
-            const remainingDamage = Math.max(0, baseHitDamage - absorbedDamage);
+            const burnBonus = isFireAttack ? getBurnFireBonus(playerBurnStacks, baseHitDamage) : 0;
+            const bonusAdjustedDamage = baseHitDamage + burnBonus;
+            const absorbedDamage = Math.min(currentPlayerShield, bonusAdjustedDamage);
+            const remainingDamage = Math.max(0, bonusAdjustedDamage - absorbedDamage);
 
             if (absorbedDamage > 0) {
                 currentPlayerShield = Math.max(0, currentPlayerShield - absorbedDamage);
@@ -1050,16 +1027,6 @@ function Fight() {
         if (currentPlayerBurn) {
             await wait(220);
 
-            const burnDamage = getBurnTickDamage(currentPlayerBurn.stacks);
-            if (burnDamage > 0) {
-                simulatedPlayerHp = Math.max(0, simulatedPlayerHp - burnDamage);
-                applyEnemyAttack(burnDamage);
-                triggerPlayerDamagePopup(burnDamage, `-${burnDamage}`, "burn");
-                triggerPlayerBurnHitFlash();
-                pushEventLog(`Burn deals ${burnDamage} damage (${currentPlayerBurn.stacks} stack${currentPlayerBurn.stacks === 1 ? "" : "s"})`, "status");
-                await wait(EFFECT_STEP_DELAY_MS);
-            }
-
             const nextDuration = currentPlayerBurn.remainingTurns - 1;
             currentPlayerBurn = nextDuration > 0 && simulatedPlayerHp > 0
                 ? { ...currentPlayerBurn, remainingTurns: nextDuration }
@@ -1100,18 +1067,6 @@ function Fight() {
         const energyAtTurnStart = remainingEnergy;
         let nextEnemyHealth = enemyHealth;
         if (burnAtTurnEnd && nextEnemyHealth > 0) {
-            const burnDamage = getBurnTickDamage(burnAtTurnEnd.stacks);
-            if (burnDamage > 0) {
-                nextEnemyHealth = Math.max(0, nextEnemyHealth - burnDamage);
-                setEnemyHealth(nextEnemyHealth);
-                triggerEnemyHitFeedback(burnDamage, "#ff8f44", `-${burnDamage} BURN`, "burn");
-                pushEventLog(
-                    `Enemy burn deals ${burnDamage} damage (${burnAtTurnEnd.stacks} stack${burnAtTurnEnd.stacks === 1 ? "" : "s"})`,
-                    "status",
-                );
-                await wait(240);
-            }
-
             const nextDuration = burnAtTurnEnd.remainingTurns - 1;
             setEnemyBurnStatus(nextDuration > 0 && nextEnemyHealth > 0
                 ? { ...burnAtTurnEnd, remainingTurns: nextDuration }
@@ -1278,6 +1233,7 @@ function Fight() {
         const hardenedState = hardenedSpellStates[spell.id];
         const isHardenedSpell = hasHardenedEffect(spell.effects);
         const isHardenedPreparing = isHardenedSpell && (hardenedState?.phase ?? "preparing") === "preparing";
+        const isCombustSpell = hasCombustEffect(spell.effects);
         const spellDamageForCast = isHardenedSpell && hardenedState?.phase === "ready"
             ? hardenedState.readyDamage
             : spell.damage;
@@ -1385,7 +1341,9 @@ function Fight() {
             const enemyFloatEarthReduction = isEarthSpell ? getFloatEarthReduction(enemyFloatStacks, scaledSpellDamage) : 0;
             const enemyFloatLightningBonus = isLightningSpell ? getFloatLightningBonus(enemyFloatStacks, scaledSpellDamage) : 0;
             const baseHitDamage = Math.max(0, scaledSpellDamage + soakBonus - soakPenalty + freezeBonus - enemyFloatEarthReduction + enemyFloatLightningBonus);
-            const hitDamage = isCritical ? baseHitDamage * 2 : baseHitDamage;
+            const burnBonus = isFireSpell ? getBurnFireBonus(enemyBurnStatus?.stacks ?? 0, baseHitDamage) : 0;
+            const hitDamageBeforeCrit = baseHitDamage + burnBonus;
+            const hitDamage = isCritical ? hitDamageBeforeCrit * 2 : hitDamageBeforeCrit;
             hitDamageBreakdown.push(hitDamage);
             totalDamage += hitDamage;
             nextEnemyHealth = Math.max(0, nextEnemyHealth - hitDamage);
@@ -1562,6 +1520,17 @@ function Fight() {
             await wait(EFFECT_STEP_DELAY_MS);
         }
 
+        let combustRecoilDamage = 0;
+        if (isCombustSpell) {
+            const combustAttackPower = spellDamageForCast;
+            combustRecoilDamage = Math.max(0, Math.round(combustAttackPower * COMBUST_RECOIL_PERCENT));
+            if (combustRecoilDamage > 0) {
+                applyEnemyAttack(combustRecoilDamage);
+                triggerPlayerDamagePopup(combustRecoilDamage, `-${combustRecoilDamage} COMBUST`);
+                await wait(EFFECT_STEP_DELAY_MS);
+            }
+        }
+
         if (activeComboType) {
             if (comboMatches) {
                 comboWasConsumed = true;
@@ -1608,6 +1577,9 @@ function Fight() {
         }
         if (totalEnemyFloatApplied > 0 && nextEnemyHealth > 0) {
             effectMessages.push(`Float +${totalEnemyFloatApplied}`);
+        }
+        if (combustRecoilDamage > 0) {
+            effectMessages.push(`Combust recoil ${combustRecoilDamage}`);
         }
         if (soakWasConsumed) {
             effectMessages.push("Soak evaporates");
@@ -1697,6 +1669,7 @@ function Fight() {
                     spritePath={enemy.sprite ?? ""}
                     enemyHealth={enemyHealth}
                     enemyMaxHp={enemyMaxHp}
+                    enemyPower={enemy.power}
                     weaknesses={enemyWeaknesses}
                     elements={enemy.elements}
                     souls={enemy.souls}
@@ -1710,7 +1683,17 @@ function Fight() {
                 />
                 {queuedEnemyAttack ? (
                     <ElementDetailsTooltip
-                        element={queuedEnemyAttack}
+                            element={{
+                                ...queuedEnemyAttack,
+                                damage: (() => {
+                                    const baseDamage = Number(queuedEnemyAttack.damage ?? 0);
+                                    return baseDamage + (
+                                        getSpellTypeList(queuedEnemyAttack).includes("fire")
+                                            ? getBurnFireBonus(playerBurnStatus?.stacks ?? 0, baseDamage)
+                                            : 0
+                                    );
+                                })(),
+                            }}
                         anchorElement={enemyIntentIconRef.current ?? enemyAttackMarkerRef.current}
                         open={isEnemyIntentTooltipOpen && Boolean(enemyIntentIconRef.current ?? enemyAttackMarkerRef.current)}
                         className={`reward-element-tooltip-shell${isEnemyIntentTooltipClosing ? " is-closing" : ""}`}
@@ -1735,7 +1718,18 @@ function Fight() {
                             <ElementIcon name={queuedEnemyAttack.letter} className="enemy-attack-marker-icon" />
                         ) : "?"}
                     </div>
-                    <div className="enemy-intent-damage">{queuedEnemyAttack?.damage ?? "?"}</div>
+                    <div className="enemy-intent-damage">
+                        {queuedEnemyAttack
+                            ? (() => {
+                                const baseDamage = Number(queuedEnemyAttack.damage ?? 0);
+                                return baseDamage + (
+                                    getSpellTypeList(queuedEnemyAttack).includes("fire")
+                                        ? getBurnFireBonus(playerBurnStatus?.stacks ?? 0, baseDamage)
+                                        : 0
+                                );
+                            })()
+                            : "?"}
+                    </div>
                     <div className="enemy-intent-label">NEXT ATTACK</div>
                 </div>
             </div>{/* end .enemy-zone */}
@@ -1748,14 +1742,23 @@ function Fight() {
                             const activeComboType = playerComboStatus?.requiredType ?? null;
                             const spellTypes = getSpellTypeList(spell);
                             const comboReady = Boolean(activeComboType && spellTypes.includes(activeComboType));
+                            const isFireSpell = spellTypes.includes("fire");
                             const displayedEnergyCost = getSpellEnergyCost(spell, activeComboType);
                             const hardenedState = hardenedSpellStates[spell.id];
                             const isHardenedSpell = hasHardenedEffect(spell.effects);
                             const isHardenedPreparing = isHardenedSpell && (hardenedState?.phase ?? "preparing") === "preparing";
                             const isHardenedReady = isHardenedSpell && hardenedState?.phase === "ready";
+                            const isCombustSpell = hasCombustEffect(spell.effects);
                             const displayedDamage = hasHardenedEffect(spell.effects) && hardenedState?.phase === "ready"
                                 ? hardenedState.readyDamage
                                 : spell.damage;
+                            const spellTypeMultiplier = Math.max(
+                                ...spellTypes.map((t) => typeMultipliers[normalizeType(t)] ?? 1),
+                                1,
+                            );
+                            const baseDisplayedDamage = Math.round(displayedDamage * spellTypeMultiplier);
+                            const burnBonusDamage = isFireSpell ? getBurnFireBonus(enemyBurnStatus?.stacks ?? 0, baseDisplayedDamage) : 0;
+                            const totalDisplayedDamage = baseDisplayedDamage + burnBonusDamage;
                             const canAffordSpell = isHardenedPreparing ? true : remainingEnergy >= displayedEnergyCost;
                             const hardenedBoostPercent = Math.max(0, (hardenedState?.consumedEnergy ?? 0) * 50);
                             const isWeapon = spell.category?.toLowerCase() === "weapon";
@@ -1789,14 +1792,12 @@ function Fight() {
                                 }
 
                                 const btn = e.currentTarget as HTMLButtonElement;
-                                if (!isHardenedPreparing) {
-                                    launchProjectiles(
-                                        { letter: spell.letter, effects: spell.effects },
-                                        btn,
-                                    );
-                                    if ([spell.type1, spell.type2].map(normalizeType).includes("leaf")) {
-                                        launchLeafFlight(btn, energizeDisplayRef.current);
-                                    }
+                                launchProjectiles(
+                                    { letter: spell.letter, effects: spell.effects },
+                                    btn,
+                                );
+                                if ([spell.type1, spell.type2].map(normalizeType).includes("leaf")) {
+                                    launchLeafFlight(btn, energizeDisplayRef.current);
                                 }
                                 handleSlotClick({
                                     id: spell.id,
@@ -1822,7 +1823,7 @@ function Fight() {
                                 typeMultipliers={typeMultipliers}
                                 elementDetails={{
                                     letter: spell.letter,
-                                    damage: displayedDamage,
+                                    damage: totalDisplayedDamage,
                                     energy: spell.energy,
                                     description: spell.description,
                                     type1: spell.type1,
@@ -1838,16 +1839,18 @@ function Fight() {
                             </div>
                             <div className="spell-card-name">{spell.letter}</div>
                             <div className={`spell-card-damage${isHardenedReady ? " is-hardened-ready" : ""}`}>
-                                {Math.round(displayedDamage * Math.max(
-                                    ...[spell.type1, spell.type2]
-                                        .filter((t): t is string => Boolean(t?.trim()))
-                                        .map(t => typeMultipliers[normalizeType(t)] ?? 1),
-                                    1,
-                                ))}
-                                {isHardenedReady && hardenedState ? (
+                                {totalDisplayedDamage}
+                                {isHardenedReady || isCombustSpell ? (
                                     <span className="spell-card-power-tooltip" role="tooltip">
-                                        <span>{`${hardenedState.baseDamage} -> ${hardenedState.readyDamage}`}</span>
-                                        <span>{`${hardenedState.consumedEnergy} energy consumed increased power by ${hardenedBoostPercent}%`}</span>
+                                        {isHardenedReady && hardenedState ? (
+                                            <span>{`${hardenedState.baseDamage} -> ${hardenedState.readyDamage}`}</span>
+                                        ) : null}
+                                        {isHardenedReady && hardenedState ? (
+                                            <span>{`${hardenedState.consumedEnergy} energy consumed increased power by ${hardenedBoostPercent}%`}</span>
+                                        ) : null}
+                                        {isCombustSpell ? (
+                                            <span>{`Combust power is baked into this element, 10% self-damage on use`}</span>
+                                        ) : null}
                                     </span>
                                 ) : null}
                             </div>
@@ -1873,7 +1876,8 @@ function Fight() {
                             <span className="player-status-tooltip">
                                 <span>Burn Stacks: {playerBurnStatus?.stacks ?? 0}</span>
                                 <span>Expires in: {playerBurnStatus?.remainingTurns ?? 0} turns</span>
-                                <span>Damage: {(playerBurnStatus?.stacks ?? 0) * BURN_DAMAGE_PER_STACK}</span>
+                                <span>Fire bonus: {getBurnFireBonusPercent(playerBurnStatus?.stacks ?? 0)}%</span>
+                                <span>Boosts fire attacks while it lasts</span>
                             </span>
                         </span>
                         <span

@@ -39,6 +39,28 @@ const renderFight = (options: { playerElements: TestSpell[]; enemyHp: number }) 
             souls: 0,
             elements: options.playerElements,
         },
+        playerStatuses: {
+            burn: null,
+            soak: null,
+            freeze: null,
+            thorns: null,
+            float: null,
+            energize: null,
+            shield: 0,
+        },
+        typeMultipliers: {
+            fire: 1,
+            water: 1,
+            lightning: 1,
+            earth: 1,
+            ice: 1,
+            leaf: 1,
+        },
+        shieldMultiplier: 1,
+        soakMultiplier: 1,
+        burnMultiplier: 1,
+        maxHpMultiplier: 1,
+        battleEnergyCarryover: 0,
         playerName: "Tester",
         levels: [{ level: 1, hp: 100 }],
         setPlayerName: vi.fn(),
@@ -93,9 +115,14 @@ const renderFight = (options: { playerElements: TestSpell[]; enemyHp: number }) 
 };
 
 const getSpellButton = (view: RenderResult, letter: string): HTMLButtonElement => {
+    const accessibleTarget = screen.queryByRole("button", { name: new RegExp(letter, "i") });
+    if (accessibleTarget instanceof HTMLButtonElement) {
+        return accessibleTarget;
+    }
+
     const buttons = Array.from(view.container.querySelectorAll(".spell-hand .spell-card"));
     const target = buttons.find((entry) =>
-        (entry as HTMLElement).textContent?.toLowerCase().includes(letter.toLowerCase()),
+        (entry as HTMLElement).textContent?.replace(/\s+/g, "").toLowerCase().includes(letter.replace(/\s+/g, "").toLowerCase()),
     );
     if (!(target instanceof HTMLButtonElement)) {
         throw new Error(`Spell button not found for ${letter}`);
@@ -122,9 +149,9 @@ describe("Fight status effects", () => {
         vi.clearAllMocks();
     });
 
-    it("applies burn to enemy and burns for extra damage at end of turn", async () => {
+    it("applies burn to enemy and boosts fire damage", async () => {
         const view = renderFight({
-            enemyHp: 50,
+            enemyHp: 60,
             playerElements: [
                 {
                     id: 1,
@@ -134,7 +161,16 @@ describe("Fight status effects", () => {
                     level: 1,
                     description: "Applies burn",
                     type1: "fire",
-                    effects: [{ kind: "burn", amount: 2, duration: 2, target: "enemy" }],
+                    effects: [{ kind: "burn", amount: 10, duration: 2, target: "enemy" }],
+                },
+                {
+                    id: 2,
+                    letter: "Flare",
+                    damage: 10,
+                    energy: 1,
+                    level: 1,
+                    description: "Fire strike",
+                    type1: "fire",
                 },
             ],
         });
@@ -145,17 +181,18 @@ describe("Fight status effects", () => {
         });
 
         await waitFor(() => {
-            expect(screen.getByLabelText("Burn 2")).toBeTruthy();
+            expect(screen.getByLabelText("Burn 10")).toBeTruthy();
+        });
+
+        await waitForSpellReady(view, "flare");
+
+        const flareButton = clickSpellButton(view, "flare");
+        await waitFor(() => {
+            expect(flareButton.disabled).toBe(true);
         });
 
         await waitFor(() => {
-            expect((screen.getByRole("button", { name: /end turn/i }) as HTMLButtonElement).disabled).toBe(false);
-        }, { timeout: 5000 });
-
-        fireEvent.click(screen.getByRole("button", { name: /end turn/i }));
-
-        await waitFor(() => {
-            expect(screen.getByText(/enemy burn deals 10 damage/i)).toBeTruthy();
+            expect(screen.getByText(/flare \(fire\) deals 15 damage/i)).toBeTruthy();
         }, { timeout: 5000 });
     }, 20000);
 

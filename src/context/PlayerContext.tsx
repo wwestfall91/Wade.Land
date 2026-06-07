@@ -49,6 +49,7 @@ export type RewardElement = Omit<PlayerElement, "id">;
 export type SelectedEnemy = {
     name: string;
     hp: number;
+    power: number;
     souls: number;
     description: string;
     sprite: string;

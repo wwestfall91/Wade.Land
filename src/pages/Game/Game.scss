@@ -7,6 +7,8 @@
     flex-direction: column;
     align-items: start;
     justify-content: center;
+    width: 100vw;
+    width: 100dvw;
     height: 100vh;
     height: 100dvh;
     box-sizing: border-box;
@@ -1437,7 +1439,6 @@
         align-items: flex-start;
         gap: 1rem;
         align-self: flex-start;
-        padding-top: 4.5rem;
     }
 
     .game-controls-stack {
@@ -1493,45 +1494,64 @@
         }
 
         &.combination-station--fire.is-lit {
-            border-color: #ffd0cb;
+            background:
+                radial-gradient(circle at 14% 10%, var(--element-fire-accent-inset), transparent 34%),
+                linear-gradient(180deg, var(--element-fire-accent-top) 0%, var(--element-fire-accent-bottom) 100%);
+            border-color: var(--element-fire-accent-border);
             box-shadow:
-                inset 0 0 0 1px rgba(255, 188, 180, 0.46),
+                inset 0 0 0 1px var(--element-fire-accent-inset),
                 inset 0 0 0 2px #0f175a,
                 0 8px 0 rgba(0, 0, 0, 0.34),
-                0 0 18px rgba(255, 113, 88, 0.34);
+                0 0 18px var(--element-fire-accent-glow);
         }
 
         &.combination-station--earth.is-lit {
-            border-color: #b6975d;
-            box-shadow: unset;
+            background:
+                radial-gradient(circle at 14% 10%, var(--element-earth-accent-inset), transparent 34%),
+                linear-gradient(180deg, var(--element-earth-accent-top) 0%, var(--element-earth-accent-bottom) 100%);
+            border-color: var(--element-earth-accent-border);
+            box-shadow:
+                inset 0 0 0 1px var(--element-earth-accent-inset),
+                inset 0 0 0 2px #0f175a,
+                0 8px 0 rgba(0, 0, 0, 0.34),
+                0 0 18px var(--element-earth-accent-glow);
 
         }
 
         &.combination-station--water.is-lit {
-            border-color: #cde8ff;
+            background:
+                radial-gradient(circle at 14% 10%, var(--element-water-accent-inset), transparent 34%),
+                linear-gradient(180deg, var(--element-water-accent-top) 0%, var(--element-water-accent-bottom) 100%);
+            border-color: var(--element-water-accent-border);
             box-shadow:
-                inset 0 0 0 1px rgba(174, 220, 255, 0.44),
+                inset 0 0 0 1px var(--element-water-accent-inset),
                 inset 0 0 0 2px #0f175a,
                 0 8px 0 rgba(0, 0, 0, 0.34),
-                0 0 18px rgba(113, 177, 255, 0.3);
+                0 0 18px var(--element-water-accent-glow);
         }
 
         &.combination-station--air.is-lit {
-            border-color: #d6f2ff;
+            background:
+                radial-gradient(circle at 14% 10%, var(--element-air-accent-inset), transparent 34%),
+                linear-gradient(180deg, var(--element-air-accent-top) 0%, var(--element-air-accent-bottom) 100%);
+            border-color: var(--element-air-accent-border);
             box-shadow:
-                inset 0 0 0 1px rgba(188, 236, 255, 0.44),
+                inset 0 0 0 1px var(--element-air-accent-inset),
                 inset 0 0 0 2px #0f175a,
                 0 8px 0 rgba(0, 0, 0, 0.34),
-                0 0 18px rgba(133, 213, 246, 0.3);
+                0 0 18px var(--element-air-accent-glow);
         }
 
         &.combination-station--soul.is-lit {
-            border-color: #b9ffe2;
+            background:
+                radial-gradient(circle at 14% 10%, var(--element-soul-accent-inset), transparent 34%),
+                linear-gradient(180deg, var(--element-soul-accent-top) 0%, var(--element-soul-accent-bottom) 100%);
+            border-color: var(--element-soul-accent-border);
             box-shadow:
-                inset 0 0 0 1px rgba(188, 255, 225, 0.44),
+                inset 0 0 0 1px var(--element-soul-accent-inset),
                 inset 0 0 0 2px #0f175a,
                 0 8px 0 rgba(0, 0, 0, 0.34),
-                0 0 18px rgba(95, 255, 186, 0.34);
+                0 0 18px var(--element-soul-accent-glow);
         }
     }
 
@@ -1599,51 +1619,51 @@
                 }
 
                 &.slot-connector--fire.is-lit {
-                    border-color: #ffd0cb;
-                    background: linear-gradient(90deg, #de604f 0%, #a92d20 100%);
+                    border-color: var(--element-fire-accent-border);
+                    background: linear-gradient(90deg, var(--element-fire-accent-top) 0%, var(--element-fire-accent-bottom) 100%);
                     box-shadow:
-                        inset 0 0 0 1px rgba(255, 188, 180, 0.36),
-                        0 0 12px rgba(255, 113, 88, 0.55);
+                        inset 0 0 0 1px var(--element-fire-accent-inset),
+                        0 0 12px var(--element-fire-accent-glow);
                 }
 
                 &.slot-connector--earth.is-lit {
-                    border-color: #ead3a4;
-                    background: linear-gradient(90deg, #8a6a3f 0%, #5a4324 100%);
+                    border-color: var(--element-earth-accent-border);
+                    background: linear-gradient(90deg, var(--element-earth-accent-top) 0%, var(--element-earth-accent-bottom) 100%);
                     box-shadow:
-                        inset 0 0 0 1px rgba(234, 206, 154, 0.34),
-                        0 0 12px rgba(204, 156, 82, 0.48);
+                        inset 0 0 0 1px var(--element-earth-accent-inset),
+                        0 0 12px var(--element-earth-accent-glow);
                 }
 
                 &.slot-connector--water.is-lit {
-                    border-color: #cde8ff;
-                    background: linear-gradient(90deg, #3f7fc6 0%, #1f4f89 100%);
+                    border-color: var(--element-water-accent-border);
+                    background: linear-gradient(90deg, var(--element-water-accent-top) 0%, var(--element-water-accent-bottom) 100%);
                     box-shadow:
-                        inset 0 0 0 1px rgba(174, 220, 255, 0.36),
-                        0 0 12px rgba(113, 177, 255, 0.52);
+                        inset 0 0 0 1px var(--element-water-accent-inset),
+                        0 0 12px var(--element-water-accent-glow);
                 }
 
                 &.slot-connector--air.is-lit {
-                    border-color: #d6f2ff;
-                    background: linear-gradient(90deg, #6aa2b8 0%, #3d6f84 100%);
+                    border-color: var(--element-air-accent-border);
+                    background: linear-gradient(90deg, var(--element-air-accent-top) 0%, var(--element-air-accent-bottom) 100%);
                     box-shadow:
-                        inset 0 0 0 1px rgba(188, 236, 255, 0.36),
-                        0 0 12px rgba(133, 213, 246, 0.5);
+                        inset 0 0 0 1px var(--element-air-accent-inset),
+                        0 0 12px var(--element-air-accent-glow);
                 }
 
                 &.slot-connector--soul.is-lit {
-                    border-color: #b9ffe2;
-                    background: linear-gradient(90deg, #159a68 0%, #0b5a3d 100%);
+                    border-color: var(--element-soul-accent-border);
+                    background: linear-gradient(90deg, var(--element-soul-accent-top) 0%, var(--element-soul-accent-bottom) 100%);
                     box-shadow:
-                        inset 0 0 0 1px rgba(188, 255, 225, 0.36),
-                        0 0 12px rgba(95, 255, 186, 0.55);
+                        inset 0 0 0 1px var(--element-soul-accent-inset),
+                        0 0 12px var(--element-soul-accent-glow);
                 }
 
                 &.slot-connector--yellow.is-lit {
-                    border-color: #ffe480;
-                    background: linear-gradient(90deg, #e0bb28 0%, #a17d05 100%);
+                    border-color: var(--element-lightning-accent-border);
+                    background: linear-gradient(90deg, var(--element-lightning-accent-top) 0%, var(--element-lightning-accent-bottom) 100%);
                     box-shadow:
-                        inset 0 0 0 1px rgba(255, 241, 171, 0.38),
-                        0 0 12px rgba(255, 224, 120, 0.65);
+                        inset 0 0 0 1px var(--element-lightning-accent-inset),
+                        0 0 12px var(--element-lightning-accent-glow);
                 }
             }
 
@@ -1799,53 +1819,53 @@
         }
 
         &.combine-button--fire {
-            border-color: #ffd0cb;
-            background: linear-gradient(180deg, #de604f 0%, #a92d20 100%);
+            border-color: var(--element-fire-accent-border);
+            background: linear-gradient(180deg, var(--element-fire-accent-top) 0%, var(--element-fire-accent-bottom) 100%);
             box-shadow:
-                inset 0 0 0 1px #ff978e,
-                inset 0 0 0 2px #681a12,
+                inset 0 0 0 1px var(--element-fire-accent-button-inset-1),
+                inset 0 0 0 2px var(--element-fire-accent-button-inset-2),
                 0 5px 0 rgba(0, 0, 0, 0.3);
-            color: #fff7da;
+            color: var(--element-fire-accent-text);
         }
 
         &.combine-button--earth {
-            border-color: #ead3a4;
-            background: linear-gradient(180deg, #8a6a3f 0%, #5a4324 100%);
+            border-color: var(--element-earth-accent-border);
+            background: linear-gradient(180deg, var(--element-earth-accent-top) 0%, var(--element-earth-accent-bottom) 100%);
             box-shadow:
-                inset 0 0 0 1px #c49f67,
-                inset 0 0 0 2px #3a2a14,
+                inset 0 0 0 1px var(--element-earth-accent-button-inset-1),
+                inset 0 0 0 2px var(--element-earth-accent-button-inset-2),
                 0 5px 0 rgba(0, 0, 0, 0.3);
-            color: #fff3d7;
+            color: var(--element-earth-accent-text);
         }
 
         &.combine-button--water {
-            border-color: #cde8ff;
-            background: linear-gradient(180deg, #3f7fc6 0%, #1f4f89 100%);
+            border-color: var(--element-water-accent-border);
+            background: linear-gradient(180deg, var(--element-water-accent-top) 0%, var(--element-water-accent-bottom) 100%);
             box-shadow:
-                inset 0 0 0 1px #8ec6ff,
-                inset 0 0 0 2px #113461,
+                inset 0 0 0 1px var(--element-water-accent-button-inset-1),
+                inset 0 0 0 2px var(--element-water-accent-button-inset-2),
                 0 5px 0 rgba(0, 0, 0, 0.3);
-            color: #ecf7ff;
+            color: var(--element-water-accent-text);
         }
 
         &.combine-button--air {
-            border-color: #d6f2ff;
-            background: linear-gradient(180deg, #6aa2b8 0%, #3d6f84 100%);
+            border-color: var(--element-air-accent-border);
+            background: linear-gradient(180deg, var(--element-air-accent-top) 0%, var(--element-air-accent-bottom) 100%);
             box-shadow:
-                inset 0 0 0 1px #9ad4eb,
-                inset 0 0 0 2px #294b5a,
+                inset 0 0 0 1px var(--element-air-accent-button-inset-1),
+                inset 0 0 0 2px var(--element-air-accent-button-inset-2),
                 0 5px 0 rgba(0, 0, 0, 0.3);
-            color: #f3fcff;
+            color: var(--element-air-accent-text);
         }
 
         &.combine-button--soul {
-            border-color: #b9ffe2;
-            background: linear-gradient(180deg, #159a68 0%, #0b5a3d 100%);
+            border-color: var(--element-soul-accent-border);
+            background: linear-gradient(180deg, var(--element-soul-accent-top) 0%, var(--element-soul-accent-bottom) 100%);
             box-shadow:
-                inset 0 0 0 1px #7ff5c3,
-                inset 0 0 0 2px #063726,
+                inset 0 0 0 1px var(--element-soul-accent-button-inset-1),
+                inset 0 0 0 2px var(--element-soul-accent-button-inset-2),
                 0 5px 0 rgba(0, 0, 0, 0.3);
-            color: #ecfff7;
+            color: var(--element-soul-accent-text);
         }
     }
 
@@ -1913,9 +1933,9 @@
         min-width: 13rem;
         padding: 0 1.15rem;
         border-radius: 4px;
-        border: 2px solid #ffd0cb;
-        background: linear-gradient(180deg, #de604f 0%, #a92d20 100%);
-        color: #fff7da;
+        border: 2px solid var(--element-fire-accent-border);
+        background: linear-gradient(180deg, var(--element-fire-accent-top) 0%, var(--element-fire-accent-bottom) 100%);
+        color: var(--element-fire-accent-text);
         font-family: "Trebuchet MS", "Segoe UI", sans-serif;
         font-size: 1.5rem;
         font-weight: 700;
@@ -1924,8 +1944,8 @@
         cursor: pointer;
         transition: transform 110ms ease, box-shadow 110ms ease, border-color 110ms ease;
         box-shadow:
-            inset 0 0 0 1px #f4988d,
-            inset 0 0 0 2px #751812,
+            inset 0 0 0 1px var(--element-fire-accent-button-inset-1),
+            inset 0 0 0 2px var(--element-fire-accent-button-inset-2),
             0 5px 0 rgba(0, 0, 0, 0.32);
 
         &:hover {

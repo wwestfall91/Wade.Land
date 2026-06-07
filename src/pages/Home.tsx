@@ -1,9 +1,10 @@
+import "./Home.scss";
+
 function Home() {
     return (
-        <>
-        <div>You made it!</div>
-    
-        </>
+        <div id="Home">
+            <div className="home-message">You made it!</div>
+        </div>
     );
 }
 

@@ -1,4 +1,5 @@
 import type { SpellEffectConfig, SpellEffectKind } from "./spellEffects";
+import { BURN_FIRE_BONUS_PERCENT_PER_STACK } from "./statusMath";
 
 type SupportedStatusEffectKind = Exclude<SpellEffectKind, "multi_hit">;
 
@@ -25,6 +26,36 @@ const formatAmountLine = (label: string, effect: SpellEffectConfig): string | nu
     return amount > 0 ? `${label}: +${amount}` : null;
 };
 
+const formatChipAmount = (effect: SpellEffectConfig): string | null => {
+    if (effect.kind === "multi_hit") {
+        const hits = Math.max(1, Math.floor(effect.hits ?? 1));
+        return hits > 1 ? `${hits}x` : null;
+    }
+
+    if (effect.kind === "lifesteal") {
+        const amount = Math.max(0, effect.amount ?? 0);
+        if (amount <= 0) {
+            return null;
+        }
+
+        const percent = amount > 1 ? amount : Math.round(amount * 100);
+        return `${percent}%`;
+    }
+
+    if (
+        effect.kind === "soak"
+        || effect.kind === "energize"
+        || effect.kind === "freeze"
+        || effect.kind === "thorns"
+        || effect.kind === "float"
+    ) {
+        return String(Math.max(1, effect.amount ?? 1));
+    }
+
+    const amount = Math.max(0, effect.amount ?? 0);
+    return amount > 0 ? `+${amount}` : null;
+};
+
 const STATUS_EFFECT_DESCRIPTORS: StatusEffectDescriptor[] = [
     {
         kind: "heal",
@@ -49,7 +80,7 @@ const STATUS_EFFECT_DESCRIPTORS: StatusEffectDescriptor[] = [
             const amount = Math.max(0, effect.amount ?? 0);
             return amount > 0 ? `Burn: +${amount}` : null;
         },
-        formatDetail: () => "Each stack deals damage at the end of turn",
+        formatDetail: (effect) => `Each stack increases fire attack damage by ${Math.max(0, Math.floor(effect.amount ?? 0)) * BURN_FIRE_BONUS_PERCENT_PER_STACK}% while it lasts.`,
     },
     {
         kind: "shield",
@@ -138,10 +169,10 @@ const STATUS_EFFECT_DESCRIPTORS: StatusEffectDescriptor[] = [
     },
     {
         kind: "explode",
-        label: "Explode",
+        label: "Combust",
         chipClass: "effect-explode",
-        formatLine: (effect) => formatAmountLine("Explode", effect),
-        formatDetail: () => "Deals a burst of damage when it resolves.",
+        formatLine: () => "Combust: +150% power",
+        formatDetail: () => "Increases attack power by 150%, but the caster takes recoil damage equal to 10% of that boosted attack power.",
     },
     {
         kind: "poison",
@@ -258,6 +289,19 @@ export class StatusEffectsRegistry {
         }
 
         return descriptor.formatDetail(effect);
+    }
+
+    getChipLabel(effect: SpellEffectConfig): string {
+        if (effect.kind === "multi_hit") {
+            const amountText = formatChipAmount(effect);
+            return amountText ? `Hits ${amountText}` : "Hits";
+        }
+
+        const descriptor = this.descriptorsByKind.get(effect.kind);
+        const label = descriptor?.label ?? effect.kind;
+        const amountText = formatChipAmount(effect);
+
+        return amountText ? `${label} ${amountText}` : label;
     }
 
     getChipClass(line: string): string {

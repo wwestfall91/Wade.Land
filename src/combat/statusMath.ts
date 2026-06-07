@@ -1,7 +1,7 @@
 export const ENERGY_PER_TURN = 3;
 export const MAX_TURN_ENERGY = 9;
 
-export const BURN_DAMAGE_PER_STACK = 5;
+export const BURN_FIRE_BONUS_PERCENT_PER_STACK = 5;
 export const SOAK_LIGHTNING_BONUS_PER_STACK = 3;
 export const SOAK_FIRE_PENALTY_PER_STACK = 3;
 export const FREEZE_FIRE_BONUS_PER_STACK = 10;
@@ -9,8 +9,11 @@ export const THORNS_REFLECT_PERCENT_PER_STACK = 5;
 export const FLOAT_EARTH_REDUCTION_PERCENT_PER_STACK = 5;
 export const FLOAT_LIGHTNING_BONUS_PERCENT_PER_STACK = 5;
 
-export const getBurnTickDamage = (stacks: number): number =>
-    Math.max(0, Math.floor(stacks)) * BURN_DAMAGE_PER_STACK;
+export const getBurnFireBonusPercent = (stacks: number): number =>
+    Math.max(0, Math.floor(stacks)) * BURN_FIRE_BONUS_PERCENT_PER_STACK;
+
+export const getBurnFireBonus = (stacks: number, baseDamage: number): number =>
+    Math.max(0, Math.round(baseDamage * getBurnFireBonusPercent(stacks) / 100));
 
 export const getSoakLightningBonus = (stacks: number): number =>
     Math.max(0, Math.floor(stacks)) * SOAK_LIGHTNING_BONUS_PER_STACK;

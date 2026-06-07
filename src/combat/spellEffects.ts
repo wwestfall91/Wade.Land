@@ -122,6 +122,7 @@ const normalizeEffectKind = (value: string): SpellEffectKind | null => {
         case "combo":
             return "combo";
         case "explode":
+        case "combust":
             return "explode";
         case "poison":
             return "poison";

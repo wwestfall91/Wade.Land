@@ -124,15 +124,15 @@
             letter-spacing: 0.01em;
         }
 
-        .type-fire { background-color: #ffb17d; color: #111; }
-        .type-water { background-color: #9ad6ff; color: #111; }
-        .type-earth { background-color: #cdb48a; color: #111; }
-        .type-air { background-color: #d5eef9; color: #111; }
-        .type-lightning { background-color: #ffe56d; color: #111; }
-        .type-ice { background-color: #b8f0ff; color: #111; }
-        .type-light { background-color: #fff4b5; color: #111; }
-        .type-dark { background-color: #8f86aa; color: #f4f4f4; }
-        .type-arcane { background-color: #ffbfe1; color: #111; }
+        .type-fire { background-color: var(--element-fire-chip-bg); color: var(--element-chip-text-default); }
+        .type-water { background-color: var(--element-water-chip-bg); color: var(--element-chip-text-default); }
+        .type-earth { background-color: var(--element-earth-chip-bg); color: var(--element-chip-text-default); }
+        .type-air { background-color: var(--element-air-chip-bg); color: var(--element-chip-text-default); }
+        .type-lightning { background-color: var(--element-lightning-chip-bg); color: var(--element-chip-text-default); }
+        .type-ice { background-color: var(--element-ice-chip-bg); color: var(--element-chip-text-default); }
+        .type-light { background-color: var(--element-light-chip-bg); color: var(--element-chip-text-default); }
+        .type-dark { background-color: var(--element-dark-chip-bg); color: var(--element-chip-text-dark); }
+        .type-arcane { background-color: var(--element-arcane-chip-bg); color: var(--element-chip-text-default); }
 
         .enemy-meta-chip-attack {
             background: rgba(123, 11, 11, 0.72);

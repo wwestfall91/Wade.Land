@@ -7,7 +7,7 @@ import "./EnemyStage.scss";
 import type { RewardElement } from "../context/PlayerContext";
 import type { ActiveBurnStatus, ActiveFreezeStatus, ActiveSoakStatus } from "../combat/spellEffects";
 import {
-    BURN_DAMAGE_PER_STACK,
+    BURN_FIRE_BONUS_PERCENT_PER_STACK,
     FREEZE_FIRE_BONUS_PER_STACK,
     SOAK_FIRE_PENALTY_PER_STACK,
     SOAK_LIGHTNING_BONUS_PER_STACK,
@@ -25,6 +25,7 @@ type EnemyStageProps = {
     spritePath: string;
     enemyHealth: number;
     enemyMaxHp: number;
+    enemyPower?: number;
     weaknesses: string[];
     elements: RewardElement[];
     souls: number;
@@ -48,6 +49,7 @@ function EnemyStage({
     spritePath,
     enemyHealth,
     enemyMaxHp,
+    enemyPower,
     weaknesses,
     elements,
     souls,
@@ -184,8 +186,8 @@ function EnemyStage({
                             <span className="burn-tooltip">
                                 <span>Burn Stacks: {burnStatus.stacks}</span>
                                 <span>Expires in: {burnStatus.remainingTurns} turns</span>
-                                <span>Damage: {burnStatus.stacks * BURN_DAMAGE_PER_STACK}</span>
-                                <span>Triggers at the end of each turn</span>
+                                <span>Fire bonus: {burnStatus.stacks * BURN_FIRE_BONUS_PERCENT_PER_STACK}%</span>
+                                <span>Boosts fire attacks while it lasts</span>
                             </span>
                         </span>
                     ) : null}
@@ -240,7 +242,7 @@ function EnemyStage({
                                             onMouseEnter={() => handleElementChipMouseEnter(index)}
                                             onMouseLeave={handleElementChipMouseLeave}
                                         >
-                                            <ElementIcon name={element.letter} /> ({element.damage})
+                                            <ElementIcon name={element.letter} /> ({enemyPower ?? element.damage})
                                         </span>
                                     ))
                                 ) : (
@@ -256,7 +258,10 @@ function EnemyStage({
                 if (!hoveredElement) return null;
                 return (
                     <ElementDetailsTooltip
-                        element={hoveredElement}
+                        element={{
+                            ...hoveredElement,
+                            damage: enemyPower ?? hoveredElement.damage,
+                        }}
                         anchorElement={elementRefs.current[hoveredElementIndex]}
                         open={isElementTooltipOpen}
                         className={`reward-element-tooltip-shell${isElementTooltipClosing ? " is-closing" : ""}`}

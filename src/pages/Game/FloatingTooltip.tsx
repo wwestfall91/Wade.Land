@@ -26,6 +26,8 @@ type FloatingTooltipProps = {
         damage: number;
         isDamageEnhanced?: boolean;
         baseDamageBeforeEnhance?: number;
+        isCombusted?: boolean;
+        baseDamageBeforeCombust?: number;
         energy?: number;
         description: string;
         type1?: string;
@@ -145,10 +147,11 @@ function FloatingTooltip({
     const effectKinds = (elementDetails?.effects ?? []).map((effect, index) => {
         const descriptor = effect.kind === "multi_hit" ? undefined : statusEffectsRegistry.get(effect.kind);
         const detail = statusEffectsRegistry.getEffectDetail(effect);
+        const chipLabel = statusEffectsRegistry.getChipLabel(effect);
 
         return {
             key: `${effect.kind}-${index}`,
-            label: effect.kind,
+            label: chipLabel,
             detail,
             chipClass: effect.kind === "multi_hit"
                 ? "effect-multi-hit"
@@ -196,6 +199,12 @@ function FloatingTooltip({
     const enhancedDamageBefore = hasEnhanceDamagePreview
         ? Math.round((elementDetails?.baseDamageBeforeEnhance ?? 0) * masteryMultiplier)
         : 0;
+    const hasCombustDamagePreview = Boolean(
+        elementDetails?.isCombusted && typeof elementDetails.baseDamageBeforeCombust === "number",
+    );
+    const combustDamageBefore = hasCombustDamagePreview
+        ? Math.round((elementDetails?.baseDamageBeforeCombust ?? 0) * masteryMultiplier)
+        : 0;
 
     return createPortal(
         <div
@@ -239,10 +248,16 @@ function FloatingTooltip({
 
                         <span className="damage-details">
                             <span className="damage-label">Damage:</span>
-                            <span className={`damage-value${elementDetails.isDamageEnhanced ? " damage-value--enhanced" : ""}`}>
+                            <span className={`damage-value${elementDetails.isDamageEnhanced ? " damage-value--enhanced" : ""}${elementDetails.isCombusted ? " damage-value--combusted" : ""}`}>
                                 {hasEnhanceDamagePreview ? (
                                     <>
                                         <span className="damage-value-before">{enhancedDamageBefore}</span>
+                                        <span className="damage-value-arrow" aria-hidden="true">➔</span>
+                                        <span className="damage-value-after">{finalDamage}</span>
+                                    </>
+                                ) : hasCombustDamagePreview ? (
+                                    <>
+                                        <span className="damage-value-before">{combustDamageBefore}</span>
                                         <span className="damage-value-arrow" aria-hidden="true">➔</span>
                                         <span className="damage-value-after">{finalDamage}</span>
                                     </>

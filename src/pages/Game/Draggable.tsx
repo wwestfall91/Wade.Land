@@ -157,22 +157,25 @@ function Draggable({
 		if (!isDragging) return;
 
 		const onMove = (e: PointerEvent) => {
-			const rect = containerRef.current?.getBoundingClientRect();
-			if (!rect) return;
+			const dragWidth = draggableRef.current?.offsetWidth ?? 32;
+			const dragHeight = draggableRef.current?.offsetHeight ?? 32;
+			const maxX = Math.max(0, window.innerWidth - dragWidth);
+			const maxY = Math.max(0, window.innerHeight - dragHeight);
+			const rawX = e.clientX - mouseOffset.x;
+			const rawY = e.clientY - mouseOffset.y;
 
 			setPosition({
-				x: Math.round(e.clientX - rect.left - mouseOffset.x),
-				y: Math.round(e.clientY - rect.top - mouseOffset.y),
+				x: Math.round(Math.max(0, Math.min(maxX, rawX))),
+				y: Math.round(Math.max(0, Math.min(maxY, rawY))),
 			});
 		};
 
 		const onUp = () => {
-			const containerRect = containerRef.current?.getBoundingClientRect();
 			const dragRect = draggableRef.current?.getBoundingClientRect();
 			const dragWidth = draggableRef.current?.offsetWidth ?? dragRect?.width ?? 0;
 			const dragHeight = draggableRef.current?.offsetHeight ?? dragRect?.height ?? 0;
 
-			if (containerRect && dragRect) {
+			if (dragRect) {
 				const intersectingZoneIndex = dropZoneRefs.findIndex((zoneRef) => {
 					const dropZoneRect = zoneRef.current?.getBoundingClientRect();
 					if (!dropZoneRect) {
@@ -200,13 +203,11 @@ function Draggable({
 						setIsInvalidDrop(false);
 						setPosition({
 							x: Math.round(
-								dropZoneRect.left -
-								containerRect.left +
+								dropZoneRect.left +
 								(dropZoneRect.width - dragWidth) / 2,
 							),
 							y: Math.round(
-								dropZoneRect.top -
-								containerRect.top +
+								dropZoneRect.top +
 								(dropZoneRect.height - dragHeight) / 2,
 							),
 						});
@@ -246,29 +247,41 @@ function Draggable({
 	// it passes a new forcedSnapZone object. The version field changing triggers this effect.
 	useLayoutEffect(() => {
 		if (forcedSnapZone == null) return;
-		const containerRect = containerRef.current?.getBoundingClientRect();
 		const dropZoneRect = dropZoneRefs[forcedSnapZone.zone]?.current?.getBoundingClientRect();
 		const dragWidth = draggableRef.current?.offsetWidth ?? 32;
 		const dragHeight = draggableRef.current?.offsetHeight ?? 32;
-		if (containerRect && dropZoneRect) {
+		if (dropZoneRect) {
 			setPosition({
-				x: Math.round(dropZoneRect.left - containerRect.left + (dropZoneRect.width - dragWidth) / 2),
-				y: Math.round(dropZoneRect.top - containerRect.top + (dropZoneRect.height - dragHeight) / 2),
+				x: Math.round(dropZoneRect.left + (dropZoneRect.width - dragWidth) / 2),
+				y: Math.round(dropZoneRect.top + (dropZoneRect.height - dragHeight) / 2),
 			});
 		}
 	// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [forcedSnapZone]);
 
+	useLayoutEffect(() => {
+		if (isDragging) {
+			return;
+		}
+
+		const containerRect = containerRef.current?.getBoundingClientRect();
+		if (!containerRect) {
+			return;
+		}
+
+		setPosition({
+			x: Math.round(containerRect.left + initialPosition.x),
+			y: Math.round(containerRect.top + initialPosition.y),
+		});
+	}, [containerRef, initialPosition.x, initialPosition.y, isDragging]);
+
 	const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
 		e.stopPropagation();
-		const rect = containerRef.current?.getBoundingClientRect();
-		if (!rect) return;
-
 		setIsInvalidDrop(false);
 
 		setMouseOffset({
-			x: e.clientX - rect.left - position.x,
-			y: e.clientY - rect.top - position.y,
+			x: e.clientX - position.x,
+			y: e.clientY - position.y,
 		});
 		setIsHovered(false);
 		setIsTooltipHovered(false);

@@ -384,21 +384,21 @@
 }
 
 .floating-tooltip .element-info-badge.type-badge-fire {
-    background: linear-gradient(180deg, #ffd5bc 0%, #ff9d6d 100%);
-    border-color: #c5652a;
-    color: #2c1308;
+    background: linear-gradient(180deg, var(--element-fire-accent-top) 0%, var(--element-fire-accent-bottom) 100%);
+    border-color: var(--element-fire-accent-border);
+    color: var(--element-fire-accent-text);
 }
 
 .floating-tooltip .element-info-badge.type-badge-water {
-    background: linear-gradient(180deg, #d8f0ff 0%, #8dcdff 100%);
-    border-color: #3d82c3;
-    color: #0d2436;
+    background: linear-gradient(180deg, var(--element-water-accent-top) 0%, var(--element-water-accent-bottom) 100%);
+    border-color: var(--element-water-accent-border);
+    color: var(--element-water-accent-text);
 }
 
 .floating-tooltip .element-info-badge.type-badge-earth {
-    background: linear-gradient(180deg, #e2d0b7 0%, #c19b6f 100%);
-    border-color: #251a0f;
-    color: #000000;
+    background: linear-gradient(180deg, var(--element-earth-accent-top) 0%, var(--element-earth-accent-bottom) 100%);
+    border-color: var(--element-earth-accent-border);
+    color: var(--element-earth-accent-text);
 }
 
 .floating-tooltip .element-info-badge.type-badge-steel {
@@ -408,39 +408,39 @@
 }
 
 .floating-tooltip .element-info-badge.type-badge-air {
-    background: linear-gradient(180deg, #f0fbff 0%, #cae9f7 100%);
-    border-color: #6a9aad;
-    color: #112b34;
+    background: linear-gradient(180deg, var(--element-air-accent-top) 0%, var(--element-air-accent-bottom) 100%);
+    border-color: var(--element-air-accent-border);
+    color: var(--element-air-accent-text);
 }
 
 .floating-tooltip .element-info-badge.type-badge-lightning {
-    background: linear-gradient(180deg, #fff7b1 0%, #ffdc5e 100%);
-    border-color: #b68d09;
+    background: linear-gradient(180deg, var(--element-lightning-accent-top) 0%, var(--element-lightning-accent-bottom) 100%);
+    border-color: var(--element-lightning-accent-border);
     color: #302400;
 }
 
 .floating-tooltip .element-info-badge.type-badge-ice {
-    background: linear-gradient(180deg, #e8fcff 0%, #aeeeff 100%);
-    border-color: #4e9db2;
-    color: #0f2a32;
+    background: linear-gradient(180deg, var(--element-ice-accent-top) 0%, var(--element-ice-accent-bottom) 100%);
+    border-color: var(--element-ice-accent-border);
+    color: var(--element-ice-accent-text);
 }
 
 .floating-tooltip .element-info-badge.type-badge-light {
-    background: linear-gradient(180deg, #fffce1 0%, #ffec9f 100%);
-    border-color: #b89b43;
-    color: #312802;
+    background: linear-gradient(180deg, var(--element-light-accent-top) 0%, var(--element-light-accent-bottom) 100%);
+    border-color: var(--element-light-accent-border);
+    color: var(--element-light-accent-text);
 }
 
 .floating-tooltip .element-info-badge.type-badge-dark {
-    background: linear-gradient(180deg, #8f86aa 0%, #5a5372 100%);
-    border-color: #3f3758;
-    color: #f6f5ff;
+    background: linear-gradient(180deg, var(--element-dark-accent-top) 0%, var(--element-dark-accent-bottom) 100%);
+    border-color: var(--element-dark-accent-border);
+    color: var(--element-dark-accent-text);
 }
 
 .floating-tooltip .element-info-badge.type-badge-arcane {
-    background: linear-gradient(180deg, #ffd7eb 0%, #ffb8db 100%);
-    border-color: #ac6489;
-    color: #341326;
+    background: linear-gradient(180deg, var(--element-arcane-accent-top) 0%, var(--element-arcane-accent-bottom) 100%);
+    border-color: var(--element-arcane-accent-border);
+    color: var(--element-arcane-accent-text);
 }
 
 .floating-tooltip .element-info-badge.type-badge-none {
@@ -621,40 +621,40 @@
 }
 
 .floating-tooltip .type-fire {
-    background-color: #ffb17d;
+    background-color: var(--element-fire-chip-bg);
 }
 
 .floating-tooltip .type-water {
-    background-color: #9ad6ff;
+    background-color: var(--element-water-chip-bg);
 }
 
 .floating-tooltip .type-earth {
-    background-color: #cdb48a;
+    background-color: var(--element-earth-chip-bg);
 }
 
 .floating-tooltip .type-air {
-    background-color: #d5eef9;
+    background-color: var(--element-air-chip-bg);
 }
 
 .floating-tooltip .type-lightning {
-    background-color: #ffe56d;
+    background-color: var(--element-lightning-chip-bg);
 }
 
 .floating-tooltip .type-ice {
-    background-color: #b8f0ff;
+    background-color: var(--element-ice-chip-bg);
 }
 
 .floating-tooltip .type-light {
-    background-color: #fff4b5;
+    background-color: var(--element-light-chip-bg);
 }
 
 .floating-tooltip .type-dark {
-    background-color: #8f86aa;
-    color: #f4f4f4;
+    background-color: var(--element-dark-chip-bg);
+    color: var(--element-chip-text-dark);
 }
 
 .floating-tooltip .type-arcane {
-    background-color: #ffbfe1;
+    background-color: var(--element-arcane-chip-bg);
 }
 
 .floating-tooltip .type-none {

@@ -201,15 +201,15 @@
                 text-shadow: none;
             }
 
-            .type-fire { background-color: #ffb17d; }
-            .type-water { background-color: #9ad6ff; }
-            .type-earth { background-color: #cdb48a; }
-            .type-air { background-color: #d5eef9; }
-            .type-lightning { background-color: #ffe56d; }
-            .type-ice { background-color: #b8f0ff; }
-            .type-light { background-color: #fff4b5; }
-            .type-dark { background-color: #8f86aa; color: #f4f4f4; }
-            .type-arcane { background-color: #ffbfe1; }
+            .type-fire { background-color: var(--element-fire-chip-bg); }
+            .type-water { background-color: var(--element-water-chip-bg); }
+            .type-earth { background-color: var(--element-earth-chip-bg); }
+            .type-air { background-color: var(--element-air-chip-bg); }
+            .type-lightning { background-color: var(--element-lightning-chip-bg); }
+            .type-ice { background-color: var(--element-ice-chip-bg); }
+            .type-light { background-color: var(--element-light-chip-bg); }
+            .type-dark { background-color: var(--element-dark-chip-bg); color: var(--element-chip-text-dark); }
+            .type-arcane { background-color: var(--element-arcane-chip-bg); }
 
             .type-chip-attack {
                 background-color: #751818;

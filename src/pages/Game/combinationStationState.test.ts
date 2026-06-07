@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getCombinationStationState } from "./Game";
+import { getCombinationStationState } from "./CombinationStation";
 
 describe("combination station state machine", () => {
     it("resolves the five actionable states from slot one element", () => {

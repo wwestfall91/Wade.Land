@@ -1,6 +1,6 @@
 #Game {
     .drag {
-        position: absolute;
+        position: fixed;
         min-width: fit-content;
         width: 2rem;
         height: 2rem;
@@ -112,23 +112,23 @@
         }
 
         &.drag-preview {
-            border-color: #d8fff1;
-            background: linear-gradient(180deg, #5bcda8 0%, #2f8c73 100%);
-            color: #ebfff8;
+            border-color: var(--element-soul-accent-border);
+            background: linear-gradient(180deg, var(--element-soul-accent-top) 0%, var(--element-soul-accent-bottom) 100%);
+            color: var(--element-soul-accent-text);
             box-shadow:
-                inset 0 0 0 1px rgba(183, 255, 233, 0.62),
-                inset 0 0 0 2px rgba(11, 69, 58, 0.84),
+                inset 0 0 0 1px var(--element-soul-accent-inset),
+                inset 0 0 0 2px var(--element-soul-accent-button-inset-2),
                 0 5px 0 rgba(0, 0, 0, 0.3);
             opacity: 0.5;
         }
     }
 
     .drag.is-invalid-drop {
-        background: linear-gradient(180deg, #de604f 0%, #a92d20 100%);
+        background: linear-gradient(180deg, var(--element-fire-accent-top) 0%, var(--element-fire-accent-bottom) 100%);
         border-color: #ffe4e0 !important;
         box-shadow:
-            inset 0 0 0 1px #ffb0a7,
-            inset 0 0 0 2px #751812,
+            inset 0 0 0 1px var(--element-fire-accent-button-inset-1),
+            inset 0 0 0 2px var(--element-fire-accent-button-inset-2),
             0 6px 0 rgba(0, 0, 0, 0.34);
         animation: invalid-drop-shake 0.35s ease-in-out;
     }

@@ -4,7 +4,7 @@ import { usePlayer, type PlayerStatuses } from "../context/PlayerContext";
 import soulIcon from "../assets/icons/Soul.png";
 import energizeIcon from "../assets/icons/Energize.png";
 import {
-    BURN_DAMAGE_PER_STACK,
+    BURN_FIRE_BONUS_PERCENT_PER_STACK,
     FREEZE_FIRE_BONUS_PER_STACK,
     SOAK_FIRE_PENALTY_PER_STACK,
     SOAK_LIGHTNING_BONUS_PER_STACK,
@@ -77,7 +77,8 @@ function PlayerStats({
                             <span className="player-status-tooltip">
                                 <span>Burn Stacks: {statuses.burn.stacks}</span>
                                 <span>Expires in: {statuses.burn.remainingTurns} turns</span>
-                                <span>Damage: {statuses.burn.stacks * BURN_DAMAGE_PER_STACK}</span>
+                                <span>Fire bonus: {statuses.burn.stacks * BURN_FIRE_BONUS_PERCENT_PER_STACK}%</span>
+                                <span>Boosts fire attacks while it lasts</span>
                             </span>
                         </span>
                     ) : null}

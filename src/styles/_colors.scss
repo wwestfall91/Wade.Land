@@ -1,2 +1,85 @@
-// ─── Soul ────────────────────────────────────────────────────────────────────
-$color-souls: #00bd6f;
+:root {
+	--element-fire-chip-bg: #ffb17d;
+	--element-water-chip-bg: #9ad6ff;
+	--element-earth-chip-bg: #a8d892;
+	--element-air-chip-bg: #d5eef9;
+	--element-lightning-chip-bg: #ffe56d;
+	--element-ice-chip-bg: #b8f0ff;
+	--element-light-chip-bg: #fff4b5;
+	--element-dark-chip-bg: #8f86aa;
+	--element-arcane-chip-bg: #ffbfe1;
+
+	--element-chip-text-default: #111;
+	--element-chip-text-dark: #f4f4f4;
+
+	--element-fire-accent-border: #ffd0cb;
+	--element-fire-accent-top: #de604f;
+	--element-fire-accent-bottom: #a92d20;
+	--element-fire-accent-inset: rgba(255, 188, 180, 0.36);
+	--element-fire-accent-glow: rgba(255, 113, 88, 0.55);
+	--element-fire-accent-button-inset-1: #ff978e;
+	--element-fire-accent-button-inset-2: #681a12;
+	--element-fire-accent-text: #fff7da;
+
+	--element-water-accent-border: #cde8ff;
+	--element-water-accent-top: #3f7fc6;
+	--element-water-accent-bottom: #1f4f89;
+	--element-water-accent-inset: rgba(174, 220, 255, 0.36);
+	--element-water-accent-glow: rgba(113, 177, 255, 0.52);
+	--element-water-accent-button-inset-1: #8ec6ff;
+	--element-water-accent-button-inset-2: #113461;
+	--element-water-accent-text: #f3fcff;
+
+	--element-earth-accent-border: #cde8c3;
+	--element-earth-accent-top: #4f8f4a;
+	--element-earth-accent-bottom: #2f5f2d;
+	--element-earth-accent-inset: rgba(190, 236, 178, 0.34);
+	--element-earth-accent-glow: rgba(132, 210, 120, 0.48);
+	--element-earth-accent-button-inset-1: #9ad88f;
+	--element-earth-accent-button-inset-2: #1f3f1e;
+	--element-earth-accent-text: #f3fff1;
+
+	--element-air-accent-border: #d6f2ff;
+	--element-air-accent-top: #6aa2b8;
+	--element-air-accent-bottom: #3d6f84;
+	--element-air-accent-inset: rgba(188, 236, 255, 0.36);
+	--element-air-accent-glow: rgba(133, 213, 246, 0.5);
+	--element-air-accent-button-inset-1: #9ed5ea;
+	--element-air-accent-button-inset-2: #1f3f51;
+	--element-air-accent-text: #f3fcff;
+
+	--element-soul-accent-border: #b9ffe2;
+	--element-soul-accent-top: #159a68;
+	--element-soul-accent-bottom: #0b5a3d;
+	--element-soul-accent-inset: rgba(188, 255, 225, 0.36);
+	--element-soul-accent-glow: rgba(95, 255, 186, 0.55);
+	--element-soul-accent-button-inset-1: #7ff5c3;
+	--element-soul-accent-button-inset-2: #063726;
+	--element-soul-accent-text: #ecfff7;
+
+	--element-lightning-accent-border: #ffe480;
+	--element-lightning-accent-top: #e0bb28;
+	--element-lightning-accent-bottom: #a17d05;
+	--element-lightning-accent-inset: rgba(255, 241, 171, 0.38);
+	--element-lightning-accent-glow: rgba(255, 224, 120, 0.65);
+
+	--element-ice-accent-border: #c8f2ff;
+	--element-ice-accent-top: #4d9abb;
+	--element-ice-accent-bottom: #2a647f;
+	--element-ice-accent-text: #eefbff;
+
+	--element-light-accent-border: #ffefb4;
+	--element-light-accent-top: #d2b85d;
+	--element-light-accent-bottom: #8f7a30;
+	--element-light-accent-text: #fffdf1;
+
+	--element-dark-accent-border: #d6ccff;
+	--element-dark-accent-top: #69579a;
+	--element-dark-accent-bottom: #3f2f67;
+	--element-dark-accent-text: #f4efff;
+
+	--element-arcane-accent-border: #ffd2e7;
+	--element-arcane-accent-top: #b4658f;
+	--element-arcane-accent-bottom: #744165;
+	--element-arcane-accent-text: #fff0f8;
+}
