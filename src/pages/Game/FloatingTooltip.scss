@@ -177,6 +177,19 @@
     gap:5px;
 }
 
+.effects-delta-arrow {
+    color: #2f2f2f;
+    font-weight: 800;
+    margin: 0 0.1rem;
+}
+
+.effect-chip.effect-chip-none {
+    background: linear-gradient(180deg, #d6d9df 0%, #aab0ba 100%);
+    border-color: #7b828f;
+    color: #2c313a;
+    text-transform: lowercase;
+}
+
 .element-description{
     display: flex;
     flex-direction: column;

@@ -33,6 +33,7 @@ type FloatingTooltipProps = {
         type1?: string;
         type2?: string;
         effects?: SpellEffectConfig[];
+        sourceEffects?: SpellEffectConfig[];
         level?: number;
         category?: string;
     };
@@ -159,6 +160,38 @@ function FloatingTooltip({
         };
     });
 
+    const sourceEffectKinds = (elementDetails?.sourceEffects ?? []).map((effect, index) => {
+        const descriptor = effect.kind === "multi_hit" ? undefined : statusEffectsRegistry.get(effect.kind);
+        const detail = statusEffectsRegistry.getEffectDetail(effect);
+        const chipLabel = statusEffectsRegistry.getChipLabel(effect);
+
+        return {
+            key: `source-${effect.kind}-${index}`,
+            label: chipLabel,
+            detail,
+            chipClass: effect.kind === "multi_hit"
+                ? "effect-multi-hit"
+                : (descriptor?.chipClass ?? "effect-default"),
+        };
+    });
+
+    const effectSignature = (effects?: SpellEffectConfig[]) =>
+        JSON.stringify((effects ?? []).map((effect) => ({
+            kind: effect.kind,
+            amount: effect.amount ?? null,
+            duration: effect.duration ?? null,
+            hits: effect.hits ?? null,
+            target: effect.target ?? null,
+            targetType: effect.targetType ?? null,
+        })));
+
+    const hasEffectDifference = Boolean(
+        elementDetails?.sourceEffects &&
+        effectSignature(elementDetails.sourceEffects) !== effectSignature(elementDetails.effects),
+    );
+    const shouldShowEffectDelta = hasEffectDifference;
+    const showSourceNoneChip = shouldShowEffectDelta && sourceEffectKinds.length === 0 && effectKinds.length > 0;
+
     const toTypeBadgeClass = (value?: string) => {
         if (!value || value.trim().length === 0) {
             return "type-badge-none";
@@ -271,21 +304,61 @@ function FloatingTooltip({
                             </span>
                         ) : null}
 
-                        {effectKinds.length > 0 ? (
+                        {(effectKinds.length > 0 || shouldShowEffectDelta) ? (
                             <span className="effects-details">Effects:
-                                {effectKinds.map((effectKind) => (
-                                    <span
-                                        key={effectKind.key}
-                                        className={`effect-chip ${effectKind.chipClass}`}
-                                    >
-                                        {effectKind.label}
-                                        {effectKind.detail ? (
-                                            <span className="effect-chip-popup" role="tooltip">
-                                                {effectKind.detail}
-                                            </span>
-                                        ) : null}
-                                    </span>
-                                ))}
+                                {shouldShowEffectDelta ? (
+                                    <>
+                                        {showSourceNoneChip ? (
+                                            <span className="effect-chip effect-chip-none">none</span>
+                                        ) : (
+                                            sourceEffectKinds.map((effectKind) => (
+                                                <span
+                                                    key={effectKind.key}
+                                                    className={`effect-chip ${effectKind.chipClass}`}
+                                                >
+                                                    {effectKind.label}
+                                                    {effectKind.detail ? (
+                                                        <span className="effect-chip-popup" role="tooltip">
+                                                            {effectKind.detail}
+                                                        </span>
+                                                    ) : null}
+                                                </span>
+                                            ))
+                                        )}
+                                        <span className="effects-delta-arrow" aria-hidden="true">➔</span>
+                                        {effectKinds.length > 0 ? (
+                                            effectKinds.map((effectKind) => (
+                                                <span
+                                                    key={`delta-${effectKind.key}`}
+                                                    className={`effect-chip ${effectKind.chipClass}`}
+                                                >
+                                                    {effectKind.label}
+                                                    {effectKind.detail ? (
+                                                        <span className="effect-chip-popup" role="tooltip">
+                                                            {effectKind.detail}
+                                                        </span>
+                                                    ) : null}
+                                                </span>
+                                            ))
+                                        ) : (
+                                            <span className="effect-chip effect-chip-none">none</span>
+                                        )}
+                                    </>
+                                ) : (
+                                    effectKinds.map((effectKind) => (
+                                        <span
+                                            key={effectKind.key}
+                                            className={`effect-chip ${effectKind.chipClass}`}
+                                        >
+                                            {effectKind.label}
+                                            {effectKind.detail ? (
+                                                <span className="effect-chip-popup" role="tooltip">
+                                                    {effectKind.detail}
+                                                </span>
+                                            ) : null}
+                                        </span>
+                                    ))
+                                )}
                             </span>
                         ) : null}
                     </div>

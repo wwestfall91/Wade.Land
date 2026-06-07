@@ -2002,6 +2002,7 @@ function Game() {
         hoveredStarterChoiceIndex !== null
             ? (starterChoiceElements[hoveredStarterChoiceIndex] ?? null)
             : null;
+    const slotTwoPreviewDraggable = getDraggableById(zoneOccupants[1] ?? null);
     const hasActiveUpgrades = Object.keys(typeMultipliers).length > 0 || shieldMultiplier > 1 || soakMultiplier > 1 || burnMultiplier > 1;
     const selectedStarterChoiceElement =
         selectedStarterChoiceIndex !== null
@@ -2332,6 +2333,7 @@ function Game() {
                                 type1: previewCombination.type1,
                                 type2: previewCombination.type2,
                                 effects: previewCombination.effects,
+                                sourceEffects: slotTwoPreviewDraggable?.effects,
                                 category: previewCombination.category,
                             };
                         })()}
