@@ -273,7 +273,7 @@ function Draggable({
 			x: Math.round(containerRect.left + initialPosition.x),
 			y: Math.round(containerRect.top + initialPosition.y),
 		});
-	}, [containerRef, initialPosition.x, initialPosition.y, isDragging]);
+	}, [containerRef, initialPosition.x, initialPosition.y]);
 
 	const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
 		e.stopPropagation();
