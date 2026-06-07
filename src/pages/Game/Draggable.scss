@@ -111,6 +111,15 @@
                 -7px 13px 20px 0 rgba(0, 0, 0, 0.22);
         }
 
+        &.is-tooltip-pinned {
+            border-color: #ffd34d;
+            box-shadow:
+                inset 0 0 0 1px #ffe899,
+                inset 0 0 0 2px #8a6500,
+                0 0 0 1px rgba(255, 210, 77, 0.45),
+                0 8px 16px rgba(84, 58, 0, 0.35);
+        }
+
         &.drag-preview {
             border-color: var(--element-soul-accent-border);
             background: linear-gradient(180deg, var(--element-soul-accent-top) 0%, var(--element-soul-accent-bottom) 100%);
@@ -154,6 +163,14 @@
             transform: translateY(-1px) scale(1.05);
             border-color: #ffee88;
             box-shadow: inset 0 0 0 1px rgba(255, 248, 160, 0.5);
+        }
+
+        &.is-tooltip-pinned {
+            border-color: #ffd34d;
+            box-shadow:
+                inset 0 0 0 1px rgba(255, 238, 160, 0.7),
+                0 0 0 1px rgba(255, 210, 77, 0.45),
+                0 8px 16px rgba(84, 58, 0, 0.35);
         }
 
         // Override the general is-invalid-drop rule — keep type bg, flash red border
@@ -246,6 +263,15 @@
             box-shadow: none !important;
 
             &::before { opacity: 0; }
+        }
+
+        &.is-tooltip-pinned {
+            background: #ffd34d;
+            filter: drop-shadow(0 0 6px rgba(255, 220, 120, 0.65));
+
+            &::before {
+                background: linear-gradient(160deg, #7a5a0f 0%, #a78022 100%);
+            }
         }
 
         // Discoverable pulse ring looks wrong on a triangle – suppress it

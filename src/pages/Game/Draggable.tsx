@@ -5,6 +5,8 @@ import ElementIcon from "../../components/ElementIcon";
 import { usePlayer } from "../../context/PlayerContext";
 import "./Draggable.scss";
 
+const DRAG_START_THRESHOLD_PX = 6;
+
 type Position = {
 	x: number;
 	y: number;
@@ -60,13 +62,18 @@ function Draggable({
 	const [isHovered, setIsHovered] = useState(false);
 	const [isTooltipHovered, setIsTooltipHovered] = useState(false);
 	const [isTooltipGraceOpen, setIsTooltipGraceOpen] = useState(false);
+	const [isTooltipPinned, setIsTooltipPinned] = useState(false);
 	const [isAltLockActive, setIsAltLockActive] = useState(false);
 	const [isAltHeld, setIsAltHeld] = useState(false);
+	const [isPointerDown, setIsPointerDown] = useState(false);
 	const [mouseOffset, setMouseOffset] = useState({ x: 0, y: 0 });
 	const [position, setPosition] = useState<Position>(initialPosition);
 	const draggableRef = useRef<HTMLDivElement | null>(null);
 	const tooltipGraceTimeoutRef = useRef<number | null>(null);
 	const altHeldRef = useRef(false);
+	const pointerDownRef = useRef<Position | null>(null);
+	const dragStartedRef = useRef(false);
+	const suppressPinOnPointerUpRef = useRef(false);
 
 	const clearTooltipGraceTimeout = () => {
 		if (tooltipGraceTimeoutRef.current !== null) {
@@ -154,9 +161,41 @@ function Draggable({
 	}, [isAltHeld]);
 
 	useEffect(() => {
-		if (!isDragging) return;
+		if (!isPointerDown) return;
 
 		const onMove = (e: PointerEvent) => {
+			if (!isDragging) {
+				const origin = pointerDownRef.current;
+				if (!origin) {
+					return;
+				}
+
+				const deltaX = e.clientX - origin.x;
+				const deltaY = e.clientY - origin.y;
+				const travelDistance = Math.hypot(deltaX, deltaY);
+
+				if (travelDistance < DRAG_START_THRESHOLD_PX) {
+					return;
+				}
+
+				setIsDragging(true);
+				dragStartedRef.current = true;
+				setIsTooltipPinned(false);
+				setIsHovered(false);
+				setIsTooltipHovered(false);
+				setIsTooltipGraceOpen(false);
+				clearTooltipGraceTimeout();
+				onSnapChange(id, null);
+				setHasBeenDragged(true);
+				if (showTutorialCue && !hasBeenDragged) {
+					onDismissTutorialCue?.();
+				}
+			}
+
+			if (!isDragging) {
+				return;
+			}
+
 			const dragWidth = draggableRef.current?.offsetWidth ?? 32;
 			const dragHeight = draggableRef.current?.offsetHeight ?? 32;
 			const maxX = Math.max(0, window.innerWidth - dragWidth);
@@ -171,6 +210,24 @@ function Draggable({
 		};
 
 		const onUp = () => {
+			const wasDragging = dragStartedRef.current;
+			dragStartedRef.current = false;
+			setIsPointerDown(false);
+			pointerDownRef.current = null;
+
+			if (!wasDragging) {
+				if (suppressPinOnPointerUpRef.current) {
+					suppressPinOnPointerUpRef.current = false;
+					return;
+				}
+				setIsTooltipPinned(true);
+				setIsHovered(false);
+				setIsTooltipHovered(false);
+				setIsTooltipGraceOpen(false);
+				clearTooltipGraceTimeout();
+				return;
+			}
+
 			const dragRect = draggableRef.current?.getBoundingClientRect();
 			const dragWidth = draggableRef.current?.offsetWidth ?? dragRect?.width ?? 0;
 			const dragHeight = draggableRef.current?.offsetHeight ?? dragRect?.height ?? 0;
@@ -235,12 +292,54 @@ function Draggable({
 		canSnapToZone,
 		containerRef,
 		dropZoneRefs,
+		hasBeenDragged,
 		id,
 		isDragging,
+		isPointerDown,
 		mouseOffset.x,
 		mouseOffset.y,
+		onDismissTutorialCue,
 		onSnapChange,
+		showTutorialCue,
 	]);
+
+	useEffect(() => {
+		if (!isTooltipPinned) {
+			return;
+		}
+
+		const handleWindowPointerDown = (event: PointerEvent) => {
+			const target = event.target as Element | null;
+			if (!target) {
+				setIsTooltipPinned(false);
+				setIsHovered(false);
+				setIsTooltipHovered(false);
+				setIsTooltipGraceOpen(false);
+				clearTooltipGraceTimeout();
+				return;
+			}
+
+			// Multi-select: keep existing selections when modifier-clicking another draggable.
+			if ((event.ctrlKey || event.metaKey) && target.closest("#Draggable")) {
+				return;
+			}
+
+			if (target.closest(".floating-tooltip")) {
+				return;
+			}
+
+			setIsTooltipPinned(false);
+			setIsHovered(false);
+			setIsTooltipHovered(false);
+			setIsTooltipGraceOpen(false);
+			clearTooltipGraceTimeout();
+		};
+
+		window.addEventListener("pointerdown", handleWindowPointerDown, true);
+		return () => {
+			window.removeEventListener("pointerdown", handleWindowPointerDown, true);
+		};
+	}, [isTooltipPinned]);
 
 	// When Game.tsx needs to reposition this element to a specific zone (e.g. plasma
 	// dropped on slot 1 but should appear in the middle after the 3-slot layout expands),
@@ -278,21 +377,23 @@ function Draggable({
 	const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
 		e.stopPropagation();
 		setIsInvalidDrop(false);
+		dragStartedRef.current = false;
+
+		if (isTooltipPinned) {
+			suppressPinOnPointerUpRef.current = true;
+			setIsTooltipPinned(false);
+			setIsHovered(false);
+			setIsTooltipHovered(false);
+			setIsTooltipGraceOpen(false);
+			clearTooltipGraceTimeout();
+		}
 
 		setMouseOffset({
 			x: e.clientX - position.x,
 			y: e.clientY - position.y,
 		});
-		setIsHovered(false);
-		setIsTooltipHovered(false);
-		setIsTooltipGraceOpen(false);
-		clearTooltipGraceTimeout();
-		if (showTutorialCue && !hasBeenDragged) {
-			onDismissTutorialCue?.();
-		}
-		onSnapChange(id, null);
-		setHasBeenDragged(true);
-		setIsDragging(true);
+		pointerDownRef.current = { x: e.clientX, y: e.clientY };
+		setIsPointerDown(true);
 	};
 
 	const handleDraggableMouseEnter = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -308,6 +409,10 @@ function Draggable({
 	};
 
 	const handleDraggableMouseLeave = (event: React.MouseEvent<HTMLDivElement>) => {
+		if (isTooltipPinned) {
+			return;
+		}
+
 		setIsHovered(false);
 
 		if (isAltLockActive && (isAltHeld || altHeldRef.current || event.altKey)) {
@@ -341,6 +446,10 @@ function Draggable({
 	};
 
 	const handleTooltipMouseLeave = () => {
+		if (isTooltipPinned) {
+			return;
+		}
+
 		setIsTooltipHovered(false);
 
 		if (isAltLockActive && (isAltHeld || altHeldRef.current)) {
@@ -351,7 +460,7 @@ function Draggable({
 	};
 
 	const isAltStickyOpen = isAltLockActive && isAltHeld;
-	const isTooltipOpen = !isDragging && (isHovered || isTooltipHovered || isTooltipGraceOpen || isAltStickyOpen);
+	const isTooltipOpen = !isDragging && (isHovered || isTooltipHovered || isTooltipGraceOpen || isAltStickyOpen || isTooltipPinned);
 	const isTooltipClosing = isTooltipGraceOpen && !isHovered && !isTooltipHovered;
 
 	return (
@@ -364,6 +473,7 @@ function Draggable({
 				category === "spell" ? `is-spell--${(type1 || type2 || "none")}` : "",
 				category === "weapon" ? "is-weapon" : "",			category === "soul" ? "is-soul" : "",				isInvalidDrop ? "is-invalid-drop" : "",
 				isDragging ? "is-dragging" : "",
+				isTooltipPinned ? "is-tooltip-pinned" : "",
 				showTutorialCue && !hasBeenDragged ? "is-discoverable" : "",
 			].filter(Boolean).join(" ")}
 			onPointerDown={handlePointerDown}
@@ -384,8 +494,8 @@ function Draggable({
 			<FloatingTooltip
 				anchorElement={draggableRef.current}
 				open={isTooltipOpen}
-				className={`drag-description-popup${isTooltipClosing ? " is-closing" : ""}`}
-				interactive={isAltHeld}
+				className={`drag-description-popup${isTooltipClosing ? " is-closing" : ""}${isTooltipPinned ? " is-pinned" : ""}`}
+				interactive={isAltHeld || isTooltipPinned}
 				onTooltipMouseEnter={handleTooltipMouseEnter}
 				onTooltipMouseLeave={handleTooltipMouseLeave}
 				clampHorizontal={false}

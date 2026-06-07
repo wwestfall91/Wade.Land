@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { SpellEffectConfig } from "../../combat/spellEffects";
+import { effectTypeFactory } from "../../combat/effectTypeFactory";
 import { statusEffectsRegistry } from "../../combat/statusEffectsRegistry";
 import "./FloatingTooltip.scss";
 
@@ -145,13 +146,21 @@ function FloatingTooltip({
         )
         : [];
 
-    const effectKinds = (elementDetails?.effects ?? []).map((effect, index) => {
+    const isPassiveEffect = (effect: SpellEffectConfig) =>
+        effectTypeFactory.getEffectType(effect.kind) === "passive";
+
+    const regularEffects = (elementDetails?.effects ?? []).filter((effect) => !isPassiveEffect(effect));
+    const passiveEffects = (elementDetails?.effects ?? []).filter((effect) => isPassiveEffect(effect));
+    const sourceRegularEffects = (elementDetails?.sourceEffects ?? []).filter((effect) => !isPassiveEffect(effect));
+    const sourcePassiveEffects = (elementDetails?.sourceEffects ?? []).filter((effect) => isPassiveEffect(effect));
+
+    const buildEffectKinds = (effects: SpellEffectConfig[], keyPrefix = "") => effects.map((effect, index) => {
         const descriptor = effect.kind === "multi_hit" ? undefined : statusEffectsRegistry.get(effect.kind);
         const detail = statusEffectsRegistry.getEffectDetail(effect);
         const chipLabel = statusEffectsRegistry.getChipLabel(effect);
 
         return {
-            key: `${effect.kind}-${index}`,
+            key: `${keyPrefix}${effect.kind}-${index}`,
             label: chipLabel,
             detail,
             chipClass: effect.kind === "multi_hit"
@@ -160,20 +169,10 @@ function FloatingTooltip({
         };
     });
 
-    const sourceEffectKinds = (elementDetails?.sourceEffects ?? []).map((effect, index) => {
-        const descriptor = effect.kind === "multi_hit" ? undefined : statusEffectsRegistry.get(effect.kind);
-        const detail = statusEffectsRegistry.getEffectDetail(effect);
-        const chipLabel = statusEffectsRegistry.getChipLabel(effect);
-
-        return {
-            key: `source-${effect.kind}-${index}`,
-            label: chipLabel,
-            detail,
-            chipClass: effect.kind === "multi_hit"
-                ? "effect-multi-hit"
-                : (descriptor?.chipClass ?? "effect-default"),
-        };
-    });
+    const regularEffectKinds = buildEffectKinds(regularEffects);
+    const passiveEffectKinds = buildEffectKinds(passiveEffects, "passive-");
+    const sourceRegularEffectKinds = buildEffectKinds(sourceRegularEffects, "source-");
+    const sourcePassiveEffectKinds = buildEffectKinds(sourcePassiveEffects, "source-passive-");
 
     const effectSignature = (effects?: SpellEffectConfig[]) =>
         JSON.stringify((effects ?? []).map((effect) => ({
@@ -185,12 +184,18 @@ function FloatingTooltip({
             targetType: effect.targetType ?? null,
         })));
 
-    const hasEffectDifference = Boolean(
+    const hasRegularEffectDifference = Boolean(
         elementDetails?.sourceEffects &&
-        effectSignature(elementDetails.sourceEffects) !== effectSignature(elementDetails.effects),
+        effectSignature(sourceRegularEffects) !== effectSignature(regularEffects),
     );
-    const shouldShowEffectDelta = hasEffectDifference;
-    const showSourceNoneChip = shouldShowEffectDelta && sourceEffectKinds.length === 0 && effectKinds.length > 0;
+    const hasPassiveEffectDifference = Boolean(
+        elementDetails?.sourceEffects &&
+        effectSignature(sourcePassiveEffects) !== effectSignature(passiveEffects),
+    );
+    const shouldShowRegularEffectDelta = hasRegularEffectDifference;
+    const shouldShowPassiveEffectDelta = hasPassiveEffectDifference;
+    const showSourceRegularNoneChip = shouldShowRegularEffectDelta && sourceRegularEffectKinds.length === 0 && regularEffectKinds.length > 0;
+    const showSourcePassiveNoneChip = shouldShowPassiveEffectDelta && sourcePassiveEffectKinds.length === 0 && passiveEffectKinds.length > 0;
 
     const toTypeBadgeClass = (value?: string) => {
         if (!value || value.trim().length === 0) {
@@ -307,14 +312,14 @@ function FloatingTooltip({
                             </span>
                         ) : null}
 
-                        {(effectKinds.length > 0 || shouldShowEffectDelta) ? (
+                        {(regularEffectKinds.length > 0 || shouldShowRegularEffectDelta) ? (
                             <span className="effects-details">Effects:
-                                {shouldShowEffectDelta ? (
+                                {shouldShowRegularEffectDelta ? (
                                     <>
-                                        {showSourceNoneChip ? (
+                                        {showSourceRegularNoneChip ? (
                                             <span className="effect-chip effect-chip-none">none</span>
                                         ) : (
-                                            sourceEffectKinds.map((effectKind) => (
+                                            sourceRegularEffectKinds.map((effectKind) => (
                                                 <span
                                                     key={effectKind.key}
                                                     className={`effect-chip ${effectKind.chipClass}`}
@@ -329,8 +334,8 @@ function FloatingTooltip({
                                             ))
                                         )}
                                         <span className="effects-delta-arrow" aria-hidden="true">➔</span>
-                                        {effectKinds.length > 0 ? (
-                                            effectKinds.map((effectKind) => (
+                                        {regularEffectKinds.length > 0 ? (
+                                            regularEffectKinds.map((effectKind) => (
                                                 <span
                                                     key={`delta-${effectKind.key}`}
                                                     className={`effect-chip ${effectKind.chipClass}`}
@@ -348,7 +353,70 @@ function FloatingTooltip({
                                         )}
                                     </>
                                 ) : (
-                                    effectKinds.map((effectKind) => (
+                                    regularEffectKinds.map((effectKind) => (
+                                        <span
+                                            key={effectKind.key}
+                                            className={`effect-chip ${effectKind.chipClass}`}
+                                        >
+                                            {effectKind.label}
+                                            {effectKind.detail ? (
+                                                <span className="effect-chip-popup" role="tooltip">
+                                                    {effectKind.detail}
+                                                </span>
+                                            ) : null}
+                                        </span>
+                                    ))
+                                )}
+                            </span>
+                        ) : null}
+                        {(passiveEffectKinds.length > 0 || shouldShowPassiveEffectDelta) ? (
+                            <span className="passive-effects-details">
+                                <span className="passive-effects-label">
+                                    Passive:
+                                    <span className="effect-chip-popup" role="tooltip">
+                                        Available as long as this element exists
+                                    </span>
+                                </span>
+                                {shouldShowPassiveEffectDelta ? (
+                                    <>
+                                        {showSourcePassiveNoneChip ? (
+                                            <span className="effect-chip effect-chip-none">none</span>
+                                        ) : (
+                                            sourcePassiveEffectKinds.map((effectKind) => (
+                                                <span
+                                                    key={effectKind.key}
+                                                    className={`effect-chip ${effectKind.chipClass}`}
+                                                >
+                                                    {effectKind.label}
+                                                    {effectKind.detail ? (
+                                                        <span className="effect-chip-popup" role="tooltip">
+                                                            {effectKind.detail}
+                                                        </span>
+                                                    ) : null}
+                                                </span>
+                                            ))
+                                        )}
+                                        <span className="effects-delta-arrow" aria-hidden="true">➔</span>
+                                        {passiveEffectKinds.length > 0 ? (
+                                            passiveEffectKinds.map((effectKind) => (
+                                                <span
+                                                    key={`delta-${effectKind.key}`}
+                                                    className={`effect-chip ${effectKind.chipClass}`}
+                                                >
+                                                    {effectKind.label}
+                                                    {effectKind.detail ? (
+                                                        <span className="effect-chip-popup" role="tooltip">
+                                                            {effectKind.detail}
+                                                        </span>
+                                                    ) : null}
+                                                </span>
+                                            ))
+                                        ) : (
+                                            <span className="effect-chip effect-chip-none">none</span>
+                                        )}
+                                    </>
+                                ) : (
+                                    passiveEffectKinds.map((effectKind) => (
                                         <span
                                             key={effectKind.key}
                                             className={`effect-chip ${effectKind.chipClass}`}

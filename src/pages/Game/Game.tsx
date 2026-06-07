@@ -176,6 +176,7 @@ const ELEMENT_FLIGHT_TRAVEL_MS = 520;
 const STARTER_LABEL_ANIM_MS = 520;
 const ENABLE_FIRST_BATTLE_OLD_ONE_SCENE = false;
 const COMBUST_DAMAGE_MULTIPLIER = 2.5;
+const PREVIEW_DRAG_START_THRESHOLD_PX = 6;
 
 type SoulFlightIcon = {
     id: number;
@@ -299,8 +300,10 @@ function Game() {
     const [isPreviewHovered, setIsPreviewHovered] = useState(false);
     const [isPreviewTooltipHovered, setIsPreviewTooltipHovered] = useState(false);
     const [isPreviewTooltipGraceOpen, setIsPreviewTooltipGraceOpen] = useState(false);
+    const [isPreviewTooltipPinned, setIsPreviewTooltipPinned] = useState(false);
     const [isPreviewAltLockActive, setIsPreviewAltLockActive] = useState(false);
     const [isPreviewAltHeld, setIsPreviewAltHeld] = useState(false);
+    const [isPreviewPointerDown, setIsPreviewPointerDown] = useState(false);
     const [previewHomePosition, setPreviewHomePosition] = useState<Position | null>(null);
     const [previewPosition, setPreviewPosition] = useState<Position | null>(null);
     const [previewPointerOffset, setPreviewPointerOffset] = useState<Position>({ x: 0, y: 0 });
@@ -340,6 +343,9 @@ function Game() {
     const [starterChoiceNameRevision, setStarterChoiceNameRevision] = useState(0);
     const previewPositionRef = useRef<Position | null>(null);
     const previewPointerClientRef = useRef<Position>({ x: 0, y: 0 });
+    const previewPointerDownStartRef = useRef<Position | null>(null);
+    const previewDragStartedRef = useRef(false);
+    const suppressPreviewPinOnPointerUpRef = useRef(false);
     const previewAltHeldRef = useRef(false);
     const previewTooltipGraceTimeoutRef = useRef<number | null>(null);
     const introChosenNameRef = useRef("");
@@ -1480,6 +1486,7 @@ function Game() {
         setIsPreviewHovered(false);
         setIsPreviewTooltipHovered(false);
         setIsPreviewTooltipGraceOpen(false);
+        setIsPreviewTooltipPinned(false);
         setIsPreviewAltLockActive(false);
         clearPreviewTooltipGraceTimeout();
         setPreviewHomePosition(null);
@@ -1499,11 +1506,38 @@ function Game() {
     }, [getOutputCenterPosition, isPreviewDragging, previewCombination]);
 
     useEffect(() => {
-        if (!isPreviewDragging) {
+        if (!isPreviewPointerDown) {
             return;
         }
 
         const handleMove = (event: PointerEvent) => {
+            if (!isPreviewDragging) {
+                const origin = previewPointerDownStartRef.current;
+                if (!origin) {
+                    return;
+                }
+
+                const deltaX = event.clientX - origin.x;
+                const deltaY = event.clientY - origin.y;
+                const travelDistance = Math.hypot(deltaX, deltaY);
+
+                if (travelDistance < PREVIEW_DRAG_START_THRESHOLD_PX) {
+                    return;
+                }
+
+                previewDragStartedRef.current = true;
+                setIsPreviewDragging(true);
+                setIsPreviewTooltipPinned(false);
+                setIsPreviewHovered(false);
+                setIsPreviewTooltipHovered(false);
+                setIsPreviewTooltipGraceOpen(false);
+                clearPreviewTooltipGraceTimeout();
+            }
+
+            if (!previewDragStartedRef.current) {
+                return;
+            }
+
             const containerRect = gameRef.current?.getBoundingClientRect();
             if (!containerRect) {
                 return;
@@ -1520,6 +1554,24 @@ function Game() {
         };
 
         const handleUp = () => {
+            const wasDragging = previewDragStartedRef.current;
+            previewDragStartedRef.current = false;
+            setIsPreviewPointerDown(false);
+            previewPointerDownStartRef.current = null;
+
+            if (!wasDragging) {
+                if (suppressPreviewPinOnPointerUpRef.current) {
+                    suppressPreviewPinOnPointerUpRef.current = false;
+                    return;
+                }
+                setIsPreviewTooltipPinned(true);
+                setIsPreviewHovered(false);
+                setIsPreviewTooltipHovered(false);
+                setIsPreviewTooltipGraceOpen(false);
+                clearPreviewTooltipGraceTimeout();
+                return;
+            }
+
             const outputRect = outputRef.current?.getBoundingClientRect();
             const pointer = previewPointerClientRef.current;
 
@@ -1549,10 +1601,20 @@ function Game() {
             window.removeEventListener("pointermove", handleMove);
             window.removeEventListener("pointerup", handleUp);
         };
-    }, [finalizeCombination, getOutputCenterPosition, isPreviewDragging, previewPointerOffset.x, previewPointerOffset.y]);
+    }, [clearPreviewTooltipGraceTimeout, finalizeCombination, getOutputCenterPosition, isPreviewDragging, isPreviewPointerDown, previewPointerOffset.x, previewPointerOffset.y]);
 
     const handlePreviewPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
         event.stopPropagation();
+        previewDragStartedRef.current = false;
+
+        if (isPreviewTooltipPinned) {
+            suppressPreviewPinOnPointerUpRef.current = true;
+            setIsPreviewTooltipPinned(false);
+            setIsPreviewHovered(false);
+            setIsPreviewTooltipHovered(false);
+            setIsPreviewTooltipGraceOpen(false);
+            clearPreviewTooltipGraceTimeout();
+        }
 
         const previewRect = previewRef.current?.getBoundingClientRect();
         const containerRect = gameRef.current?.getBoundingClientRect();
@@ -1571,15 +1633,11 @@ function Game() {
         };
 
         previewPointerClientRef.current = { x: event.clientX, y: event.clientY };
+        previewPointerDownStartRef.current = { x: event.clientX, y: event.clientY };
         setPreviewPointerOffset(offset);
         setPreviewPosition(initial);
-        setIsPreviewTooltipGraceOpen(false);
-        clearPreviewTooltipGraceTimeout();
-        setIsPreviewHovered(false);
-        setIsPreviewTooltipHovered(false);
-        setIsPreviewAltLockActive(false);
         previewPositionRef.current = initial;
-        setIsPreviewDragging(true);
+        setIsPreviewPointerDown(true);
     };
 
     const handlePreviewMouseEnter = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -1595,6 +1653,10 @@ function Game() {
     };
 
     const handlePreviewMouseLeave = (event: React.MouseEvent<HTMLDivElement>) => {
+        if (isPreviewTooltipPinned) {
+            return;
+        }
+
         setIsPreviewHovered(false);
 
         if (isPreviewAltLockActive && (isPreviewAltHeld || previewAltHeldRef.current || event.altKey)) {
@@ -1628,6 +1690,10 @@ function Game() {
     };
 
     const handlePreviewTooltipMouseLeave = () => {
+        if (isPreviewTooltipPinned) {
+            return;
+        }
+
         setIsPreviewTooltipHovered(false);
 
         if (isPreviewAltLockActive && (isPreviewAltHeld || previewAltHeldRef.current)) {
@@ -1638,7 +1704,45 @@ function Game() {
     };
 
     const isPreviewAltStickyOpen = isPreviewAltLockActive && isPreviewAltHeld;
-    const isPreviewTooltipOpen = !isPreviewDragging && (isPreviewHovered || isPreviewTooltipHovered || isPreviewTooltipGraceOpen || isPreviewAltStickyOpen);
+    const isPreviewTooltipOpen = !isPreviewDragging && (isPreviewHovered || isPreviewTooltipHovered || isPreviewTooltipGraceOpen || isPreviewAltStickyOpen || isPreviewTooltipPinned);
+
+    useEffect(() => {
+        if (!isPreviewTooltipPinned) {
+            return;
+        }
+
+        const handleWindowPointerDown = (event: PointerEvent) => {
+            const target = event.target as Element | null;
+            if (!target) {
+                setIsPreviewTooltipPinned(false);
+                setIsPreviewHovered(false);
+                setIsPreviewTooltipHovered(false);
+                setIsPreviewTooltipGraceOpen(false);
+                clearPreviewTooltipGraceTimeout();
+                return;
+            }
+
+            // Multi-select: keep preview selected when modifier-clicking a draggable element.
+            if ((event.ctrlKey || event.metaKey) && target.closest("#Draggable")) {
+                return;
+            }
+
+            if (target.closest(".floating-tooltip")) {
+                return;
+            }
+
+            setIsPreviewTooltipPinned(false);
+            setIsPreviewHovered(false);
+            setIsPreviewTooltipHovered(false);
+            setIsPreviewTooltipGraceOpen(false);
+            clearPreviewTooltipGraceTimeout();
+        };
+
+        window.addEventListener("pointerdown", handleWindowPointerDown, true);
+        return () => {
+            window.removeEventListener("pointerdown", handleWindowPointerDown, true);
+        };
+    }, [clearPreviewTooltipGraceTimeout, isPreviewTooltipPinned]);
 
     const handleSnapChange = (draggableId: number, zoneIndex: number | null) => {
         const enhanceZoneIndex = zoneOccupants.length;
@@ -2323,6 +2427,7 @@ function Game() {
                             "drag",
                             "drag-preview",
                             isPreviewDragging ? "is-dragging" : "",
+                            isPreviewTooltipPinned ? "is-tooltip-pinned" : "",
                             previewCombination.category === "spell" ? "is-spell" : "",
                             previewCombination.category === "spell" ? `is-spell--${previewCombination.type1 || previewCombination.type2 || "none"}` : "",
                             previewCombination.category === "weapon" ? "is-weapon" : "",
@@ -2346,8 +2451,8 @@ function Game() {
                     <FloatingTooltip
                         anchorElement={previewRef.current}
                         open={isPreviewTooltipOpen}
-                        className="drag-description-popup"
-                        interactive={isPreviewAltHeld}
+                        className={`drag-description-popup${isPreviewTooltipPinned ? " is-pinned" : ""}`}
+                        interactive={isPreviewAltHeld || isPreviewTooltipPinned}
                         onTooltipMouseEnter={handlePreviewTooltipMouseEnter}
                         onTooltipMouseLeave={handlePreviewTooltipMouseLeave}
                         clampHorizontal={false}
