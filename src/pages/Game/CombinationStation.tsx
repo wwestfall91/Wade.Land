@@ -65,10 +65,10 @@ type CombinationStationProps = {
     combinationStationState: CombinationStationState;
     canCombine: boolean;
     onCombine: () => void;
-    dropZoneRefA: RefObject<HTMLDivElement | null>;
-    dropZoneRefB: RefObject<HTMLDivElement | null>;
-    dropZoneRefC: RefObject<HTMLDivElement | null>;
-    outputRef: RefObject<HTMLDivElement | null>;
+    dropZoneRefA: RefObject<HTMLDivElement>;
+    dropZoneRefB: RefObject<HTMLDivElement>;
+    dropZoneRefC: RefObject<HTMLDivElement>;
+    outputRef: RefObject<HTMLDivElement>;
     onHoverInsertSlot: (slot: 1 | 2 | null) => void;
     hoveredInsertSlot: 1 | 2 | null;
     isCombineButtonHovered: boolean;
