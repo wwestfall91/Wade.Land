@@ -261,6 +261,9 @@ function FloatingTooltip({
                         {typeof elementDetails.energy === "number" ? (
                             <span className="element-energy-badge" aria-label={`Energy ${elementDetails.energy}`}>
                                 {elementDetails.energy}
+                                <span className="element-energy-badge-tooltip" role="tooltip">
+                                    Energy required to use.
+                                </span>
                             </span>
                         ) : null}
                         <div className="element-title">

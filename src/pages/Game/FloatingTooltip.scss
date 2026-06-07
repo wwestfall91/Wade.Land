@@ -10,6 +10,7 @@
     gap: 0.45rem;
     opacity: 1;
     transition: opacity 170ms linear;
+    cursor: default;
 
     &.is-closing {
         opacity: 0;
@@ -40,6 +41,39 @@
     background: radial-gradient(circle at 30% 25%, #fff9cf 0%, #ffd86b 55%, #c08b19 100%);
     border: 2px solid #fff3b8;
     box-shadow: 0 5px 10px rgba(82, 54, 4, 0.4);
+    pointer-events: auto;
+    
+
+    .element-energy-badge-tooltip {
+        position: absolute;
+        right: 0;
+        top: calc(100% + 0.35rem);
+        padding: 0.25rem 0.45rem;
+        border-radius: 4px;
+        background: rgba(20, 18, 13, 0.96);
+        color: #ffeeb5;
+        border: 1px solid rgba(255, 227, 157, 0.75);
+        font-size: 0.62rem;
+        font-weight: 700;
+        line-height: 1.1;
+        text-transform: lowercase;
+        letter-spacing: 0.01em;
+        white-space: nowrap;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45);
+        opacity: 0;
+        visibility: hidden;
+        transform: translateY(-2px);
+        transition: opacity 120ms linear, transform 120ms linear, visibility 120ms linear;
+        pointer-events: none;
+        z-index: 2;
+    }
+
+    &:hover .element-energy-badge-tooltip,
+    &:focus-within .element-energy-badge-tooltip {
+        opacity: 1;
+        visibility: visible;
+        transform: translateY(0);
+    }
 }
 
 .tooltip-header{

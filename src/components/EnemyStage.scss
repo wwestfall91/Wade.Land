@@ -487,7 +487,10 @@
 }
 
 .game-enemy-card:hover .enemy-meta-tooltip,
-.game-enemy-card.is-enemy-sub-tooltip-active .enemy-meta-tooltip {
+.game-enemy-card.is-enemy-stage-hovered .enemy-meta-tooltip,
+.game-enemy-card.is-enemy-sub-tooltip-active .enemy-meta-tooltip,
+.enemy-zone.is-enemy-stage-hovered .enemy-meta-tooltip,
+.enemy-zone.is-enemy-sub-tooltip-active .enemy-meta-tooltip {
     opacity: 1;
     visibility: visible;
     transform: translateY(0) scale(1);

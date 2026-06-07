@@ -64,6 +64,7 @@ function EnemyStage({
     freezeStatus = null,
 }: EnemyStageProps) {
     const stageRef = useRef<HTMLDivElement | null>(null);
+    const [isEnemyStageHovered, setIsEnemyStageHovered] = useState(false);
     const [hoveredElementIndex, setHoveredElementIndex] = useState<number | null>(null);
     const [isElementChipHovered, setIsElementChipHovered] = useState(false);
     const [isElementTooltipHovered, setIsElementTooltipHovered] = useState(false);
@@ -135,26 +136,42 @@ function EnemyStage({
 
     useEffect(() => {
         const stageElement = stageRef.current;
-        const enemyCardElement = stageElement?.closest(".game-enemy-card");
-        if (!enemyCardElement) {
+        const tooltipHostElement = stageElement?.closest(".game-enemy-card, .enemy-zone");
+        if (!tooltipHostElement) {
             return;
         }
 
         const lockClassName = "is-enemy-sub-tooltip-active";
-        if (isElementTooltipOpen) {
-            enemyCardElement.classList.add(lockClassName);
+        const hoverClassName = "is-enemy-stage-hovered";
+        if (isEnemyStageHovered) {
+            tooltipHostElement.classList.add(hoverClassName);
         } else {
-            enemyCardElement.classList.remove(lockClassName);
+            tooltipHostElement.classList.remove(hoverClassName);
+        }
+        if (isElementTooltipOpen) {
+            tooltipHostElement.classList.add(lockClassName);
+        } else {
+            tooltipHostElement.classList.remove(lockClassName);
         }
 
         return () => {
-            enemyCardElement.classList.remove(lockClassName);
+            tooltipHostElement.classList.remove(lockClassName);
+            tooltipHostElement.classList.remove(hoverClassName);
         };
-    }, [isElementTooltipOpen]);
+    }, [isElementTooltipOpen, isEnemyStageHovered]);
 
     return (
         <>
-            <div ref={stageRef} className={`enemy-stage${className ? ` ${className}` : ""}`}>
+            <div
+                ref={stageRef}
+                className={`enemy-stage${className ? ` ${className}` : ""}`}
+                onMouseEnter={() => {
+                    setIsEnemyStageHovered(true);
+                }}
+                onMouseLeave={() => {
+                    setIsEnemyStageHovered(false);
+                }}
+            >
                 <div
                     ref={spriteRef}
                     className={`enemy-sprite-card ${isHitFlashing ? "is-hit-flash" : ""}`}

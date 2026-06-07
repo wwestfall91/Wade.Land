@@ -539,7 +539,7 @@ function Fight() {
         if (message.startsWith("Enemy attacks")) {
             return "enemy";
         }
-        if (message.startsWith("Heals") || message.startsWith("Shield ") || message.startsWith("Hits") || message.startsWith("Critical hit")) {
+        if (message.startsWith("Heals") || message.startsWith("Shield ") || message.startsWith("Hits") || message.startsWith("Critical hit") || message.startsWith("Super Effective")) {
             return "player";
         }
 
@@ -1630,7 +1630,7 @@ function Fight() {
             effectMessages.push("Burn extinguished");
         }
         if (hadCriticalHit) {
-            effectMessages.push("Critical hit");
+            effectMessages.push("Super Effective");
         }
 
         if (effectMessages.length > 0) {
@@ -1685,7 +1685,7 @@ function Fight() {
             ) : null}
             {isScreenFlashing ? <div className="screen-hit-flash" /> : null}
             {isCritFlashing ? <div className="screen-crit-flash" /> : null}
-            {isCritTextVisible ? <div className="crit-text">CRITICAL!</div> : null}
+            {isCritTextVisible ? <div className="crit-text">SUPER EFFECTIVE!</div> : null}
 
             {/* ─── Arena wrapper ─── */}
             <div className="fight-arena">
@@ -2019,7 +2019,7 @@ function Fight() {
 
             {/* ─── Energy Row ─── */}
             <div className="energy-row" aria-live="polite" aria-label={`Turn energy ${remainingEnergy} out of ${MAX_TURN_ENERGY}`}>
-                <span className="energy-row-label">{isEnemyTurnActive ? "ENEMY TURN" : "YOUR TURN"}</span>
+                <span className="energy-row-label">{isEnemyTurnActive ? "ENEMY TURN" : "ENERGY"}</span>
                 <div className="energy-pips">
                     {Array.from({ length: MAX_TURN_ENERGY }).map((_, i) => (
                         <span
