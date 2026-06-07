@@ -23,7 +23,7 @@ type TestSpell = {
     type1?: string;
     type2?: string;
     effects?: Array<{
-        kind: "heal" | "multi_hit" | "burn" | "shield" | "lifesteal" | "soak";
+        kind: "heal" | "multi_hit" | "burn" | "shield" | "lifesteal" | "soak" | "freeze";
         amount?: number;
         hits?: number;
         duration?: number;
@@ -69,6 +69,8 @@ const renderFight = (options: { playerElements: TestSpell[]; enemyHp: number }) 
         combineElements: vi.fn(),
         applyEnemyAttack: vi.fn(),
         healPlayer: vi.fn(),
+        decreaseMaxHp: vi.fn(),
+        permanentMaxHpReduction: 0,
         resetGame: vi.fn(),
         addElement: vi.fn(),
         selectedEnemy: null,
@@ -282,6 +284,7 @@ describe("Fight status effects", () => {
                     level: 1,
                     description: "Converts soak into freeze",
                     type1: "ice",
+                    effects: [{ kind: "freeze", amount: 100, target: "enemy" }],
                 },
                 {
                     id: 3,

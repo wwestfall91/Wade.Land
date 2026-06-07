@@ -1,17 +1,23 @@
 import type { SpellEffectConfig } from "../../combat/spellEffects";
+import type { SpellEffectGrowth } from "../../combat/spellEffects";
+import { effectTypeFactory } from "../../combat/effectTypeFactory";
 
 export type EffectWorkbookRow = {
     [key: string]: unknown;
     Effect?: string;
+    "Short Description"?: string;
     Amount?: string | number;
     Duration?: string | number;
     Target?: string;
+    Growth?: string;
 };
 
 export type EffectWorkbookValues = {
+    shortDescription: string;
     amount: string | number;
     duration: string | number;
     target: string;
+    growth: string;
 };
 
 type CombinationPreviewBase = {
@@ -28,8 +34,6 @@ export type CombinationPreviewResolution = {
     baseDamageBeforeEnhance?: number;
 };
 
-const CREATION_EFFECT_KINDS = new Set(["powerful", "energetic", "efficient"]);
-
 const asPercentMultiplier = (amount?: number): number => {
     const normalizedAmount = Math.max(0, amount ?? 0);
     return normalizedAmount > 1
@@ -37,7 +41,8 @@ const asPercentMultiplier = (amount?: number): number => {
         : 1 + normalizedAmount;
 };
 
-const isCreationEffect = (effect: SpellEffectConfig): boolean => CREATION_EFFECT_KINDS.has(effect.kind);
+const isCreationEffect = (effect: SpellEffectConfig): boolean =>
+    effectTypeFactory.getEffectType(effect.kind) === "create";
 
 const scaleEffectValue = (value: number | undefined, multiplier: number): number | undefined => {
     if (value === undefined) {
@@ -77,9 +82,11 @@ export const buildEffectValuesByKey = (rows: EffectWorkbookRow[]): Map<string, E
         }
 
         effectValuesByKey.set(effectKey, {
+            shortDescription: String(row["Short Description"] ?? "").trim(),
             amount: row.Amount ?? "",
             duration: row.Duration ?? "",
             target: String(row.Target ?? "").trim(),
+            growth: String(row.Growth ?? "").trim(),
         });
     });
 
@@ -94,9 +101,11 @@ export const buildMappedEffectRow = (
 
     const mappedEffectRow: Record<string, unknown> = {
         "Effect 1 Kind": effectName,
+        "Effect 1 Short Description": effectValues?.shortDescription ?? "",
         "Effect 1 Amount": effectValues?.amount ?? "",
         "Effect 1 Duration": effectValues?.duration ?? "",
         "Effect 1 Target": effectValues?.target ?? "",
+        "Effect 1 Growth": effectValues?.growth ?? "",
     };
 
     if (normalizeEffectLookupKey(effectName) === "multihit" && effectValues?.amount !== undefined) {
@@ -110,7 +119,9 @@ export const resolveCombinationPreviewFromEffects = (
     base: CombinationPreviewBase,
     creationTriggerEffects: SpellEffectConfig[],
 ): CombinationPreviewResolution => {
-    const creationEffects = creationTriggerEffects.filter(isCreationEffect);
+    const creationEffects = effectTypeFactory
+        .getCreationTriggerEffects(creationTriggerEffects)
+        .filter(isCreationEffect);
     if (creationEffects.length === 0) {
         return {
             damage: base.damage,
@@ -158,3 +169,47 @@ export const resolveCombinationPreviewFromEffects = (
         baseDamageBeforeEnhance: isDamageEnhanced ? baseDamageBeforeEnhance : undefined,
     };
 };
+
+/**
+ * Applies one upgrade step to a single effect's `amount`.
+ *
+ * Growth rules (from effects.xlsx):
+ *   `+`  — incrementing the amount benefits the player → amount increases by `step`
+ *   `-`  — decrementing the amount benefits the player → amount decreases by `step`
+ *   `=`  — the amount must remain static → no change
+ *   (absent) — treated as static; no change applied
+ *
+ * The returned object is a new `SpellEffectConfig` with the updated amount.
+ * All other fields are preserved unchanged.
+ *
+ * @param effect  The effect to upgrade.
+ * @param step    The magnitude of change per upgrade level (must be > 0, default 1).
+ */
+export const upgradeElementEffect = (
+    effect: SpellEffectConfig,
+    step = 1,
+): SpellEffectConfig => {
+    const growth: SpellEffectGrowth | undefined = effect.growth;
+
+    if (growth === "=" || growth === undefined) {
+        return effect;
+    }
+
+    const currentAmount = effect.amount ?? 0;
+    const delta = Math.max(0, step);
+    const nextAmount = growth === "+" ? currentAmount + delta : currentAmount - delta;
+
+    return { ...effect, amount: nextAmount };
+};
+
+/**
+ * Applies one upgrade step to every upgradeable effect on a spell's effect list.
+ * Effects with growth `=` or no growth value are returned unchanged.
+ *
+ * @param effects  The full effects array from a `PlayerElement`.
+ * @param step     The magnitude of change per upgrade level (default 1).
+ */
+export const upgradeElementEffects = (
+    effects: SpellEffectConfig[],
+    step = 1,
+): SpellEffectConfig[] => effects.map((effect) => upgradeElementEffect(effect, step));

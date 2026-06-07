@@ -102,6 +102,9 @@ type PlayerContextValue = {
     playerStatuses: PlayerStatuses;
     setPlayerStatuses: (statuses: PlayerStatuses) => void;
     maxHpMultiplier: number;
+    /** Permanently reduces the player's effective max HP by this flat amount (from consume effects). */
+    permanentMaxHpReduction: number;
+    decreaseMaxHp: (amount: number) => void;
     shieldMultiplier: number;
     applyShieldMultiplier: (multiplier: number) => void;
     soakMultiplier: number;
@@ -159,6 +162,7 @@ const resolvePlayerProgress = (
     elements: PlayerElement[],
     currentHp: number | null,
     maxHpMultiplier: number,
+    permanentMaxHpReduction: number,
 ): PlayerProgress => {
     const matchedLevel = resolveLevelForPlayer(playerLevel, levels);
 
@@ -170,7 +174,7 @@ const resolvePlayerProgress = (
         };
     }
 
-    const effectiveMaxHp = Math.round(matchedLevel.hp * maxHpMultiplier);
+    const effectiveMaxHp = Math.max(1, Math.round(matchedLevel.hp * maxHpMultiplier) - permanentMaxHpReduction);
     const resolvedHp = Math.max(0, Math.min(currentHp ?? effectiveMaxHp, effectiveMaxHp));
 
     return {
@@ -202,6 +206,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
     const [soakMultiplier, setSoakMultiplier] = useState(1);
     const [burnMultiplier, setBurnMultiplier] = useState(1);
     const [battleEnergyCarryover, setBattleEnergyCarryoverState] = useState(0);
+    const [permanentMaxHpReduction, setPermanentMaxHpReduction] = useState(0);
 
     useEffect(() => {
         fetch("/levels.xlsx")
@@ -222,8 +227,8 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
     }, []);
 
     const player = useMemo(
-        () => resolvePlayerProgress(souls, playerLevel, levels, elements, currentHp, maxHpMultiplier),
-        [currentHp, elements, levels, maxHpMultiplier, playerLevel, souls],
+        () => resolvePlayerProgress(souls, playerLevel, levels, elements, currentHp, maxHpMultiplier, permanentMaxHpReduction),
+        [currentHp, elements, levels, maxHpMultiplier, permanentMaxHpReduction, playerLevel, souls],
     );
 
     const addSouls = useCallback((amount: number) => {
@@ -266,21 +271,25 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
         const normalizedPower = Math.max(0, power);
         setCurrentHp((previousHp) => {
             const matchedLevel = resolveLevelForPlayer(playerLevel, levels);
-            const effectiveMaxHp = Math.round((matchedLevel?.hp ?? 0) * maxHpMultiplier);
+            const effectiveMaxHp = Math.max(1, Math.round((matchedLevel?.hp ?? 0) * maxHpMultiplier) - permanentMaxHpReduction);
             const startingHp = previousHp ?? effectiveMaxHp;
             return Math.max(0, startingHp - normalizedPower);
         });
-    }, [levels, maxHpMultiplier, playerLevel]);
+    }, [levels, maxHpMultiplier, permanentMaxHpReduction, playerLevel]);
 
     const healPlayer = useCallback((amount: number) => {
         const normalizedAmount = Math.max(0, amount);
         setCurrentHp((previousHp) => {
             const matchedLevel = resolveLevelForPlayer(playerLevel, levels);
-            const effectiveMaxHp = Math.round((matchedLevel?.hp ?? 0) * maxHpMultiplier);
+            const effectiveMaxHp = Math.max(1, Math.round((matchedLevel?.hp ?? 0) * maxHpMultiplier) - permanentMaxHpReduction);
             const startingHp = previousHp ?? effectiveMaxHp;
             return Math.min(effectiveMaxHp, startingHp + normalizedAmount);
         });
-    }, [levels, maxHpMultiplier, playerLevel]);
+    }, [levels, maxHpMultiplier, permanentMaxHpReduction, playerLevel]);
+
+    const decreaseMaxHp = useCallback((amount: number) => {
+        setPermanentMaxHpReduction((previous) => previous + Math.max(0, amount));
+    }, []);
 
     const applyTypeMultiplier = useCallback((type: string, multiplier: number) => {
         const normalized = type.trim().toLowerCase();
@@ -319,6 +328,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
         setSoakMultiplier(1);
         setBurnMultiplier(1);
         setBattleEnergyCarryoverState(0);
+        setPermanentMaxHpReduction(0);
         setDiscoveredCraftedLetters(new Set());
     }, []);
 
@@ -361,6 +371,8 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             playerStatuses,
             setPlayerStatuses,
             maxHpMultiplier,
+            permanentMaxHpReduction,
+            decreaseMaxHp,
             shieldMultiplier,
             applyShieldMultiplier,
             soakMultiplier,
@@ -393,6 +405,8 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             playerStatuses,
             setPlayerStatuses,
             maxHpMultiplier,
+            permanentMaxHpReduction,
+            decreaseMaxHp,
             shieldMultiplier,
             applyShieldMultiplier,
             soakMultiplier,

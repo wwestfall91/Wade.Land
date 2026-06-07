@@ -276,6 +276,11 @@ export class StatusEffectsRegistry {
     }
 
     getEffectDetail(effect: SpellEffectConfig): string | null {
+        const shortDescription = effect.shortDescription?.trim();
+        if (shortDescription && shortDescription.length > 0) {
+            return shortDescription;
+        }
+
         if (effect.kind === "multi_hit") {
             const hits = Math.max(1, Math.floor(effect.hits ?? 1));
             return hits > 1

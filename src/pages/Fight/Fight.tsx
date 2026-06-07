@@ -14,6 +14,7 @@ import {
     type SpellEffectConfig,
 } from "../../combat/spellEffects";
 import { effectFactory } from "../../combat/effectFactory";
+import { effectTypeFactory } from "../../combat/effectTypeFactory";
 import {
     ENERGY_PER_TURN,
     FREEZE_FIRE_BONUS_PER_STACK,
@@ -21,8 +22,6 @@ import {
     SOAK_FIRE_PENALTY_PER_STACK,
     SOAK_LIGHTNING_BONUS_PER_STACK,
     THORNS_REFLECT_PERCENT_PER_STACK,
-    FLOAT_EARTH_REDUCTION_PERCENT_PER_STACK,
-    FLOAT_LIGHTNING_BONUS_PERCENT_PER_STACK,
     getBurnFireBonus,
     getBurnFireBonusPercent,
     getFreezeFireBonus,
@@ -56,7 +55,6 @@ const HIT_FLASH_MS = scaleCombatAnimationMs(190);
 const HIT_STEP_DELAY_MS = scaleCombatAnimationMs(120);
 const EFFECT_STEP_DELAY_MS = scaleCombatAnimationMs(95);
 const EVENT_LOG_MAX_ENTRIES = 60;
-const COMBUST_RECOIL_PERCENT = 0.1;
 
 type EnergyFlight = {
     id: number;
@@ -118,13 +116,8 @@ type CastableSpell = {
 
 type ComboStatus = {
     requiredType: string;
-};
-
-type HardenedSpellState = {
-    phase: "preparing" | "ready";
-    baseDamage: number;
-    readyDamage: number;
-    consumedEnergy: number;
+    /** Energy discount applied when a matching-type spell is cast */
+    discountAmount: number;
 };
 
 function Fight() {
@@ -136,6 +129,7 @@ function Fight() {
         levels,
         applyEnemyAttack,
         healPlayer,
+        decreaseMaxHp,
         resetGame,
         typeMultipliers,
         playerStatuses: playerStatusesFromContext,
@@ -144,6 +138,7 @@ function Fight() {
         soakMultiplier,
         burnMultiplier,
         maxHpMultiplier,
+        permanentMaxHpReduction,
         battleEnergyCarryover,
         setBattleEnergyCarryover: setBattleEnergyCarryoverFromContext,
     } = usePlayer();
@@ -207,7 +202,9 @@ function Fight() {
     const [playerFloatStatus, setPlayerFloatStatus] = useState<ActiveFloatStatus | null>(playerStatuses.float);
     const [playerShield, setPlayerShield] = useState(playerStatuses.shield);
     const [playerComboStatus, setPlayerComboStatus] = useState<ComboStatus | null>(null);
-    const [hardenedSpellStates, setHardenedSpellStates] = useState<Record<number, HardenedSpellState>>({});
+    const [followUpStatus, setFollowUpStatus] = useState<{ letter: string; bonusPercent: number; count: number } | null>(null);
+    const [playerPowerComboStatus, setPlayerPowerComboStatus] = useState<{ requiredType: string; bonusPercent: number } | null>(null);
+    const [spellExponentialDamage, setSpellExponentialDamage] = useState<Record<string, number>>({});
     const [enemyShield, setEnemyShield] = useState(0);
     const [isResolvingTurn, setIsResolvingTurn] = useState(false);
     const [isEnemyTurnActive, setIsEnemyTurnActive] = useState(false);
@@ -350,7 +347,7 @@ function Fight() {
     const [enemyHealth, setEnemyHealth] = useState(() => enemy.hp);
     const enemyMaxHp = Math.max(1, enemy.hp);
     const enemyHpFillPercent = Math.max(0, Math.min(100, (enemyHealth / enemyMaxHp) * 100));
-    const playerMaxHp = Math.round((levels.find((levelDef) => levelDef.level === player.level)?.hp ?? Math.max(player.hp, 1)) * effectiveMaxHpMultiplier);
+    const playerMaxHp = Math.max(1, Math.round((levels.find((levelDef) => levelDef.level === player.level)?.hp ?? Math.max(player.hp, 1)) * effectiveMaxHpMultiplier) - (permanentMaxHpReduction ?? 0));
     const displayedPlayerHp = player.hp + Math.max(0, playerShield);
     const playerHpFillPercent = Math.max(0, Math.min(100, (player.hp / playerMaxHp) * 100));
     const playerShieldFillPercent = Math.max(0, Math.min(100, (Math.max(0, playerShield) / playerMaxHp) * 100));
@@ -374,39 +371,30 @@ function Fight() {
     const enemyWeaknesses = (enemy.weaknesses ?? []).map((weakness) => weakness.trim()).filter((weakness) => weakness.length > 0);
     const getSpellTypeList = (spell: { type1?: string; type2?: string }) =>
         [spell.type1, spell.type2].map(normalizeType).filter(Boolean);
+    const getSpellEnergyComboEffect = (effects?: SpellEffectConfig[]) =>
+        effects?.find((effect) => effect.kind === "combo" || effect.kind === "energy_combo") ?? null;
     const getSpellComboType = (effects?: SpellEffectConfig[]) =>
-        effects?.find((effect) => effect.kind === "combo")?.targetType ?? null;
-    const hasHardenedEffect = (effects?: SpellEffectConfig[]) =>
-        Boolean(effects?.some((effect) => effect.kind === "hardened"));
+        getSpellEnergyComboEffect(effects)?.targetType ?? null;
     const hasCombustEffect = (effects?: SpellEffectConfig[]) =>
         Boolean(effects?.some((effect) => effect.kind === "explode"));
 
-    useEffect(() => {
-        setHardenedSpellStates((previous) => {
-            const next: Record<number, HardenedSpellState> = {};
+    /** Passive float percent from player's owned elements (affects incoming damage). */
+    const playerPassiveFloatPercent = useMemo(
+        () => player.elements.reduce((total, el) => {
+            const f = el.effects?.find(e => e.kind === "float");
+            return f ? total + (f.amount ?? 0) : total;
+        }, 0),
+        [player.elements],
+    );
 
-            player.elements.forEach((spell) => {
-                if (!hasHardenedEffect(spell.effects)) {
-                    return;
-                }
-
-                const existing = previous[spell.id];
-                if (existing?.phase === "ready") {
-                    next[spell.id] = existing;
-                    return;
-                }
-
-                next[spell.id] = {
-                    phase: "preparing",
-                    baseDamage: spell.damage,
-                    readyDamage: spell.damage,
-                    consumedEnergy: 0,
-                };
-            });
-
-            return next;
-        });
-    }, [player.elements]);
+    /** Passive float percent from enemy's elements (affects spell damage against enemy). */
+    const enemyPassiveFloatPercent = useMemo(
+        () => enemy.elements.reduce((total, el) => {
+            const f = el.effects?.find(e => e.kind === "float");
+            return f ? total + (f.amount ?? 0) : total;
+        }, 0),
+        [enemy.elements],
+    );
 
     const getSpellSlotStyle = (type1?: string, type2?: string) => {
         const normalized = [type1, type2].map(normalizeType).filter(Boolean);
@@ -525,14 +513,18 @@ function Fight() {
         }, scaleCombatAnimationMs(500));
     };
 
-    const getSpellEnergyCost = (spell: { energy?: number; type1?: string; type2?: string }, comboType: string | null = playerComboStatus?.requiredType ?? null) => {
+    const getSpellEnergyCost = (
+        spell: { energy?: number; type1?: string; type2?: string },
+        comboType: string | null = playerComboStatus?.requiredType ?? null,
+        discountAmount: number = playerComboStatus?.discountAmount ?? 1,
+    ) => {
         const baseCost = Math.max(0, spell.energy ?? 0);
         if (!comboType) {
             return baseCost;
         }
 
         const spellTypes = getSpellTypeList(spell);
-        return spellTypes.includes(comboType) ? Math.max(0, baseCost - 1) : baseCost;
+        return spellTypes.includes(comboType) ? Math.max(0, baseCost - discountAmount) : baseCost;
     };
 
     const inferEventKind = (message: string): EventLogEntry["kind"] => {
@@ -753,16 +745,14 @@ function Fight() {
         let currentPlayerSoak = playerSoakStatus;
         let currentPlayerFreeze = playerFreezeStatus;
         const currentPlayerThorns = playerThornsStatus;
-        const currentPlayerFloat = playerFloatStatus;
 
         const attackTypes = [attack.type1, attack.type2].map(normalizeType).filter(Boolean);
         const isWaterAttack = attackTypes.includes("water");
         const isLightningAttack = attackTypes.includes("lightning");
         const isFireAttack = attackTypes.includes("fire");
-        const isIceAttack = attackTypes.includes("ice");
         const isEarthAttack = attackTypes.includes("earth");
         const hitCount = getSpellHitCount(attack.effects);
-        const perHitEffects = getPerHitSpellEffects(attack.effects);
+        const perHitEffects = effectTypeFactory.getBattleTriggerEffects(getPerHitSpellEffects(attack.effects));
         const attackDamageBreakdown: number[] = [];
         let totalDamageTaken = 0;
         let totalPlayerBurnApplied = 0;
@@ -770,16 +760,17 @@ function Fight() {
         let totalPlayerShieldGranted = 0;
         let totalPlayerSoakApplied = 0;
         let playerSoakWasConsumed = false;
-        let playerSoakWasFrozen = false;
         let playerFreezeWasConsumed = false;
-        let convertedPlayerFreezeStacks = 0;
         let currentPlayerSoakStacks = currentPlayerSoak?.stacks ?? 0;
         let currentPlayerFreezeStacks = currentPlayerFreeze?.stacks ?? 0;
         let totalEnemyHealing = 0;
         let totalThornsReflected = 0;
-        let totalPlayerFreezeApplied = 0;
+        let totalPlayerFreezeSoakConvertPercent = 0;
+        let convertedPlayerFreezeStacksFromEffect = 0;
+        let totalPlayerSoakDuration = 0;
+        let totalPlayerFreezeSoakConvertDuration = 0;
         let totalPlayerThornsApplied = 0;
-        let totalPlayerFloatApplied = 0;
+        let totalPlayerThornsDuration = 0;
         let nextEnemyHealthForThorns = enemyHealth;
         const enemyAttackSource = enemyIntentIconRef.current ?? enemyAttackMarkerRef.current;
         const playerBurnStacks = currentPlayerBurn?.stacks ?? 0;
@@ -792,9 +783,9 @@ function Fight() {
             const soakBonus = isLightningAttack ? getSoakLightningBonus(currentPlayerSoakStacks) : 0;
             const soakPenalty = isFireAttack ? getSoakFirePenalty(currentPlayerSoakStacks) : 0;
             const freezeBonus = isFireAttack ? getFreezeFireBonus(currentPlayerFreezeStacks) : 0;
-            const floatStacks = currentPlayerFloat?.stacks ?? 0;
-            const floatEarthReduction = isEarthAttack ? getFloatEarthReduction(floatStacks, attack.damage) : 0;
-            const floatLightningBonus = isLightningAttack ? getFloatLightningBonus(floatStacks, attack.damage) : 0;
+            // Float is passive — use player's element-based float percent
+            const floatEarthReduction = isEarthAttack ? getFloatEarthReduction(playerPassiveFloatPercent, attack.damage) : 0;
+            const floatLightningBonus = isLightningAttack ? getFloatLightningBonus(playerPassiveFloatPercent, attack.damage) : 0;
             const baseHitDamage = Math.max(0, attack.damage + soakBonus - soakPenalty + freezeBonus - floatEarthReduction + floatLightningBonus);
             const burnBonus = isFireAttack ? getBurnFireBonus(playerBurnStacks, baseHitDamage) : 0;
             const bonusAdjustedDamage = baseHitDamage + burnBonus;
@@ -839,12 +830,7 @@ function Fight() {
                 await wait(EFFECT_STEP_DELAY_MS);
             }
 
-            if (isIceAttack && !playerSoakWasFrozen && currentPlayerSoakStacks > 0) {
-                convertedPlayerFreezeStacks = currentPlayerSoakStacks;
-                playerSoakWasFrozen = true;
-                currentPlayerSoakStacks = 0;
-                await wait(EFFECT_STEP_DELAY_MS);
-            } else if ((isFireAttack || isLightningAttack) && !playerSoakWasConsumed && currentPlayerSoakStacks > 0) {
+            if ((isFireAttack || isLightningAttack) && !playerSoakWasConsumed && currentPlayerSoakStacks > 0) {
                 playerSoakWasConsumed = true;
                 currentPlayerSoakStacks = 0;
                 await wait(EFFECT_STEP_DELAY_MS);
@@ -865,9 +851,11 @@ function Fight() {
                 totalPlayerShieldGranted += delta.playerShieldGranted;
                 totalEnemyHealing += delta.enemyHealing;
                 totalPlayerSoakApplied += delta.playerSoakApplied;
-                totalPlayerFreezeApplied += delta.playerFreezeApplied;
+                totalPlayerSoakDuration = Math.max(totalPlayerSoakDuration, delta.playerSoakDuration);
+                totalPlayerFreezeSoakConvertPercent += delta.playerFreezeSoakConvertPercent;
+                totalPlayerFreezeSoakConvertDuration = Math.max(totalPlayerFreezeSoakConvertDuration, delta.playerFreezeSoakConvertDuration);
                 totalPlayerThornsApplied += delta.playerThornsApplied;
-                totalPlayerFloatApplied += delta.playerFloatApplied;
+                totalPlayerThornsDuration = Math.max(totalPlayerThornsDuration, delta.playerThornsDuration);
             });
 
             if (simulatedPlayerHp <= 0) {
@@ -878,26 +866,13 @@ function Fight() {
         const stackProjectileCount =
             Math.max(0, totalPlayerBurnApplied) +
             Math.max(0, totalPlayerSoakApplied) +
-            Math.max(0, convertedPlayerFreezeStacks);
+            Math.max(0, convertedPlayerFreezeStacksFromEffect);
         if (stackProjectileCount > 0 && simulatedPlayerHp > 0) {
             launchProjectileBurst(attack.letter, enemyAttackSource, playerStatusStripRef.current, stackProjectileCount, 110);
             await wait(240);
         }
 
-        if (playerSoakWasFrozen) {
-            setPlayerSoakStatus(null);
-            setPlayerFreezeStatus((previous) => {
-                if (!previous) {
-                    return { kind: "freeze", stacks: convertedPlayerFreezeStacks };
-                }
-
-                return {
-                    kind: "freeze",
-                    stacks: previous.stacks + convertedPlayerFreezeStacks,
-                };
-            });
-            await wait(EFFECT_STEP_DELAY_MS);
-        } else if (playerSoakWasConsumed) {
+        if (playerSoakWasConsumed) {
             setPlayerSoakStatus(null);
             await wait(EFFECT_STEP_DELAY_MS);
         }
@@ -930,19 +905,12 @@ function Fight() {
         }
 
         if (totalPlayerSoakApplied > 0 && simulatedPlayerHp > 0) {
-            setPlayerSoakStatus((previous) => {
-                if (!previous) {
-                    return {
-                        kind: "soak",
-                        stacks: totalPlayerSoakApplied,
-                    };
-                }
-
-                return {
-                    kind: "soak",
-                    stacks: previous.stacks + totalPlayerSoakApplied,
-                };
-            });
+            const soakRemainingTurns = totalPlayerSoakDuration > 0 ? totalPlayerSoakDuration : undefined;
+            setPlayerSoakStatus((previous) => ({
+                kind: "soak",
+                stacks: (previous?.stacks ?? 0) + totalPlayerSoakApplied,
+                remainingTurns: soakRemainingTurns ?? previous?.remainingTurns,
+            }));
             await wait(EFFECT_STEP_DELAY_MS);
         }
 
@@ -951,33 +919,27 @@ function Fight() {
             await wait(EFFECT_STEP_DELAY_MS);
         }
 
-        if (totalPlayerFreezeApplied > 0 && simulatedPlayerHp > 0) {
-            setPlayerFreezeStatus((previous) => {
-                if (!previous) {
-                    return { kind: "freeze", stacks: totalPlayerFreezeApplied };
+        if (totalPlayerFreezeSoakConvertPercent > 0 && simulatedPlayerHp > 0) {
+            const currentSoak = playerSoakWasConsumed ? 0 : (currentPlayerSoak?.stacks ?? 0);
+            if (currentSoak > 0) {
+                convertedPlayerFreezeStacksFromEffect = Math.floor(currentSoak * Math.min(100, totalPlayerFreezeSoakConvertPercent) / 100);
+                if (convertedPlayerFreezeStacksFromEffect > 0) {
+                    const remaining = currentSoak - convertedPlayerFreezeStacksFromEffect;
+                    setPlayerSoakStatus(remaining > 0 ? { kind: "soak", stacks: remaining, remainingTurns: currentPlayerSoak?.remainingTurns } : null);
+                    const freezeRemainingTurns = totalPlayerFreezeSoakConvertDuration > 0 ? totalPlayerFreezeSoakConvertDuration : undefined;
+                    setPlayerFreezeStatus((prev) => ({ kind: "freeze", stacks: (prev?.stacks ?? 0) + convertedPlayerFreezeStacksFromEffect, remainingTurns: freezeRemainingTurns ?? prev?.remainingTurns }));
+                    await wait(EFFECT_STEP_DELAY_MS);
                 }
-                return { kind: "freeze", stacks: previous.stacks + totalPlayerFreezeApplied };
-            });
-            await wait(EFFECT_STEP_DELAY_MS);
+            }
         }
 
         if (totalPlayerThornsApplied > 0 && simulatedPlayerHp > 0) {
-            setPlayerThornsStatus((previous) => {
-                if (!previous) {
-                    return { kind: "thorns", stacks: totalPlayerThornsApplied };
-                }
-                return { kind: "thorns", stacks: previous.stacks + totalPlayerThornsApplied };
-            });
-            await wait(EFFECT_STEP_DELAY_MS);
-        }
-
-        if (totalPlayerFloatApplied > 0 && simulatedPlayerHp > 0) {
-            setPlayerFloatStatus((previous) => {
-                if (!previous) {
-                    return { kind: "float", stacks: totalPlayerFloatApplied };
-                }
-                return { kind: "float", stacks: previous.stacks + totalPlayerFloatApplied };
-            });
+            const thornsRemainingTurns = totalPlayerThornsDuration > 0 ? totalPlayerThornsDuration : undefined;
+            setPlayerThornsStatus((previous) => ({
+                kind: "thorns",
+                stacks: (previous?.stacks ?? 0) + totalPlayerThornsApplied,
+                remainingTurns: thornsRemainingTurns ?? previous?.remainingTurns,
+            }));
             await wait(EFFECT_STEP_DELAY_MS);
         }
 
@@ -1004,20 +966,14 @@ function Fight() {
         if (playerSoakWasConsumed) {
             detailLines.push("Soak consumed");
         }
-        if (playerSoakWasFrozen) {
-            detailLines.push(`Freeze +${convertedPlayerFreezeStacks}`);
+        if (convertedPlayerFreezeStacksFromEffect > 0) {
+            detailLines.push(`Freeze +${convertedPlayerFreezeStacksFromEffect} (from soak)`);
         }
         if (playerFreezeWasConsumed) {
             detailLines.push("Freeze consumed");
         }
-        if (totalPlayerFreezeApplied > 0) {
-            detailLines.push(`Freeze +${totalPlayerFreezeApplied}`);
-        }
         if (totalPlayerThornsApplied > 0) {
             detailLines.push(`Thorns +${totalPlayerThornsApplied}`);
-        }
-        if (totalPlayerFloatApplied > 0) {
-            detailLines.push(`Float +${totalPlayerFloatApplied}`);
         }
         if (totalThornsReflected > 0) {
             detailLines.push(`Thorns reflects ${totalThornsReflected}`);
@@ -1075,6 +1031,23 @@ function Fight() {
             }
         }
 
+        // Tick down all other player stack durations at end of enemy's attack turn
+        setPlayerSoakStatus((prev) => {
+            if (!prev?.remainingTurns) return prev;
+            const next = prev.remainingTurns - 1;
+            return next > 0 ? { ...prev, remainingTurns: next } : null;
+        });
+        setPlayerFreezeStatus((prev) => {
+            if (!prev?.remainingTurns) return prev;
+            const next = prev.remainingTurns - 1;
+            return next > 0 ? { ...prev, remainingTurns: next } : null;
+        });
+        setPlayerThornsStatus((prev) => {
+            if (!prev?.remainingTurns) return prev;
+            const next = prev.remainingTurns - 1;
+            return next > 0 ? { ...prev, remainingTurns: next } : null;
+        });
+
         const nextAttack = pickEnemyAttack();
         setQueuedEnemyAttack(nextAttack);
         if (nextAttack) {
@@ -1094,6 +1067,12 @@ function Fight() {
             setPlayerComboStatus(null);
             pushEventLog("Combo fades", "status", { isDetail: true });
         }
+        if (followUpStatus) {
+            setFollowUpStatus(null);
+        }
+        if (playerPowerComboStatus) {
+            setPlayerPowerComboStatus(null);
+        }
 
         setIsResolvingTurn(true);
         setIsEnemyTurnActive(true);
@@ -1108,6 +1087,23 @@ function Fight() {
                 ? { ...burnAtTurnEnd, remainingTurns: nextDuration }
                 : null);
         }
+
+        // Tick down all other enemy stack durations at end of player's turn
+        setEnemySoakStatus((prev) => {
+            if (!prev?.remainingTurns) return prev;
+            const next = prev.remainingTurns - 1;
+            return next > 0 ? { ...prev, remainingTurns: next } : null;
+        });
+        setEnemyFreezeStatus((prev) => {
+            if (!prev?.remainingTurns) return prev;
+            const next = prev.remainingTurns - 1;
+            return next > 0 ? { ...prev, remainingTurns: next } : null;
+        });
+        setEnemyThornsStatus((prev) => {
+            if (!prev?.remainingTurns) return prev;
+            const next = prev.remainingTurns - 1;
+            return next > 0 ? { ...prev, remainingTurns: next } : null;
+        });
 
         if (nextEnemyHealth <= 0) {
             setQueuedEnemyAttack(null);
@@ -1266,19 +1262,46 @@ function Fight() {
         const spellComboType = getSpellComboType(spell.effects);
         const comboMatches = Boolean(activeComboType && spellTypes.includes(activeComboType));
         const spellEnergyCost = getSpellEnergyCost(spell, activeComboType);
-        const hardenedState = hardenedSpellStates[spell.id];
-        const isHardenedSpell = hasHardenedEffect(spell.effects);
-        const isHardenedPreparing = isHardenedSpell && (hardenedState?.phase ?? "preparing") === "preparing";
         const isCombustSpell = hasCombustEffect(spell.effects);
-        const spellDamageForCast = isHardenedSpell && hardenedState?.phase === "ready"
-            ? hardenedState.readyDamage
-            : spell.damage;
-        const isWeapon = spell.category?.toLowerCase() === "weapon";
+
+        // One-time cast effects (not per-hit): look up directly from spell.effects
+        const exhaustEffect = spell.effects?.find(e => e.kind === "exhaust");
+        const squishyEffect = spell.effects?.find(e => e.kind === "squishy");
+        const consumeEffect = spell.effects?.find(e => e.kind === "consume");
+        const exponentialEffect = spell.effects?.find(e => e.kind === "exponential");
+        const followUpEffect = spell.effects?.find(e => e.kind === "follow_up");
+        const powerComboEffect = spell.effects?.find(e => e.kind === "power_combo");
+        const combustSpellEffect = spell.effects?.find(e => e.kind === "explode");
+
+        // Pre-hit damage modifiers (rage, charge, hardened)
+        const preMod = effectFactory.resolvePreHitDamage(
+            effectTypeFactory.getBattleTriggerEffects(spell.effects ?? []),
+            {
+                spellEnergyCost,
+                playerCurrentHp: player.hp,
+                playerMaxHp,
+                playerShield,
+            },
+        );
+        // Apply exponential bonus from previous casts of this spell
+        const exponentialBonus = spellExponentialDamage[spell.letter] ?? 0;
+        // Follow-up: consecutive casts of same spell get +X% per stack
+        const followUpBonus = followUpStatus?.letter === spell.letter
+            ? 1 + (followUpStatus.bonusPercent / 100) * followUpStatus.count
+            : 1;
+        // Power-combo: +X% if this spell matches the required type
+        const powerComboBonusMultiplier = (playerPowerComboStatus && spellTypes.includes(playerPowerComboStatus.requiredType))
+            ? 1 + playerPowerComboStatus.bonusPercent / 100
+            : 1;
+
+        const spellDamageForCast = Math.round(
+            (spell.damage + exponentialBonus) * preMod.multiplier * followUpBonus * powerComboBonusMultiplier
+        ) + preMod.flatBonus;        const isWeapon = spell.category?.toLowerCase() === "weapon";
         if (
             enemyHealth <= 0 ||
             isGameOver ||
             isResolvingTurn ||
-            (!isHardenedPreparing && remainingEnergy < spellEnergyCost) ||
+            remainingEnergy < spellEnergyCost ||
             (isWeapon && usedWeaponThisTurn)
         ) {
             return;
@@ -1288,24 +1311,7 @@ function Fight() {
         if (isWeapon) {
             setUsedWeaponThisTurn(true);
         }
-        const energySpent = isHardenedPreparing ? remainingEnergy : spellEnergyCost;
-        setRemainingEnergy((previous) => Math.max(0, previous - energySpent));
-
-        if (isHardenedPreparing) {
-            const readyDamage = Math.max(0, Math.round(spell.damage * (1 + energySpent * 0.5)));
-            setHardenedSpellStates((previous) => ({
-                ...previous,
-                [spell.id]: {
-                    phase: "ready",
-                    baseDamage: spell.damage,
-                    readyDamage,
-                    consumedEnergy: energySpent,
-                },
-            }));
-            pushEventLog(`${spell.letter} hardens: ${spell.damage} -> ${readyDamage} (${energySpent} energy)`, "status");
-            setIsResolvingTurn(false);
-            return;
-        }
+        setRemainingEnergy((previous) => Math.max(0, previous - spellEnergyCost));
 
         setSpellCastFlashBackground(getSpellCastFlashBackground(spell.type1, spell.type2));
         setIsSpellCastFlashing(false);
@@ -1329,7 +1335,7 @@ function Fight() {
         const abilityName = getAbilityLogName(spell);
         const hitFlashColor = getSpellHitFlashColor(spell.type1, spell.type2);
         const hitCount = getSpellHitCount(spell.effects);
-        const perHitEffects = getPerHitSpellEffects(spell.effects);
+        const perHitEffects = effectTypeFactory.getBattleTriggerEffects(getPerHitSpellEffects(spell.effects));
         let remainingSoakStacks = enemySoakStatus?.stacks ?? 0;
         let remainingFreezeStacks = enemyFreezeStatus?.stacks ?? 0;
 
@@ -1343,15 +1349,17 @@ function Fight() {
         const hitDamageBreakdown: number[] = [];
         let burnedWasExtinguished = false;
         let totalSoakApplied = 0;
+        let totalSoakDuration = 0;
         let soakWasConsumed = false;
-        let soakWasFrozen = false;
-        let convertedFreezeStacks = 0;
         let freezeWasConsumed = false;
         let consumedFreezeStacks = 0;
         let totalEnergizeApplied = 0;
-        let totalEnemyFreezeApplied = 0;
+        /** Accumulated % of enemy soak stacks to convert to freeze (from freeze effects) */
+        let totalEnemyFreezeSoakConvertPercent = 0;
+        let totalEnemyFreezeSoakConvertDuration = 0;
+        let convertedFreezeStacksFromEffect = 0;
         let totalEnemyThornsApplied = 0;
-        let totalEnemyFloatApplied = 0;
+        let totalEnemyThornsDuration = 0;
         let enemyFreezeWasConsumed = false;
         let consumedEnemyFreezeStacks = 0;
         let remainingEnemyFreezeStacks = enemyFreezeStatus?.stacks ?? 0;
@@ -1368,14 +1376,14 @@ function Fight() {
             const soakBonus = isLightningSpell ? getSoakLightningBonus(remainingSoakStacks) : 0;
             const soakPenalty = isFireSpell ? getSoakFirePenalty(remainingSoakStacks) : 0;
             const freezeBonus = isFireSpell ? getFreezeFireBonus(remainingFreezeStacks) : 0;
-            const enemyFloatStacks = enemyFloatStatus?.stacks ?? 0;
             const spellTypeMultiplier = Math.max(
                 ...spellTypes.map((t) => effectiveTypeMultipliers[t] ?? 1),
                 1,
             );
             const scaledSpellDamage = Math.round(spellDamageForCast * spellTypeMultiplier);
-            const enemyFloatEarthReduction = isEarthSpell ? getFloatEarthReduction(enemyFloatStacks, scaledSpellDamage) : 0;
-            const enemyFloatLightningBonus = isLightningSpell ? getFloatLightningBonus(enemyFloatStacks, scaledSpellDamage) : 0;
+            // Float is passive — use enemy's element-based float percent
+            const enemyFloatEarthReduction = isEarthSpell ? getFloatEarthReduction(enemyPassiveFloatPercent, scaledSpellDamage) : 0;
+            const enemyFloatLightningBonus = isLightningSpell ? getFloatLightningBonus(enemyPassiveFloatPercent, scaledSpellDamage) : 0;
             const baseHitDamage = Math.max(0, scaledSpellDamage + soakBonus - soakPenalty + freezeBonus - enemyFloatEarthReduction + enemyFloatLightningBonus);
             const burnBonus = isFireSpell ? getBurnFireBonus(enemyBurnStatus?.stacks ?? 0, baseHitDamage) : 0;
             const hitDamageBeforeCrit = baseHitDamage + burnBonus;
@@ -1393,11 +1401,7 @@ function Fight() {
                 await wait(EFFECT_STEP_DELAY_MS);
             }
 
-            if (isIceSpell && !soakWasFrozen && remainingSoakStacks > 0) {
-                convertedFreezeStacks = remainingSoakStacks;
-                soakWasFrozen = true;
-                await wait(EFFECT_STEP_DELAY_MS);
-            } else if ((isFireSpell || isLightningSpell) && !soakWasConsumed && remainingSoakStacks > 0) {
+            if ((isFireSpell || isLightningSpell) && !soakWasConsumed && remainingSoakStacks > 0) {
                 soakWasConsumed = true;
                 await wait(EFFECT_STEP_DELAY_MS);
             }
@@ -1432,10 +1436,14 @@ function Fight() {
                 burnDuration = Math.max(burnDuration, delta.enemyBurnDuration);
                 totalShieldGranted += delta.playerShieldGranted;
                 totalSoakApplied += delta.enemySoakApplied;
+                totalSoakDuration = Math.max(totalSoakDuration, delta.enemySoakDuration);
                 totalEnergizeApplied += delta.playerEnergizeApplied;
-                totalEnemyFreezeApplied += delta.enemyFreezeApplied;
+                totalEnemyFreezeSoakConvertPercent += delta.enemyFreezeSoakConvertPercent;
+                totalEnemyFreezeSoakConvertDuration = Math.max(totalEnemyFreezeSoakConvertDuration, delta.enemyFreezeSoakConvertDuration);
                 totalEnemyThornsApplied += delta.enemyThornsApplied;
-                totalEnemyFloatApplied += delta.enemyFloatApplied;
+                totalEnemyThornsDuration = Math.max(totalEnemyThornsDuration, delta.enemyThornsDuration);
+                // exhaust / squishy / consume / exponential / follow_up / power_combo
+                // are one-time cast effects, not accumulated per hit.
             });
 
             if (perHitEffects.length > 0) {
@@ -1466,20 +1474,7 @@ function Fight() {
             await wait(EFFECT_STEP_DELAY_MS);
         }
 
-        if (soakWasFrozen) {
-            setEnemySoakStatus(null);
-            setEnemyFreezeStatus((previous) => {
-                if (!previous) {
-                    return { kind: "freeze", stacks: convertedFreezeStacks };
-                }
-
-                return {
-                    kind: "freeze",
-                    stacks: previous.stacks + convertedFreezeStacks,
-                };
-            });
-            await wait(EFFECT_STEP_DELAY_MS);
-        } else if (soakWasConsumed) {
+        if (soakWasConsumed) {
             setEnemySoakStatus(null);
             await wait(EFFECT_STEP_DELAY_MS);
         }
@@ -1490,52 +1485,36 @@ function Fight() {
         }
 
         if (nextEnemyHealth > 0 && totalSoakApplied > 0) {
-            setEnemySoakStatus((previous) => {
-                if (!previous) {
-                    return {
-                        kind: "soak",
-                        stacks: totalSoakApplied,
-                    };
-                }
-
-                return {
-                    kind: "soak",
-                    stacks: previous.stacks + totalSoakApplied,
-                };
-            });
-            await wait(EFFECT_STEP_DELAY_MS);
-        }
-
-        // Freeze effect: convert enemy soak to freeze first, then add any remaining
-        if (nextEnemyHealth > 0 && totalEnemyFreezeApplied > 0) {
-            const currentSoakStacks = enemySoakStatus?.stacks ?? 0;
-            if (currentSoakStacks > 0) {
-                setEnemySoakStatus(null);
-                setEnemyFreezeStatus((previous) => ({
-                    kind: "freeze",
-                    stacks: (previous?.stacks ?? 0) + currentSoakStacks + totalEnemyFreezeApplied,
-                }));
-            } else {
-                setEnemyFreezeStatus((previous) => ({
-                    kind: "freeze",
-                    stacks: (previous?.stacks ?? 0) + totalEnemyFreezeApplied,
-                }));
-            }
-            await wait(EFFECT_STEP_DELAY_MS);
-        }
-
-        if (nextEnemyHealth > 0 && totalEnemyThornsApplied > 0) {
-            setEnemyThornsStatus((previous) => ({
-                kind: "thorns",
-                stacks: (previous?.stacks ?? 0) + totalEnemyThornsApplied,
+            const soakRemainingTurns = totalSoakDuration > 0 ? totalSoakDuration : undefined;
+            setEnemySoakStatus((previous) => ({
+                kind: "soak",
+                stacks: (previous?.stacks ?? 0) + totalSoakApplied,
+                remainingTurns: soakRemainingTurns ?? previous?.remainingTurns,
             }));
             await wait(EFFECT_STEP_DELAY_MS);
         }
 
-        if (nextEnemyHealth > 0 && totalEnemyFloatApplied > 0) {
-            setEnemyFloatStatus((previous) => ({
-                kind: "float",
-                stacks: (previous?.stacks ?? 0) + totalEnemyFloatApplied,
+        // Freeze effect: convert X% of current enemy soak stacks into freeze stacks
+        if (nextEnemyHealth > 0 && totalEnemyFreezeSoakConvertPercent > 0) {
+            const currentSoak = soakWasConsumed ? 0 : (enemySoakStatus?.stacks ?? 0);
+            if (currentSoak > 0) {
+                convertedFreezeStacksFromEffect = Math.floor(currentSoak * Math.min(100, totalEnemyFreezeSoakConvertPercent) / 100);
+                if (convertedFreezeStacksFromEffect > 0) {
+                    const remaining = currentSoak - convertedFreezeStacksFromEffect;
+                    setEnemySoakStatus(remaining > 0 ? { kind: "soak", stacks: remaining, remainingTurns: enemySoakStatus?.remainingTurns } : null);
+                    const freezeRemainingTurns = totalEnemyFreezeSoakConvertDuration > 0 ? totalEnemyFreezeSoakConvertDuration : undefined;
+                    setEnemyFreezeStatus((prev) => ({ kind: "freeze", stacks: (prev?.stacks ?? 0) + convertedFreezeStacksFromEffect, remainingTurns: freezeRemainingTurns ?? prev?.remainingTurns }));
+                    await wait(EFFECT_STEP_DELAY_MS);
+                }
+            }
+        }
+
+        if (nextEnemyHealth > 0 && totalEnemyThornsApplied > 0) {
+            const thornsRemainingTurns = totalEnemyThornsDuration > 0 ? totalEnemyThornsDuration : undefined;
+            setEnemyThornsStatus((previous) => ({
+                kind: "thorns",
+                stacks: (previous?.stacks ?? 0) + totalEnemyThornsApplied,
+                remainingTurns: thornsRemainingTurns ?? previous?.remainingTurns,
             }));
             await wait(EFFECT_STEP_DELAY_MS);
         }
@@ -1558,8 +1537,8 @@ function Fight() {
 
         let combustRecoilDamage = 0;
         if (isCombustSpell) {
-            const combustAttackPower = spellDamageForCast;
-            combustRecoilDamage = Math.max(0, Math.round(combustAttackPower * COMBUST_RECOIL_PERCENT));
+            const combustRecoilPercent = (combustSpellEffect?.amount ?? 10) / 100;
+            combustRecoilDamage = Math.max(0, Math.round(spellDamageForCast * combustRecoilPercent));
             if (combustRecoilDamage > 0) {
                 applyEnemyAttack(combustRecoilDamage);
                 triggerPlayerDamagePopup(combustRecoilDamage, `-${combustRecoilDamage} COMBUST`);
@@ -1568,9 +1547,10 @@ function Fight() {
         }
 
         if (activeComboType) {
+            const comboDiscount = playerComboStatus?.discountAmount ?? 1;
             if (comboMatches) {
                 comboWasConsumed = true;
-                pushEventLog(`Combo used: ${formatTypeLabel(activeComboType)} attack costs -1 energy`, "status", { isDetail: true });
+                pushEventLog(`Combo used: ${formatTypeLabel(activeComboType)} attack costs -${comboDiscount} energy`, "status", { isDetail: true });
             } else if (!spellComboType) {
                 comboWasBroken = true;
                 pushEventLog("Combo fades", "status", { isDetail: true });
@@ -1578,8 +1558,10 @@ function Fight() {
         }
 
         if (spellComboType) {
-            setPlayerComboStatus({ requiredType: spellComboType });
-            pushEventLog(`Combo primed: next ${formatTypeLabel(spellComboType)} attack costs -1 energy`, "status", { isDetail: true });
+            const spellEnergyComboEffect = getSpellEnergyComboEffect(spell.effects);
+            const discountAmt = Math.max(1, spellEnergyComboEffect?.amount ?? 1);
+            setPlayerComboStatus({ requiredType: spellComboType, discountAmount: discountAmt });
+            pushEventLog(`Combo primed: next ${formatTypeLabel(spellComboType)} attack costs -${discountAmt} energy`, "status", { isDetail: true });
         } else if (comboWasConsumed || comboWasBroken) {
             setPlayerComboStatus(null);
         }
@@ -1605,14 +1587,11 @@ function Fight() {
         if (totalEnergizeApplied > 0) {
             effectMessages.push(`Energize +${totalEnergizeApplied}`);
         }
-        if (totalEnemyFreezeApplied > 0 && nextEnemyHealth > 0) {
-            effectMessages.push(`Freeze +${totalEnemyFreezeApplied}`);
+        if (convertedFreezeStacksFromEffect > 0 && nextEnemyHealth > 0) {
+            effectMessages.push(`Freeze +${convertedFreezeStacksFromEffect} (from soak)`);
         }
         if (totalEnemyThornsApplied > 0 && nextEnemyHealth > 0) {
             effectMessages.push(`Thorns +${totalEnemyThornsApplied}`);
-        }
-        if (totalEnemyFloatApplied > 0 && nextEnemyHealth > 0) {
-            effectMessages.push(`Float +${totalEnemyFloatApplied}`);
         }
         if (combustRecoilDamage > 0) {
             effectMessages.push(`Combust recoil ${combustRecoilDamage}`);
@@ -1620,11 +1599,8 @@ function Fight() {
         if (soakWasConsumed) {
             effectMessages.push("Soak evaporates");
         }
-        if (soakWasFrozen) {
-            effectMessages.push(`Freeze +${convertedFreezeStacks}`);
-        }
         if (freezeWasConsumed) {
-            effectMessages.push(`Freeze consumed`);
+            effectMessages.push("Freeze consumed");
         }
         if (burnedWasExtinguished) {
             effectMessages.push("Burn extinguished");
@@ -1633,22 +1609,60 @@ function Fight() {
             effectMessages.push("Super Effective");
         }
 
+        // One-time self-effects applied once per cast
+        if (exhaustEffect && (exhaustEffect.amount ?? 0) > 0) {
+            const energyAfterSpend = Math.max(0, remainingEnergy - spellEnergyCost);
+            const energyToRemove = Math.floor(energyAfterSpend * (exhaustEffect.amount ?? 0) / 100);
+            if (energyToRemove > 0) {
+                setRemainingEnergy(prev => Math.max(0, prev - energyToRemove));
+                effectMessages.push(`Exhaust -${energyToRemove} energy`);
+            }
+        }
+        if (squishyEffect && (squishyEffect.amount ?? 0) > 0) {
+            const shieldToRemove = Math.floor(playerShield * (squishyEffect.amount ?? 0) / 100);
+            if (shieldToRemove > 0) {
+                setPlayerShield(prev => Math.max(0, prev - shieldToRemove));
+                effectMessages.push(`Squishy -${shieldToRemove} shield`);
+            }
+        }
+        if (consumeEffect && (consumeEffect.amount ?? 0) > 0) {
+            decreaseMaxHp(consumeEffect.amount ?? 0);
+            effectMessages.push(`Consume -${consumeEffect.amount} max HP`);
+        }
+        if (exponentialEffect && (exponentialEffect.amount ?? 0) > 0 && nextEnemyHealth > 0) {
+            const bonusDamage = Math.round(spell.damage * (exponentialEffect.amount ?? 10) / 100);
+            if (bonusDamage > 0) {
+                setSpellExponentialDamage(prev => ({ ...prev, [spell.letter]: (prev[spell.letter] ?? 0) + bonusDamage }));
+                effectMessages.push(`Exponential +${bonusDamage} permanent damage`);
+            }
+        }
+
+        // Follow-up state: track consecutive casts of the same spell
+        if (followUpEffect) {
+            if (followUpStatus?.letter === spell.letter) {
+                setFollowUpStatus(prev => prev ? { ...prev, count: prev.count + 1 } : null);
+                effectMessages.push(`Follow-up x${(followUpStatus.count ?? 0) + 1}`);
+            } else {
+                setFollowUpStatus({ letter: spell.letter, bonusPercent: followUpEffect.amount ?? 50, count: 1 });
+            }
+        } else {
+            setFollowUpStatus(null);
+        }
+
+        // Power-combo state
+        if (playerPowerComboStatus && spellTypes.includes(playerPowerComboStatus.requiredType)) {
+            effectMessages.push(`Power combo +${playerPowerComboStatus.bonusPercent}%`);
+            setPlayerPowerComboStatus(null);
+        }
+        if (powerComboEffect?.targetType) {
+            setPlayerPowerComboStatus({ requiredType: powerComboEffect.targetType, bonusPercent: powerComboEffect.amount ?? 50 });
+            effectMessages.push(`Power combo primed: ${formatTypeLabel(powerComboEffect.targetType)} +${powerComboEffect.amount ?? 50}%`);
+        }
+
         if (effectMessages.length > 0) {
             effectMessages.forEach((message) => {
                 pushEventLog(message, inferEventKind(message), { isDetail: true });
             });
-        }
-
-        if (isHardenedSpell && hardenedState?.phase === "ready") {
-            setHardenedSpellStates((previous) => ({
-                ...previous,
-                [spell.id]: {
-                    phase: "preparing",
-                    baseDamage: spell.damage,
-                    readyDamage: spell.damage,
-                    consumedEnergy: 0,
-                },
-            }));
         }
 
         setIsResolvingTurn(false);
@@ -1780,14 +1794,8 @@ function Fight() {
                             const comboReady = Boolean(activeComboType && spellTypes.includes(activeComboType));
                             const isFireSpell = spellTypes.includes("fire");
                             const displayedEnergyCost = getSpellEnergyCost(spell, activeComboType);
-                            const hardenedState = hardenedSpellStates[spell.id];
-                            const isHardenedSpell = hasHardenedEffect(spell.effects);
-                            const isHardenedPreparing = isHardenedSpell && (hardenedState?.phase ?? "preparing") === "preparing";
-                            const isHardenedReady = isHardenedSpell && hardenedState?.phase === "ready";
                             const isCombustSpell = hasCombustEffect(spell.effects);
-                            const displayedDamage = hasHardenedEffect(spell.effects) && hardenedState?.phase === "ready"
-                                ? hardenedState.readyDamage
-                                : spell.damage;
+                            const displayedDamage = spell.damage;
                             const spellTypeMultiplier = Math.max(
                                 ...spellTypes.map((t) => effectiveTypeMultipliers[normalizeType(t)] ?? 1),
                                 1,
@@ -1795,8 +1803,7 @@ function Fight() {
                             const baseDisplayedDamage = Math.round(displayedDamage * spellTypeMultiplier);
                             const burnBonusDamage = isFireSpell ? getBurnFireBonus(enemyBurnStatus?.stacks ?? 0, baseDisplayedDamage) : 0;
                             const totalDisplayedDamage = baseDisplayedDamage + burnBonusDamage;
-                            const canAffordSpell = isHardenedPreparing ? true : remainingEnergy >= displayedEnergyCost;
-                            const hardenedBoostPercent = Math.max(0, (hardenedState?.consumedEnergy ?? 0) * 50);
+                            const canAffordSpell = remainingEnergy >= displayedEnergyCost;
                             const isWeapon = spell.category?.toLowerCase() === "weapon";
                             const isSpellCardHovered = hoveredSpellId === spell.id;
                             const isSpellTooltipHovered = hoveredSpellTooltipId === spell.id;
@@ -1811,7 +1818,7 @@ function Fight() {
                                 spellSlotRefs.current[spell.id] = element;
                             }}
                             type="button"
-                            className={`spell-card ${flashingSlotId === spell.id ? "is-flashing" : ""} ${comboReady ? "is-combo-ready" : ""} ${(!isGameOver && !isResolvingTurn && !canAffordSpell) ? "is-unaffordable" : ""} ${(isWeapon && usedWeaponThisTurn) ? "is-used" : ""} ${isHardenedReady ? "is-hardened-ready" : ""}`}
+                            className={`spell-card ${flashingSlotId === spell.id ? "is-flashing" : ""} ${comboReady ? "is-combo-ready" : ""} ${(!isGameOver && !isResolvingTurn && !canAffordSpell) ? "is-unaffordable" : ""} ${(isWeapon && usedWeaponThisTurn) ? "is-used" : ""}`}
                             disabled={
                                 isGameOver ||
                                 isResolvingTurn ||
@@ -1874,19 +1881,14 @@ function Fight() {
                                 <ElementIcon name={spell.letter} />
                             </div>
                             <div className="spell-card-name">{spell.letter}</div>
-                            <div className={`spell-card-damage${isHardenedReady ? " is-hardened-ready" : ""}`}>
+                            <div className="spell-card-damage">
                                 {totalDisplayedDamage}
-                                {isHardenedReady || isCombustSpell ? (
+                                {isCombustSpell ? (
                                     <span className="spell-card-power-tooltip" role="tooltip">
-                                        {isHardenedReady && hardenedState ? (
-                                            <span>{`${hardenedState.baseDamage} -> ${hardenedState.readyDamage}`}</span>
-                                        ) : null}
-                                        {isHardenedReady && hardenedState ? (
-                                            <span>{`${hardenedState.consumedEnergy} energy consumed increased power by ${hardenedBoostPercent}%`}</span>
-                                        ) : null}
-                                        {isCombustSpell ? (
-                                            <span>{`Combust power is baked into this element, 10% self-damage on use`}</span>
-                                        ) : null}
+                                        {(() => {
+                                            const cEffect = spell.effects?.find(e => e.kind === "explode");
+                                            return <span>{`Combust: deals ${cEffect?.amount ?? 10}% of damage as self-damage on use`}</span>;
+                                        })()}
                                     </span>
                                 ) : null}
                             </div>

@@ -20,11 +20,15 @@ export type SpellEffectKind =
     | "consume"
     | "hardened"
     | "rage"
+    | "squishy"
+    | "exponential"
     | "powerful"
     | "energetic"
     | "efficient";
 
 export type SpellEffectTarget = "self" | "enemy";
+
+export type SpellEffectGrowth = "+" | "-" | "=";
 
 export type SpellEffectConfig = {
     kind: SpellEffectKind;
@@ -33,6 +37,10 @@ export type SpellEffectConfig = {
     duration?: number;
     target?: SpellEffectTarget;
     targetType?: string;
+    /** Growth direction from effects.xlsx: + = increase is beneficial, - = decrease is beneficial, = = static */
+    growth?: SpellEffectGrowth;
+    /** Spreadsheet-provided short tooltip copy for this effect, when available. */
+    shortDescription?: string;
 };
 
 export type ActiveBurnStatus = {
@@ -44,11 +52,13 @@ export type ActiveBurnStatus = {
 export type ActiveSoakStatus = {
     kind: "soak";
     stacks: number;
+    remainingTurns?: number;
 };
 
 export type ActiveFreezeStatus = {
     kind: "freeze";
     stacks: number;
+    remainingTurns?: number;
 };
 
 export type ActiveEnergizeStatus = {
@@ -59,6 +69,7 @@ export type ActiveEnergizeStatus = {
 export type ActiveThornsStatus = {
     kind: "thorns";
     stacks: number;
+    remainingTurns?: number;
 };
 
 export type ActiveFloatStatus = {
@@ -72,6 +83,14 @@ const EFFECT_COLUMN_CANDIDATES = (index: number, suffix: string) => [
     `Effect${index} ${suffix}`,
     `Effect${index}${suffix}`,
 ];
+
+const normalizeGrowth = (value: string): SpellEffectGrowth | undefined => {
+    const trimmed = value.trim();
+    if (trimmed === "+" || trimmed === "-" || trimmed === "=") {
+        return trimmed;
+    }
+    return undefined;
+};
 
 const readFirstString = (row: Record<string, unknown>, keys: string[]): string => {
     const value = keys
@@ -152,6 +171,10 @@ const normalizeEffectKind = (value: string): SpellEffectKind | null => {
             return "hardened";
         case "rage":
             return "rage";
+        case "squishy":
+            return "squishy";
+        case "exponential":
+            return "exponential";
         case "powerful":
             return "powerful";
         case "energetic":
@@ -208,6 +231,8 @@ export const parseSpellEffectsFromRow = (
             const amount = safeNumber(readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Amount")));
             const hits = safeNumber(readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Hits")));
             const duration = safeNumber(readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Duration")));
+            const growth = normalizeGrowth(readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Growth")));
+            const shortDescription = readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Short Description"));
             const defaultTarget: SpellEffectTarget = SELF_TARGET_EFFECT_KINDS.includes(kind) ? "self" : "enemy";
             const rawTarget = readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Target"));
             const target = normalizeTarget(rawTarget, defaultTarget);
@@ -226,6 +251,12 @@ export const parseSpellEffectsFromRow = (
         }
         if (duration !== undefined) {
             effect.duration = Math.max(1, Math.floor(duration));
+        }
+        if (growth !== undefined) {
+            effect.growth = growth;
+        }
+        if (shortDescription.length > 0) {
+            effect.shortDescription = shortDescription;
         }
 
         effects.push(effect);

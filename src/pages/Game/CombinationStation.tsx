@@ -135,7 +135,7 @@ function CombinationStation({
                             onHoverInsertSlot(null);
                         }}
                     >
-                        1
+                        Base
                         {shouldShowSlotOneInsertPrompt ? (
                             <CombineStationTooltip
                                 className="combine-station-tooltip--slot-one"
@@ -154,7 +154,7 @@ function CombinationStation({
                             onHoverInsertSlot(null);
                         }}
                     >
-                        2
+                        Active
                         {shouldShowSlotTwoInsertPrompt ? (
                             <CombineStationTooltip
                                 className="combine-station-tooltip--slot-two"

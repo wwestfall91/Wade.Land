@@ -1929,7 +1929,7 @@ function Game() {
                         damage: 0,
                         energy: 0,
                         level: 1,
-                        description: "A captured soul.",
+                        description: "Could be useful as a base...",
                         category: "soul",
                     };
 
