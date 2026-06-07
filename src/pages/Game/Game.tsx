@@ -6,9 +6,8 @@ import PlayerStats from "../../components/PlayerStats";
 import EnemyStage from "../../components/EnemyStage";
 import ElementIcon from "../../components/ElementIcon";
 import { parseSpellEffectsFromRow, type SpellEffectConfig } from "../../combat/spellEffects";
-import { getEffectChipClass, getEffectSummaryLines } from "../../combat/effectSummary";
 import { type RewardElement, usePlayer } from "../../context/PlayerContext";
-import { RewardFactory, type MonsterReward } from "../../combat/rewardFactory";
+import { type MonsterReward } from "../../combat/rewardFactory";
 import FloatingTooltip from "./FloatingTooltip";
 import CombinationStation, {
     COMBINATION_STATE_WORKBOOK_PATHS,
@@ -21,7 +20,6 @@ import {
     STARTER_BUTTON_THEME_BY_TYPE,
     STARTER_BUTTON_THEME_DEFAULT,
 } from "../../styles/elementThemes";
-import RewardModal from "../Fight/RewardModal";
 import MonsterUpgradeModal from "./MonsterUpgradeModal";
 import soulIcon from "../../assets/icons/Soul.png";
 import chestIcon from "../../assets/icons/Chest.png";
@@ -48,20 +46,6 @@ type DraggableItem = {
     effects?: SpellEffectConfig[];
     category?: string;
     initialPosition: Position;
-};
-
-type CombinationRecipe = {
-    element1: string;
-    element2: string;
-    result: string;
-    damage: number;
-    energy?: number;
-    level: number;
-    description: string;
-    type1?: string;
-    type2?: string;
-    effects?: SpellEffectConfig[];
-    category?: string;
 };
 
 type ElementRow = {
@@ -181,14 +165,7 @@ const INTRO_TEXT_FADE_GAP_MS = 850;
 const INTRO_INPUT_FADE_MS = 640;
 const INTRO_SCENE_FADEOUT_MS = 1600;
 const REWARD_CUE_MS = 260;
-const SOULS_PER_FLYING_ICON = 5;
-const SOUL_COLLECTION_TRAVEL_MS = 620;
-const SOUL_COLLECTION_STAGGER_MS = 82;
-const SOUL_COLLECTION_PULSE_MS = 500;
-const SOUL_COLLECTION_TEXT_EXTRA_MS = 500;
 const ELEMENT_FLIGHT_TRAVEL_MS = 520;
-const ELEMENT_FLIGHT_STAGGER_MS = 130;
-const CHEST_REVEAL_FADEOUT_MS = 320;
 const STARTER_LABEL_ANIM_MS = 520;
 const ENABLE_FIRST_BATTLE_OLD_ONE_SCENE = false;
 const COMBUST_DAMAGE_MULTIPLIER = 2.5;
@@ -236,16 +213,6 @@ const wait = (ms: number) => new Promise<void>((resolve) => {
 
 type IntroPhase = "hidden" | "line1" | "line2" | "input" | "line3" | "line4" | "fadeout";
 
-const getRandomUniqueElements = (elements: RewardElement[], count: number): RewardElement[] => {
-    const shuffled = [...elements].sort(() => Math.random() - 0.5);
-    return shuffled.slice(0, Math.min(count, shuffled.length));
-};
-
-const getRandomElements = (elements: RewardElement[], count: number): RewardElement[] => {
-    if (elements.length === 0) return [];
-    return Array.from({ length: count }, () => elements[Math.floor(Math.random() * elements.length)]);
-};
-
 function Game() {
     const navigate = useNavigate();
     const location = useLocation();
@@ -253,19 +220,14 @@ function Game() {
         player: playerProgress,
         playerName,
         setPlayerName,
-        initializeElements,
         combineElements,
         addSouls,
         spendSouls,
         addElement,
-        healPlayer,
-        levels,
         selectedEnemy: nextEnemy,
         setSelectedEnemy: setNextEnemy,
         applyTypeMultiplier,
         typeMultipliers,
-        monsterSoulsFed: soulsFed,
-        setMonsterSoulsFed: setSoulsFed,
         playerStatuses,
         applyShieldMultiplier,
         applySoakMultiplier,
@@ -285,25 +247,18 @@ function Game() {
     const enhanceSlotRef = useRef<HTMLDivElement | null>(null);
     const machineSlotRef = useRef<HTMLDivElement | null>(null);
     const previewRef = useRef<HTMLDivElement | null>(null);
-    const feedAnimCounterRef = useRef(0);
-    const eyesFlashTimerRef = useRef<number | null>(null);
-    const rewardGlowTimerRef = useRef<number | null>(null);
 
     const [draggables, setDraggables] = useState<DraggableItem[]>([]);
-    const [recipes, setRecipes] = useState<CombinationRecipe[]>([]);
     const [combinationStateEffectsLookup, setCombinationStateEffectsLookup] = useState<CombinationStateEffectsLookup>({});
     const [enemies, setEnemies] = useState<Enemy[]>([]);
-    const [baseElements, setBaseElements] = useState<RewardElement[]>([]);
     const [allElementOptions, setAllElementOptions] = useState<RewardElement[]>([]);
     const [isDevElementPanelOpen, setIsDevElementPanelOpen] = useState(false);
     const [isFeedOverlayOpen, setIsFeedOverlayOpen] = useState(false);
     const [isFeedOverlayFadingOut, setIsFeedOverlayFadingOut] = useState(false);
-    const [isSoulsPanelFlashing, setIsSoulsPanelFlashing] = useState(false);
-    const [feedAnimations, setFeedAnimations] = useState<number[]>([]);
+    const [feedAnimations] = useState<number[]>([]);
     const [isOldOneIntroTriggered, setIsOldOneIntroTriggered] = useState(false);
     const [isOldOneReturnLocked, setIsOldOneReturnLocked] = useState(false);
-    const [oldOneFeedCount, setOldOneFeedCount] = useState(0);
-    const [isOldOneSequenceRunning, setIsOldOneSequenceRunning] = useState(false);
+    const [, setIsOldOneSequenceRunning] = useState(false);
     const [feedStoryText, setFeedStoryText] = useState<string | null>(null);
     const [isFeedStoryTextFading, setIsFeedStoryTextFading] = useState(false);
     const [isOldOneStirsModalVisible, setIsOldOneStirsModalVisible] = useState(false);
@@ -311,9 +266,9 @@ function Game() {
     const [isEnhanceStationUnlocked, setIsEnhanceStationUnlocked] = useState(false);
     const [enhanceSlotOccupantId, setEnhanceSlotOccupantId] = useState<number | null>(null);
     const [machineSlotOccupantId, setMachineSlotOccupantId] = useState<number | null>(null);
-    const [eyesFlashRevision, setEyesFlashRevision] = useState(0);
-    const [monsterThresholds, setMonsterThresholds] = useState<MonsterRewardThreshold[]>([]);
-    const [rewardGlowRevision, setRewardGlowRevision] = useState(0);
+    const [eyesFlashRevision] = useState(0);
+    const [, setMonsterThresholds] = useState<MonsterRewardThreshold[]>([]);
+    const [rewardGlowRevision] = useState(0);
     const [pendingUpgradeRewards, setPendingUpgradeRewards] = useState<MonsterReward[] | null>(null);
     const [newElementToasts, setNewElementToasts] = useState<Array<{ id: number; x: number; y: number; category?: string }>>([]);
     const [hasSeenDragTutorial, setHasSeenDragTutorial] = useState(() => {
@@ -346,12 +301,12 @@ function Game() {
     const [isIntroTextVisible, setIsIntroTextVisible] = useState(() => playerName.trim().length === 0);
     const [introNameInput, setIntroNameInput] = useState("");
     const [isIntroInputFadingOut, setIsIntroInputFadingOut] = useState(false);
-    const [fightReward, setFightReward] = useState<FightRewardState | null>(null);
+    const [, setFightReward] = useState<FightRewardState | null>(null);
     const [isCombinationStationUnlocked, setIsCombinationStationUnlocked] = useState(true);
     const [isFightVictoryCueVisible, setIsFightVictoryCueVisible] = useState(false);
     const [isSoulPulseVisible, setIsSoulPulseVisible] = useState(false);
     const [soulPulseAmount, setSoulPulseAmount] = useState(0);
-    const [isSoulCounterPopping, setIsSoulCounterPopping] = useState(false);
+    const [isSoulCounterPopping] = useState(false);
     const [isSoulPanelErrorFeedback, setIsSoulPanelErrorFeedback] = useState(false);
     const [hoveredInsertSlot, setHoveredInsertSlot] = useState<1 | 2 | null>(null);
     const [isCombineButtonHovered, setIsCombineButtonHovered] = useState(false);
@@ -364,8 +319,8 @@ function Game() {
     const [soulFlightIcons, setSoulFlightIcons] = useState<SoulFlightIcon[]>([]);
     const [enhanceSoulFlights, setEnhanceSoulFlights] = useState<EnhanceSoulFlight[]>([]);
     const [elementFlightIcons, setElementFlightIcons] = useState<ElementFlightIcon[]>([]);
-    const [isChestRevealVisible, setIsChestRevealVisible] = useState(false);
-    const [isChestRevealFadingOut, setIsChestRevealFadingOut] = useState(false);
+    const [isChestRevealVisible] = useState(false);
+    const [isChestRevealFadingOut] = useState(false);
     const [newChestElementIds, setNewChestElementIds] = useState<Set<number>>(new Set());
     const [isStarterChoiceOpen, setIsStarterChoiceOpen] = useState(false);
     const [starterChoiceElements, setStarterChoiceElements] = useState<RewardElement[]>([]);
@@ -445,9 +400,6 @@ function Game() {
         elementFlightTimeoutsRef.current.forEach((timeoutId) => {
             window.clearTimeout(timeoutId);
         });
-        if (rewardGlowTimerRef.current !== null) {
-            window.clearTimeout(rewardGlowTimerRef.current);
-        }
         if (starterChoiceLabelTimeoutRef.current !== null) {
             window.clearTimeout(starterChoiceLabelTimeoutRef.current);
         }
@@ -467,57 +419,12 @@ function Game() {
         oldOneSequenceTimeoutsRef.current = [];
     }, []);
 
-    const runOldOneAwakeningSequence = useCallback(() => {
-        setIsOldOneSequenceRunning(true);
-        setFeedStoryText("GOOD... PROTECT");
-        setIsFeedStoryTextFading(false);
-
-        clearOldOneSequenceTimeouts();
-
-        const toMakeStrongId = window.setTimeout(() => {
-            setIsFeedStoryTextFading(true);
-            const swapTextId = window.setTimeout(() => {
-                setFeedStoryText("I MAKE... STRONG");
-                setIsFeedStoryTextFading(false);
-            }, 700);
-            oldOneSequenceTimeoutsRef.current.push(swapTextId);
-        }, 1200);
-        oldOneSequenceTimeoutsRef.current.push(toMakeStrongId);
-
-        const fadeOutSecondLineId = window.setTimeout(() => {
-            setIsFeedStoryTextFading(true);
-        }, 3000);
-        oldOneSequenceTimeoutsRef.current.push(fadeOutSecondLineId);
-
-        const showStirsModalId = window.setTimeout(() => {
-            setFeedStoryText(null);
-            setIsFeedStoryTextFading(false);
-            setIsOldOneStirsModalVisible(true);
-            setIsOldOneStirsModalFadingOut(false);
-
-            const hideStirsModalId = window.setTimeout(() => {
-                setIsOldOneStirsModalFadingOut(true);
-                const finalizeIntroId = window.setTimeout(() => {
-                    setIsOldOneStirsModalVisible(false);
-                    setIsOldOneStirsModalFadingOut(false);
-                    setIsOldOneReturnLocked(false);
-                    setIsOldOneSequenceRunning(false);
-                }, 2000);
-                oldOneSequenceTimeoutsRef.current.push(finalizeIntroId);
-            }, 2000);
-
-            oldOneSequenceTimeoutsRef.current.push(hideStirsModalId);
-        }, 3800);
-        oldOneSequenceTimeoutsRef.current.push(showStirsModalId);
-    }, [clearOldOneSequenceTimeouts]);
-
     const startOldOneFirstBattleIntro = useCallback((options?: { skipTimerClear?: boolean }) => {
         if (!options?.skipTimerClear) {
             clearOldOneSequenceTimeouts();
         }
         setIsOldOneIntroTriggered(true);
         setIsOldOneReturnLocked(true);
-        setOldOneFeedCount(0);
         setIsOldOneSequenceRunning(false);
         setFeedStoryText("FEED...");
         setIsFeedStoryTextFading(false);
@@ -566,20 +473,6 @@ function Game() {
             window.clearTimeout(timeoutId);
         });
         soulAnimationTimeoutsRef.current = [];
-    }, []);
-
-    const triggerSoulCounterPop = useCallback(() => {
-        setIsSoulCounterPopping(false);
-        window.requestAnimationFrame(() => {
-            setIsSoulCounterPopping(true);
-            if (soulCounterPopTimeoutRef.current !== null) {
-                window.clearTimeout(soulCounterPopTimeoutRef.current);
-            }
-
-            soulCounterPopTimeoutRef.current = window.setTimeout(() => {
-                setIsSoulCounterPopping(false);
-            }, 240);
-        });
     }, []);
 
     const triggerSoulPanelErrorFeedback = useCallback(() => {
@@ -945,27 +838,6 @@ function Game() {
                 }))
                 .filter((row) => row.name.length > 0);
 
-            const combinationRecipes = parsedRows
-                .filter((row) => row.element1.length > 0 && row.element2.length > 0)
-                .map((row) => ({
-                    element1: row.element1,
-                    element2: row.element2,
-                    result: row.name,
-                    damage: row.damage,
-                    energy: row.energy,
-                    level: row.level,
-                    description: row.description,
-                    type1: row.type1,
-                    type2: row.type2,
-                    effects: row.effects,
-                    category: row.category,
-                }));
-
-            setRecipes(combinationRecipes);
-            const baseElementRows = parsedRows.filter(
-                (row) => row.element1.length === 0 && row.element2.length === 0,
-            );
-
             setAllElementOptions(
                 parsedRows.map((row) => ({
                     letter: row.name,
@@ -992,19 +864,6 @@ function Game() {
                     effects: row.effects,
                     category: row.category,
                 } satisfies RewardElement]),
-            );
-            setBaseElements(
-                baseElementRows.map((row) => ({
-                    letter: row.name,
-                    damage: row.damage,
-                    energy: row.energy,
-                    level: row.level,
-                    description: row.description,
-                    type1: row.type1,
-                    type2: row.type2,
-                    effects: row.effects,
-                    category: row.category,
-                })),
             );
         };
 
@@ -1186,7 +1045,7 @@ function Game() {
 
                 return {
                     ...element,
-                    initialPosition: pendingDropSpawnByIdRef.current.get(element.id) ?? getSpawnPosition(index),
+                    initialPosition: element.initialPosition ?? pendingDropSpawnByIdRef.current.get(element.id) ?? getSpawnPosition(index),
                 };
             });
         });
@@ -1521,9 +1380,12 @@ function Game() {
             type2: previewCombination.type2,
             effects: previewCombination.effects,
             category: previewCombination.category,
+            initialPosition: targetPosition,
         };
 
         nextId.current += 1;
+
+    pendingDropSpawnByIdRef.current.set(newDraggable.id, targetPosition);
 
         combineElements(previewCombination.consumedIds, newDraggable);
 
@@ -1656,7 +1518,7 @@ function Game() {
             window.removeEventListener("pointermove", handleMove);
             window.removeEventListener("pointerup", handleUp);
         };
-    }, [finalizeCombination, isPreviewDragging, previewPointerOffset.x, previewPointerOffset.y]);
+    }, [finalizeCombination, getOutputCenterPosition, isPreviewDragging, previewPointerOffset.x, previewPointerOffset.y]);
 
     const handlePreviewPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
         event.stopPropagation();
@@ -1858,7 +1720,6 @@ function Game() {
     };
 
     const enhanceSlottedDraggable = getDraggableById(enhanceSlotOccupantId);
-    const machineSlottedDraggable = getDraggableById(machineSlotOccupantId);
     const isEnhanceDisabled = !enhanceSlottedDraggable;
 
     const handleEnhanceClick = useCallback(() => {
@@ -1914,11 +1775,6 @@ function Game() {
         });
     };
 
-    const handleFeedClick = () => {
-        setIsFeedOverlayFadingOut(false);
-        setIsFeedOverlayOpen(true);
-    };
-
     const handleFeedOverlayClose = () => {
         if (isOldOneReturnLocked) {
             return;
@@ -1934,61 +1790,6 @@ function Game() {
                 setIsEnhanceStationUnlocked(true);
             }
         }, 1000);
-    };
-
-    const handleFeedSpend = () => {
-        if (playerProgress.souls <= 0) {
-            if (isSoulsPanelFlashing) return;
-            setIsSoulsPanelFlashing(true);
-            window.setTimeout(() => setIsSoulsPanelFlashing(false), 600);
-            return;
-        }
-        spendSouls(1);
-
-        const prevFed = soulsFed;
-        const nextFed = prevFed + 1;
-        setSoulsFed(nextFed);
-
-        if (isOldOneReturnLocked && !isOldOneSequenceRunning) {
-            setOldOneFeedCount((previousCount) => {
-                const nextCount = previousCount + 1;
-                if (nextCount >= 5) {
-                    runOldOneAwakeningSequence();
-                }
-                return nextCount;
-            });
-        }
-
-        const crossed = isOldOneReturnLocked
-            ? undefined
-            : monsterThresholds.find((t) => nextFed >= t.souls && prevFed < t.souls);
-        if (crossed) {
-            const choices = RewardFactory.getRandom(3);
-            setPendingUpgradeRewards(choices);
-            if (rewardGlowTimerRef.current !== null) {
-                window.clearTimeout(rewardGlowTimerRef.current);
-            }
-            setRewardGlowRevision((r) => r + 1);
-            rewardGlowTimerRef.current = window.setTimeout(() => {
-                setRewardGlowRevision(0);
-                rewardGlowTimerRef.current = null;
-            }, 3500);
-        }
-
-        const id = ++feedAnimCounterRef.current;
-        setFeedAnimations((prev) => [...prev, id]);
-        window.setTimeout(() => {
-            setFeedAnimations((prev) => prev.filter((x) => x !== id));
-            if (crossed) return;
-            setEyesFlashRevision((r) => r + 1);
-            if (eyesFlashTimerRef.current !== null) {
-                window.clearTimeout(eyesFlashTimerRef.current);
-            }
-            eyesFlashTimerRef.current = window.setTimeout(() => {
-                setEyesFlashRevision(0);
-                eyesFlashTimerRef.current = null;
-            }, 450);
-        }, 280);
     };
 
     const handleIntroNameSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -2129,86 +1930,6 @@ function Game() {
         soulAnimationTimeoutsRef.current.push(doneTimeoutId);
     }, [addElement, clearSoulAnimationTimeouts, playerProgress.elements.length]);
 
-    const handleRewardConfirm = ({ elements, bonusSoulsMultiplier, sourceRect }: { elements: RewardElement[]; bonusSoulsMultiplier?: number; sourceRect?: DOMRect }) => {
-        if (!fightReward) {
-            return;
-        }
-
-        if (rewardCueTimeoutRef.current !== null) {
-            window.clearTimeout(rewardCueTimeoutRef.current);
-            rewardCueTimeoutRef.current = null;
-        }
-
-        const bonusSouls = bonusSoulsMultiplier ? Math.floor(fightReward.soulsGained * bonusSoulsMultiplier) : 0;
-        const totalSouls = fightReward.soulsGained + bonusSouls;
-        const isChestRewardPath = (fightReward.isChestReward ?? false) && elements.length > 0;
-        hasShownInitialRewardModalRef.current = true;
-        setFightReward(null);
-        setIsFightVictoryCueVisible(false);
-        navigate("/game", {
-            replace: true,
-            state: null,
-        });
-
-        if (isChestRewardPath) {
-            setIsChestRevealVisible(true);
-            setIsChestRevealFadingOut(false);
-            const currentMaxId = playerProgress.elements.reduce((max, e) => Math.max(max, e.id), 0);
-            const predictedNewIds = elements.map((_, i) => currentMaxId + 1 + i);
-            setNewChestElementIds((prev) => {
-                const next = new Set(prev);
-                predictedNewIds.forEach((id) => next.add(id));
-                return next;
-            });
-            const currentCount = playerProgress.elements.length;
-            const containerRect = gameRef.current?.getBoundingClientRect();
-            const centerX = window.innerWidth / 2;
-            const centerY = window.innerHeight / 2;
-
-            const flightIcons: ElementFlightIcon[] = elements.map((el, i) => {
-                const targetPos = getSpawnPosition(currentCount + i);
-                const targetX = (containerRect?.left ?? 0) + targetPos.x + 16;
-                const targetY = (containerRect?.top ?? 0) + targetPos.y + 16;
-                return {
-                    id: elementFlightIdRef.current++,
-                    startX: centerX,
-                    startY: centerY,
-                    toX: targetX - centerX,
-                    toY: targetY - centerY,
-                    letter: el.letter,
-                    delayMs: 150 + i * ELEMENT_FLIGHT_STAGGER_MS,
-                };
-            });
-
-            setElementFlightIcons(flightIcons);
-
-            elements.forEach((el, i) => {
-                const landTimeoutId = window.setTimeout(() => {
-                    addElement(el);
-                }, flightIcons[i].delayMs + ELEMENT_FLIGHT_TRAVEL_MS);
-                elementFlightTimeoutsRef.current.push(landTimeoutId);
-            });
-
-            const lastLandMs = 150 + (elements.length - 1) * ELEMENT_FLIGHT_STAGGER_MS + ELEMENT_FLIGHT_TRAVEL_MS;
-            const fadeOutTimeoutId = window.setTimeout(() => {
-                setElementFlightIcons([]);
-                setIsChestRevealFadingOut(true);
-            }, lastLandMs + 100);
-            elementFlightTimeoutsRef.current.push(fadeOutTimeoutId);
-
-            const cleanupTimeoutId = window.setTimeout(() => {
-                elementFlightTimeoutsRef.current = [];
-                setIsChestRevealVisible(false);
-                setIsChestRevealFadingOut(false);
-                startSoulCollectionAnimation(totalSouls);
-            }, lastLandMs + 100 + CHEST_REVEAL_FADEOUT_MS);
-            elementFlightTimeoutsRef.current.push(cleanupTimeoutId);
-        } else {
-            elements.forEach((e) => addElement(e));
-            startSoulCollectionAnimation(totalSouls);
-        }
-    };
-
     const handleStarterChoiceSelect = (index: number) => {
         if (isStarterChoiceConfirming) {
             return;
@@ -2256,9 +1977,13 @@ function Game() {
                 combineElements([placeholderId], {
                     id: placeholderId,
                     ...chosenElement,
+                    initialPosition: spawnPosition,
                 });
             } else {
-                addElement(chosenElement);
+                addElement({
+                    ...chosenElement,
+                    initialPosition: spawnPosition,
+                });
             }
         }, ELEMENT_FLIGHT_TRAVEL_MS);
 
@@ -2574,6 +2299,7 @@ function Game() {
                         onMouseEnter={handlePreviewMouseEnter}
                         onMouseLeave={handlePreviewMouseLeave}
                         style={{
+                            position: "absolute",
                             top: (isPreviewDragging ? previewPosition : previewHomePosition)?.y ?? 0,
                             left: (isPreviewDragging ? previewPosition : previewHomePosition)?.x ?? 0,
                             display: "flex",

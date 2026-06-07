@@ -33,6 +33,7 @@ function TooltipHarness({ level, showDetails = false }: TooltipHarnessProps) {
                     damage: 12,
                     description: "Arc Burst",
                     level,
+                    category: "SPELL",
                 } : undefined}
             >
                 <span>Damage: 12</span>

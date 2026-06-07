@@ -130,7 +130,43 @@ type HardenedSpellState = {
 function Fight() {
     const location = useLocation();
     const navigate = useNavigate();
-    const { player, playerName, levels, applyEnemyAttack, healPlayer, resetGame, typeMultipliers, playerStatuses, setPlayerStatuses, shieldMultiplier, soakMultiplier, burnMultiplier, maxHpMultiplier, battleEnergyCarryover, setBattleEnergyCarryover } = usePlayer();
+    const {
+        player,
+        playerName,
+        levels,
+        applyEnemyAttack,
+        healPlayer,
+        resetGame,
+        typeMultipliers,
+        playerStatuses: playerStatusesFromContext,
+        setPlayerStatuses: setPlayerStatusesFromContext,
+        shieldMultiplier,
+        soakMultiplier,
+        burnMultiplier,
+        maxHpMultiplier,
+        battleEnergyCarryover,
+        setBattleEnergyCarryover: setBattleEnergyCarryoverFromContext,
+    } = usePlayer();
+    const playerStatuses = playerStatusesFromContext ?? {
+        burn: null,
+        soak: null,
+        freeze: null,
+        thorns: null,
+        float: null,
+        shield: 0,
+        energize: null,
+    };
+    const setPlayerStatuses = useMemo(() => setPlayerStatusesFromContext ?? (() => undefined), [setPlayerStatusesFromContext]);
+    const setBattleEnergyCarryover = useMemo(
+        () => setBattleEnergyCarryoverFromContext ?? (() => undefined),
+        [setBattleEnergyCarryoverFromContext],
+    );
+    const effectiveTypeMultipliers = typeMultipliers ?? {};
+    const effectiveShieldMultiplier = shieldMultiplier ?? 1;
+    const effectiveSoakMultiplier = soakMultiplier ?? 1;
+    const effectiveBurnMultiplier = burnMultiplier ?? 1;
+    const effectiveMaxHpMultiplier = maxHpMultiplier ?? 1;
+    const effectiveBattleEnergyCarryover = battleEnergyCarryover ?? 0;
     const [flashingSlotId, setFlashingSlotId] = useState<number | null>(null);
     const [hoveredSpellId, setHoveredSpellId] = useState<number | null>(null);
     const [hoveredSpellTooltipId, setHoveredSpellTooltipId] = useState<number | null>(null);
@@ -138,7 +174,7 @@ function Fight() {
     const [hoveredEnemyAttack, setHoveredEnemyAttack] = useState(false);
     const [isEnemyIntentTooltipHovered, setIsEnemyIntentTooltipHovered] = useState(false);
     const [isEnemyIntentTooltipGraceOpen, setIsEnemyIntentTooltipGraceOpen] = useState(false);
-    const [remainingEnergy, setRemainingEnergy] = useState(() => Math.min(MAX_TURN_ENERGY, ENERGY_PER_TURN + battleEnergyCarryover));
+    const [remainingEnergy, setRemainingEnergy] = useState(() => Math.min(MAX_TURN_ENERGY, ENERGY_PER_TURN + effectiveBattleEnergyCarryover));
     const [eventLogEntries, setEventLogEntries] = useState<EventLogEntry[]>([]);
     const [isBattleLogExpanded, setIsBattleLogExpanded] = useState(false);
     const [isGameOver, setIsGameOver] = useState(false);
@@ -314,7 +350,7 @@ function Fight() {
     const [enemyHealth, setEnemyHealth] = useState(() => enemy.hp);
     const enemyMaxHp = Math.max(1, enemy.hp);
     const enemyHpFillPercent = Math.max(0, Math.min(100, (enemyHealth / enemyMaxHp) * 100));
-    const playerMaxHp = Math.round((levels.find((levelDef) => levelDef.level === player.level)?.hp ?? Math.max(player.hp, 1)) * maxHpMultiplier);
+    const playerMaxHp = Math.round((levels.find((levelDef) => levelDef.level === player.level)?.hp ?? Math.max(player.hp, 1)) * effectiveMaxHpMultiplier);
     const displayedPlayerHp = player.hp + Math.max(0, playerShield);
     const playerHpFillPercent = Math.max(0, Math.min(100, (player.hp / playerMaxHp) * 100));
     const playerShieldFillPercent = Math.max(0, Math.min(100, (Math.max(0, playerShield) / playerMaxHp) * 100));
@@ -871,8 +907,8 @@ function Fight() {
             await wait(EFFECT_STEP_DELAY_MS);
         }
 
-        totalPlayerBurnApplied = Math.round(totalPlayerBurnApplied * burnMultiplier);
-        totalPlayerSoakApplied = Math.round(totalPlayerSoakApplied * soakMultiplier);
+        totalPlayerBurnApplied = Math.round(totalPlayerBurnApplied * effectiveBurnMultiplier);
+        totalPlayerSoakApplied = Math.round(totalPlayerSoakApplied * effectiveSoakMultiplier);
 
         if (totalPlayerBurnApplied > 0 && simulatedPlayerHp > 0) {
             setPlayerBurnStatus((previous) => {
@@ -1334,7 +1370,7 @@ function Fight() {
             const freezeBonus = isFireSpell ? getFreezeFireBonus(remainingFreezeStacks) : 0;
             const enemyFloatStacks = enemyFloatStatus?.stacks ?? 0;
             const spellTypeMultiplier = Math.max(
-                ...spellTypes.map((t) => typeMultipliers[t] ?? 1),
+                ...spellTypes.map((t) => effectiveTypeMultipliers[t] ?? 1),
                 1,
             );
             const scaledSpellDamage = Math.round(spellDamageForCast * spellTypeMultiplier);
@@ -1505,7 +1541,7 @@ function Fight() {
         }
 
         if (totalShieldGranted > 0) {
-            setPlayerShield((previous) => previous + Math.round(totalShieldGranted * shieldMultiplier));
+            setPlayerShield((previous) => previous + Math.round(totalShieldGranted * effectiveShieldMultiplier));
             await wait(EFFECT_STEP_DELAY_MS);
         }
 
@@ -1753,7 +1789,7 @@ function Fight() {
                                 ? hardenedState.readyDamage
                                 : spell.damage;
                             const spellTypeMultiplier = Math.max(
-                                ...spellTypes.map((t) => typeMultipliers[normalizeType(t)] ?? 1),
+                                ...spellTypes.map((t) => effectiveTypeMultipliers[normalizeType(t)] ?? 1),
                                 1,
                             );
                             const baseDisplayedDamage = Math.round(displayedDamage * spellTypeMultiplier);
@@ -1820,7 +1856,7 @@ function Fight() {
                                 onTooltipMouseEnter={() => handleSpellTooltipMouseEnter(spell.id)}
                                 onTooltipMouseLeave={() => handleSpellTooltipMouseLeave(spell.id)}
                                 clampHorizontal={false}
-                                typeMultipliers={typeMultipliers}
+                                typeMultipliers={effectiveTypeMultipliers}
                                 elementDetails={{
                                     letter: spell.letter,
                                     damage: totalDisplayedDamage,

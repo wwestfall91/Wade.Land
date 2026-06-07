@@ -21,7 +21,8 @@ vi.mock("xlsx", () => {
                         "Element 1": "",
                         "Element 2": "",
                         Damage: 12,
-                        Level: 1,
+                        Level: 0,
+                        Category: "element",
                         Description: "Fire base",
                         "Type 1": "fire",
                     },
@@ -30,7 +31,8 @@ vi.mock("xlsx", () => {
                         "Element 1": "",
                         "Element 2": "",
                         Damage: 10,
-                        Level: 1,
+                        Level: 0,
+                        Category: "element",
                         Description: "Water base",
                         "Type 1": "water",
                     },
@@ -39,7 +41,8 @@ vi.mock("xlsx", () => {
                         "Element 1": "",
                         "Element 2": "",
                         Damage: 11,
-                        Level: 1,
+                        Level: 0,
+                        Category: "element",
                         Description: "Earth base",
                         "Type 1": "earth",
                     },
@@ -161,11 +164,13 @@ describe("Game/Fight navigation", () => {
     it("shows the starter modal before the game begins", async () => {
         renderWithRouter(["/game"]);
 
-        await screen.findByText("Pick a Element!");
+        await waitFor(() => {
+            expect(document.querySelector(".starter-choice-overlay")).toBeTruthy();
+        });
 
         expect(screen.getByTestId("location-path").textContent).toBe("/game");
         expect(document.querySelector("#Game")).toBeTruthy();
-        expect(document.querySelector(".start-menu-overlay")).toBeTruthy();
+        expect(document.querySelector(".starter-choice-overlay")).toBeTruthy();
     });
 
     it("navigates from game scene to fight scene when clicking FIGHT", async () => {
@@ -189,7 +194,7 @@ describe("Game/Fight navigation", () => {
         expect(document.querySelector("#Fight")).toBeTruthy();
     });
 
-    it("shows reward modal after fight and returns to game on continue", async () => {
+    it("returns to game after fight resolution", async () => {
         renderWithRouter([
             {
                 pathname: "/fight",
@@ -215,20 +220,10 @@ describe("Game/Fight navigation", () => {
             },
         ]);
 
-        await screen.findByText("Pick 1 Element!");
-
-        const rewardOption = document.querySelector(".reward-element") as HTMLButtonElement | null;
-        expect(rewardOption).toBeTruthy();
-        if (rewardOption) {
-            fireEvent.click(rewardOption);
-        }
-
-        fireEvent.click(screen.getByRole("button", { name: "CONTINUE" }));
-
         await waitFor(() => {
             const probes = screen.getAllByTestId("location-path");
             expect(probes[probes.length - 1]?.textContent).toBe("/game");
-        }, { timeout: 2000 });
+        }, { timeout: 5000 });
 
         expect(document.querySelector("#Game")).toBeTruthy();
     });

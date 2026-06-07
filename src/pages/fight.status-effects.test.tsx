@@ -143,6 +143,11 @@ const waitForSpellReady = async (view: RenderResult, letter: string) => {
     }, { timeout: 5000 });
 };
 
+const expandBattleLog = () => {
+    const battleLogToggle = screen.getByRole("button", { name: /battle log/i });
+    fireEvent.click(battleLogToggle);
+};
+
 describe("Fight status effects", () => {
     afterEach(() => {
         cleanup();
@@ -174,6 +179,8 @@ describe("Fight status effects", () => {
                 },
             ],
         });
+
+        expandBattleLog();
 
         const burnSigilButton = clickSpellButton(view, "burnsigil");
         await waitFor(() => {
@@ -221,6 +228,8 @@ describe("Fight status effects", () => {
                 },
             ],
         });
+
+        expandBattleLog();
 
         const drenchButton = clickSpellButton(view, "drench");
         await waitFor(() => {
@@ -285,6 +294,8 @@ describe("Fight status effects", () => {
                 },
             ],
         });
+
+        expandBattleLog();
 
         const drenchButton = clickSpellButton(view, "drench");
         await waitFor(() => {
