@@ -371,16 +371,6 @@ function FloatingTooltip({
                             <div>{elementDetails.letter}</div>
                             <div className="description">{elementDetails.description}</div>
                         </div>
-                        <div className="enhancements" aria-label="Enhancements">
-                            {enhancementItems.map((item) => (
-                                <span
-                                    key={item.key}
-                                    className={`enhancement-chip${item.active ? " is-active" : ""}`}
-                                >
-                                    {item.label}
-                                </span>
-                            ))}
-                        </div>
                         <div className="tooltip-header">
                             <span className={`element-info-badge ${primaryBadgeClass}`}>{primaryBadgeLabel}</span>
                             <div className="element-types">
@@ -475,6 +465,16 @@ function FloatingTooltip({
                                 )}
                             </span>
                         ) : null}
+                        <div className="enhancements" aria-label="Enhancements">
+                            {enhancementItems.map((item) => (
+                                <span
+                                    key={item.key}
+                                    className={`enhancement-chip${item.active ? " is-active" : ""}`}
+                                >
+                                    {item.label}
+                                </span>
+                            ))}
+                        </div>
                     </div>
                 ) : (
                     children

@@ -23,6 +23,7 @@ describe("effect type factory", () => {
             { kind: "powerful", amount: 150, target: "self" },
             { kind: "energetic", amount: 1, target: "self" },
             { kind: "float", amount: 1, target: "enemy" },
+            { kind: "brittle", amount: 1, target: "self" },
             { kind: "burn", amount: 1, duration: 3, target: "enemy" },
         ];
 
@@ -31,17 +32,23 @@ describe("effect type factory", () => {
             { kind: "powerful", amount: 150, target: "self" },
             { kind: "energetic", amount: 1, target: "self" },
             { kind: "float", amount: 1, target: "enemy" },
+            { kind: "brittle", amount: 1, target: "self" },
         ]);
     });
 
     it("keeps passive effects in persistent bucket", () => {
         const effects: SpellEffectConfig[] = [
             { kind: "float", amount: 1, target: "enemy" },
+            { kind: "brittle", amount: 1, target: "self" },
             { kind: "burn", amount: 1, duration: 3, target: "enemy" },
         ];
 
         const buckets = effectTypeFactory.bucketByLifecycle(effects);
         expect(buckets.persistent).toEqual([{ kind: "float", amount: 1, target: "enemy" }]);
         expect(buckets.battle).toEqual([{ kind: "burn", amount: 1, duration: 3, target: "enemy" }]);
+        expect(buckets.creation).toEqual([
+            { kind: "float", amount: 1, target: "enemy" },
+            { kind: "brittle", amount: 1, target: "self" },
+        ]);
     });
 });

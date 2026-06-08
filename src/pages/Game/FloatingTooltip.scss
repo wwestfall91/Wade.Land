@@ -3,8 +3,8 @@
     position: absolute;
     left: 50%;
     top: 0;
-    min-width: min(24rem, 92vw);
-    max-width: min(24rem, 92vw);
+    min-width: min(28rem, 96vw);
+    max-width: min(28rem, 96vw);
     color: #181818;
     z-index: 2147483647;
     gap: 0.45rem;
@@ -128,15 +128,22 @@
 
 .enhancements {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 0.25rem;
     padding: 0.2rem 0.25rem;
     border-radius: 5px;
-    background: linear-gradient(rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.12));
-    border: 1px solid rgba(255, 255, 255, 0.55);
+    white-space: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+
+    &::-webkit-scrollbar {
+        display: none;
+    }
 
     .enhancement-chip {
         display: inline-flex;
+        flex: 0 0 auto;
         align-items: center;
         justify-content: center;
         padding: 0.08rem 0.35rem;
@@ -144,8 +151,8 @@
         font-size: 0.62rem;
         font-weight: 700;
         letter-spacing: 0.01em;
-        color: rgba(27, 27, 27, 0.65);
-        background: rgba(255, 255, 255, 0.4);
+        color: rgba(17, 17, 17, 0.904);
+        background: rgba(117, 117, 117, 0.671);
         border: 1px solid rgba(255, 255, 255, 0.5);
     }
 
@@ -822,6 +829,12 @@
     background-color: #e2d6ff;
     color: #402a7a;
     border-color: rgba(86, 62, 157, 0.45);
+}
+
+.floating-tooltip .effect-brittle {
+    background-color: #ffe2c8;
+    color: #5d3315;
+    border-color: rgba(152, 92, 46, 0.48);
 }
 
 @keyframes floatingTooltipFadeIn {

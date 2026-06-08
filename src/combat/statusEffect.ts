@@ -1,4 +1,4 @@
-export type StatusEffectType = "active" | "passive" | "stack" | "creation";
+export type StatusEffectType = "active" | "passive" | "stack" | "creation" | "element";
 
 export type StatusEffectAmountType = "number" | "percent";
 
@@ -63,5 +63,9 @@ export class StatusEffect {
 
 	isCreation(): boolean {
 		return this.type === "creation";
+	}
+
+	isElement(): boolean {
+		return this.type === "element";
 	}
 }

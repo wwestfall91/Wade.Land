@@ -243,6 +243,19 @@ const STATUS_EFFECT_DESCRIPTORS: StatusEffectDescriptor[] = [
         formatLine: (effect) => formatAmountLine("Rage", effect),
         formatDetail: () => "Increases damage while it is active.",
     },
+    {
+        kind: "brittle",
+        label: "Brittle",
+        chipClass: "effect-brittle",
+        formatLine: (effect) => {
+            const uses = Math.max(1, Math.floor(effect.amount ?? 1));
+            return `Brittle: consumed after ${uses} uses in a FORMULA`;
+        },
+        formatDetail: (effect) => {
+            const uses = Math.max(1, Math.floor(effect.amount ?? 1));
+            return `Consumed after ${uses} uses in a FORMULA.`;
+        },
+    },
 ];
 
 export class StatusEffectsRegistry {

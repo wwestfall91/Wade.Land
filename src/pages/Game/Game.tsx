@@ -271,6 +271,7 @@ function Game() {
         burnMultiplier,
         discoveredCraftedLetters,
         addDiscoveredCraftedLetter,
+        updateElementEffects,
     } = usePlayer();
     const gameRef = useRef<HTMLDivElement | null>(null);
     const elementStartRef = useRef<HTMLDivElement | null>(null);
@@ -1226,6 +1227,23 @@ function Game() {
             };
         };
 
+        const getBrittleUses = (effect: SpellEffectConfig): number =>
+            Math.max(1, Math.floor(effect.amount ?? 1));
+
+        const isBrittleConsumedOnFormulaUse = (item?: DraggableItem): boolean =>
+            Boolean(item?.effects?.some((effect) => effect.kind === "brittle" && getBrittleUses(effect) <= 1));
+
+        const withBrittleFormulaConsumedIds = (
+            baseConsumedIds: number[],
+            items: Array<DraggableItem | undefined>,
+        ): number[] => {
+            const brittleConsumedIds = items
+                .filter((item): item is DraggableItem => Boolean(item) && isBrittleConsumedOnFormulaUse(item))
+                .map((item) => item.id);
+
+            return Array.from(new Set([...baseConsumedIds, ...brittleConsumedIds]));
+        };
+
         const consumedIds = zoneOccupants.filter(
             (occupantId): occupantId is number => occupantId !== null,
         );
@@ -1278,7 +1296,7 @@ function Game() {
             );
 
             return applyCombustPreview({
-                consumedIds,
+                consumedIds: withBrittleFormulaConsumedIds(consumedIds, [unstableItem, otherItem]),
                 letter: `${otherItem.letter}+`,
                 damage: unstableResolved.damage,
                 energy: unstableResolved.energy,
@@ -1327,7 +1345,7 @@ function Game() {
             );
 
             return applyCombustPreview({
-                consumedIds,
+                consumedIds: withBrittleFormulaConsumedIds(consumedIds, [leftItem, middleItem, rightItem]),
                 letter: "Unstable Element",
                 damage: plasmaResolved.damage,
                 energy: plasmaResolved.energy,
@@ -1386,7 +1404,7 @@ function Game() {
             );
 
             return applyCombustPreview({
-                consumedIds: [leftItem.id],
+                consumedIds: withBrittleFormulaConsumedIds([leftItem.id], [leftItem, rightItem]),
                 letter: rightItem.letter,
                 damage: enhanceResolved.damage,
                 isDamageEnhanced: true,
@@ -1423,7 +1441,7 @@ function Game() {
         );
 
         return applyCombustPreview({
-            consumedIds: [rightItem.id],
+            consumedIds: withBrittleFormulaConsumedIds([rightItem.id], [leftItem, rightItem]),
             letter: rightItem.letter,
             damage: resolvedPreview.damage,
             isDamageEnhanced: resolvedPreview.isDamageEnhanced,
@@ -1475,6 +1493,61 @@ function Game() {
             return;
         }
 
+        const getBrittleUses = (effect: SpellEffectConfig): number =>
+            Math.max(1, Math.floor(effect.amount ?? 1));
+
+        const formulaParticipantIds = new Set(
+            zoneOccupants.filter((occupantId): occupantId is number => occupantId !== null),
+        );
+        const previewConsumedIdSet = new Set(previewCombination.consumedIds);
+        const brittleUpdatesById = new Map<number, SpellEffectConfig[]>();
+        const extraConsumedIds: number[] = [];
+
+        draggables.forEach((draggable) => {
+            if (!formulaParticipantIds.has(draggable.id) || previewConsumedIdSet.has(draggable.id)) {
+                return;
+            }
+
+            const effects = draggable.effects ?? [];
+            if (!effects.some((effect) => effect.kind === "brittle")) {
+                return;
+            }
+
+            let shouldConsume = false;
+            let updated = false;
+
+            const nextEffects = effects.map((effect) => {
+                if (effect.kind !== "brittle") {
+                    return effect;
+                }
+
+                const usesAfterFormula = getBrittleUses(effect) - 1;
+                if (usesAfterFormula <= 0) {
+                    shouldConsume = true;
+                    return effect;
+                }
+
+                updated = true;
+                return {
+                    ...effect,
+                    amount: usesAfterFormula,
+                };
+            });
+
+            if (shouldConsume) {
+                extraConsumedIds.push(draggable.id);
+                return;
+            }
+
+            if (updated) {
+                brittleUpdatesById.set(draggable.id, nextEffects);
+            }
+        });
+
+        const effectiveConsumedIds = Array.from(
+            new Set([...previewCombination.consumedIds, ...extraConsumedIds]),
+        );
+
         const outputPosition = getOutputCenterPosition();
         const targetPosition = spawnPosition ?? outputPosition;
         if (!targetPosition) {
@@ -1498,9 +1571,13 @@ function Game() {
 
         nextId.current += 1;
 
-    pendingDropSpawnByIdRef.current.set(newDraggable.id, targetPosition);
+        pendingDropSpawnByIdRef.current.set(newDraggable.id, targetPosition);
 
-        combineElements(previewCombination.consumedIds, newDraggable);
+        combineElements(effectiveConsumedIds, newDraggable);
+
+        brittleUpdatesById.forEach((nextEffects, elementId) => {
+            updateElementEffects(elementId, nextEffects);
+        });
 
         if (previewCombination.isSoulChoiceOutput) {
             const starterElements = allElementOptionsRef.current
@@ -1519,9 +1596,19 @@ function Game() {
         }
 
         setDraggables((previous) => {
-            const preserved = previous.filter(
-                (draggable) => !previewCombination.consumedIds.includes(draggable.id),
-            );
+            const preserved = previous
+                .filter((draggable) => !effectiveConsumedIds.includes(draggable.id))
+                .map((draggable) => {
+                    const nextEffects = brittleUpdatesById.get(draggable.id);
+                    if (!nextEffects) {
+                        return draggable;
+                    }
+
+                    return {
+                        ...draggable,
+                        effects: nextEffects,
+                    };
+                });
 
             return [
                 ...preserved,
@@ -1534,7 +1621,7 @@ function Game() {
 
         setZoneOccupants((previous) =>
             previous.map((occupantId) =>
-                occupantId !== null && previewCombination.consumedIds.includes(occupantId)
+                occupantId !== null && effectiveConsumedIds.includes(occupantId)
                     ? null
                     : occupantId,
             ),
@@ -1551,7 +1638,15 @@ function Game() {
                 setNewElementToasts((previous) => previous.filter((t) => t.id !== toastId));
             }, 2600);
         }
-    }, [addDiscoveredCraftedLetter, combineElements, getOutputCenterPosition, previewCombination]);
+    }, [
+        addDiscoveredCraftedLetter,
+        combineElements,
+        draggables,
+        getOutputCenterPosition,
+        previewCombination,
+        updateElementEffects,
+        zoneOccupants,
+    ]);
 
     useEffect(() => {
         if (previewCombination) {
@@ -2137,6 +2232,7 @@ function Game() {
                         energy: 0,
                         level: 1,
                         description: "Could be useful as a base...",
+                        effects: [{ kind: "brittle", target: "self" }],
                         category: "soul",
                     };
 

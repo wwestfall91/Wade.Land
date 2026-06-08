@@ -24,7 +24,8 @@ export type SpellEffectKind =
     | "exponential"
     | "powerful"
     | "energetic"
-    | "efficient";
+    | "efficient"
+    | "brittle";
 
 export type SpellEffectTarget = "self" | "enemy";
 
@@ -118,6 +119,7 @@ const SELF_TARGET_EFFECT_KINDS: SpellEffectKind[] = [
     "powerful",
     "energetic",
     "efficient",
+    "brittle",
 ];
 
 const normalizeEffectKind = (value: string): SpellEffectKind | null => {
@@ -181,6 +183,8 @@ const normalizeEffectKind = (value: string): SpellEffectKind | null => {
             return "energetic";
         case "efficient":
             return "efficient";
+        case "brittle":
+            return "brittle";
         default:
             return null;
     }

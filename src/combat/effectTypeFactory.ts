@@ -1,6 +1,6 @@
 import type { SpellEffectConfig, SpellEffectKind } from "./spellEffects";
 
-export type RuntimeEffectType = "active" | "passive" | "stack" | "create";
+export type RuntimeEffectType = "active" | "passive" | "stack" | "create" | "element";
 
 export type EffectTriggerLifecycle = "creation" | "battle" | "persistent";
 
@@ -37,6 +37,7 @@ const EFFECT_TYPE_BY_KIND: Record<SpellEffectKind, RuntimeEffectType> = {
     powerful: "create",
     energetic: "create",
     efficient: "create",
+    brittle: "element",
 };
 
 export class EffectTypeFactory {
@@ -58,7 +59,7 @@ export class EffectTypeFactory {
         }
 
         if (lifecycle === "creation") {
-            return effectType === "passive" || effectType === "create";
+            return effectType === "passive" || effectType === "create" || effectType === "element";
         }
 
         return effectType === "passive";
