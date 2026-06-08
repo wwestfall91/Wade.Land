@@ -6,7 +6,7 @@ import PlayerStats from "../../components/PlayerStats";
 import EnemyStage from "../../components/EnemyStage";
 import ElementIcon from "../../components/ElementIcon";
 import { parseSpellEffectsFromRow, type SpellEffectConfig } from "../../combat/spellEffects";
-import { type RewardElement, usePlayer } from "../../context/PlayerContext";
+import { type ElementEnhancements, type RewardElement, usePlayer } from "../../context/PlayerContext";
 import { type MonsterReward } from "../../combat/rewardFactory";
 import FloatingTooltip from "./FloatingTooltip";
 import CombinationStation, {
@@ -46,6 +46,7 @@ type DraggableItem = {
     letter: string;
     damage: number;
     energy?: number;
+    enhancements?: ElementEnhancements;
     level: number;
     description: string;
     type1?: string;
@@ -137,6 +138,8 @@ type PreviewCombination = {
     baseDamageBeforeCombust?: number;
     isSoulChoiceOutput?: boolean;
     energy?: number;
+    baseEnergyBeforeCreation?: number;
+    enhancements?: ElementEnhancements;
     level: number;
     description: string;
     type1?: string;
@@ -218,6 +221,29 @@ const isUnstableName = (value?: string): boolean => {
 const wait = (ms: number) => new Promise<void>((resolve) => {
     window.setTimeout(resolve, ms);
 });
+
+const mergeEnhancements = (
+    inherited?: ElementEnhancements,
+    stateKey?: CombinationStationActionStateKey,
+): ElementEnhancements | undefined => {
+    const merged: ElementEnhancements = {
+        purified: inherited?.purified ?? false,
+        polished: inherited?.polished ?? false,
+        cleansed: inherited?.cleansed ?? false,
+        refined: inherited?.refined ?? false,
+    };
+
+    if (stateKey === "purify") merged.purified = true;
+    if (stateKey === "polish") merged.polished = true;
+    if (stateKey === "cleanse") merged.cleansed = true;
+    if (stateKey === "refine") merged.refined = true;
+
+    if (!merged.purified && !merged.polished && !merged.cleansed && !merged.refined) {
+        return undefined;
+    }
+
+    return merged;
+};
 
 type IntroPhase = "hidden" | "line1" | "line2" | "input" | "line3" | "line4" | "fadeout";
 
@@ -1057,6 +1083,7 @@ function Game() {
                         letter: element.letter,
                         damage: element.damage,
                         energy: element.energy,
+                        enhancements: element.enhancements,
                         level: element.level,
                         description: element.description,
                         type1: element.type1,
@@ -1214,6 +1241,19 @@ function Game() {
             return null;
         }
 
+        const firstItem = occupantItems[0];
+        const currentStationStateKey = firstItem
+            ? getCombinationStationState(normalizeElementName(firstItem.letter)).key
+            : "idle";
+        const currentEnhancementStateKey: CombinationStationActionStateKey | undefined =
+            currentStationStateKey === "cleanse" ||
+            currentStationStateKey === "polish" ||
+            currentStationStateKey === "purify" ||
+            currentStationStateKey === "refine"
+                ? currentStationStateKey
+                : undefined;
+        const secondInputItem = occupantItems[1] ?? undefined;
+
         const buildUnstableCloneResult = (
             unstableItem: DraggableItem,
             otherItem: DraggableItem,
@@ -1228,16 +1268,26 @@ function Game() {
                 return null;
             }
 
+            const allUnstableInputEffects = [
+                ...(unstableItem.effects ?? []),
+                ...(otherItem.effects ?? []),
+            ];
+            const unstableResolved = resolveCombinationPreviewFromEffects(
+                { damage: otherItem.damage, energy: otherItem.energy, effects: unstableItem.effects },
+                allUnstableInputEffects,
+            );
+
             return applyCombustPreview({
                 consumedIds,
                 letter: `${otherItem.letter}+`,
-                damage: otherItem.damage,
-                energy: otherItem.energy,
+                damage: unstableResolved.damage,
+                energy: unstableResolved.energy,
+                enhancements: mergeEnhancements(secondInputItem?.enhancements, currentEnhancementStateKey),
                 level: otherItem.level,
                 description: otherItem.description,
                 type1: unstableItem.type1,
                 type2: unstableItem.type2,
-                effects: unstableItem.effects,
+                effects: unstableResolved.effects,
             });
         };
 
@@ -1266,16 +1316,27 @@ function Game() {
                 return buildUnstableCloneResult(unstableItem, otherItem);
             }
 
+            const allPlasmaInputEffects = [
+                ...(leftItem.effects ?? []),
+                ...(middleItem.effects ?? []),
+                ...(rightItem.effects ?? []),
+            ];
+            const plasmaResolved = resolveCombinationPreviewFromEffects(
+                { damage: 0, energy: combinedEnergy, effects: sideEffects },
+                allPlasmaInputEffects,
+            );
+
             return applyCombustPreview({
                 consumedIds,
                 letter: "Unstable Element",
-                damage: 0,
-                energy: combinedEnergy,
+                damage: plasmaResolved.damage,
+                energy: plasmaResolved.energy,
+                enhancements: mergeEnhancements(middleItem.enhancements, currentEnhancementStateKey),
                 level: 2,
                 description: "Unstable fusion carrying the effects of both connected elements.",
                 type1: mergedTypes[0],
                 type2: mergedTypes[1],
-                effects: sideEffects,
+                effects: plasmaResolved.effects,
             });
         }
 
@@ -1314,18 +1375,30 @@ function Game() {
         }
 
         if (state.key === "enhance") {
+            const enhancedDamage = Math.round(rightItem.damage * 1.5);
+            const allEnhanceInputEffects = [
+                ...(leftItem.effects ?? []),
+                ...(rightItem.effects ?? []),
+            ];
+            const enhanceResolved = resolveCombinationPreviewFromEffects(
+                { damage: enhancedDamage, energy: rightItem.energy, effects: rightItem.effects },
+                allEnhanceInputEffects,
+            );
+
             return applyCombustPreview({
                 consumedIds: [leftItem.id],
                 letter: rightItem.letter,
-                damage: Math.round(rightItem.damage * 1.5),
+                damage: enhanceResolved.damage,
                 isDamageEnhanced: true,
                 baseDamageBeforeEnhance: rightItem.damage,
-                energy: rightItem.energy,
+                energy: enhanceResolved.energy,
+                baseEnergyBeforeCreation: enhanceResolved.baseEnergyBeforeCreation,
+                enhancements: mergeEnhancements(rightItem.enhancements),
                 level: rightItem.level,
                 description: rightItem.description,
                 type1: rightItem.type1,
                 type2: rightItem.type2,
-                effects: rightItem.effects,
+                effects: enhanceResolved.effects,
                 category: rightItem.category,
             });
         }
@@ -1356,6 +1429,8 @@ function Game() {
             isDamageEnhanced: resolvedPreview.isDamageEnhanced,
             baseDamageBeforeEnhance: resolvedPreview.baseDamageBeforeEnhance,
             energy: resolvedPreview.energy,
+            baseEnergyBeforeCreation: resolvedPreview.baseEnergyBeforeCreation,
+            enhancements: mergeEnhancements(rightItem.enhancements, currentEnhancementStateKey),
             level: rightItem.level,
             description: rightItem.description,
             type1: rightItem.type1,
@@ -1411,6 +1486,7 @@ function Game() {
             letter: previewCombination.letter,
             damage: previewCombination.damage,
             energy: previewCombination.energy,
+            enhancements: previewCombination.enhancements,
             level: previewCombination.level,
             description: previewCombination.description,
             type1: previewCombination.type1,
@@ -1483,6 +1559,7 @@ function Game() {
         }
 
         setIsPreviewDragging(false);
+        setIsPreviewPointerDown(false);
         setIsPreviewHovered(false);
         setIsPreviewTooltipHovered(false);
         setIsPreviewTooltipGraceOpen(false);
@@ -1492,6 +1569,9 @@ function Game() {
         setPreviewHomePosition(null);
         setPreviewPosition(null);
         previewPositionRef.current = null;
+        previewPointerDownStartRef.current = null;
+        previewDragStartedRef.current = false;
+        suppressPreviewPinOnPointerUpRef.current = false;
     }, [clearPreviewTooltipGraceTimeout, previewCombination]);
 
     useLayoutEffect(() => {
@@ -1525,8 +1605,8 @@ function Game() {
                     return;
                 }
 
-                previewDragStartedRef.current = true;
                 setIsPreviewDragging(true);
+                previewDragStartedRef.current = true;
                 setIsPreviewTooltipPinned(false);
                 setIsPreviewHovered(false);
                 setIsPreviewTooltipHovered(false);
@@ -1534,7 +1614,7 @@ function Game() {
                 clearPreviewTooltipGraceTimeout();
             }
 
-            if (!previewDragStartedRef.current) {
+            if (!isPreviewDragging) {
                 return;
             }
 
@@ -1564,6 +1644,7 @@ function Game() {
                     suppressPreviewPinOnPointerUpRef.current = false;
                     return;
                 }
+
                 setIsPreviewTooltipPinned(true);
                 setIsPreviewHovered(false);
                 setIsPreviewTooltipHovered(false);
@@ -1603,8 +1684,46 @@ function Game() {
         };
     }, [clearPreviewTooltipGraceTimeout, finalizeCombination, getOutputCenterPosition, isPreviewDragging, isPreviewPointerDown, previewPointerOffset.x, previewPointerOffset.y]);
 
+    useEffect(() => {
+        if (!isPreviewTooltipPinned) {
+            return;
+        }
+
+        const handleWindowPointerDown = (event: PointerEvent) => {
+            const target = event.target as Element | null;
+            if (!target) {
+                setIsPreviewTooltipPinned(false);
+                setIsPreviewHovered(false);
+                setIsPreviewTooltipHovered(false);
+                setIsPreviewTooltipGraceOpen(false);
+                clearPreviewTooltipGraceTimeout();
+                return;
+            }
+
+            if ((event.ctrlKey || event.metaKey) && target.closest("#Draggable")) {
+                return;
+            }
+
+            if (target.closest(".floating-tooltip")) {
+                return;
+            }
+
+            setIsPreviewTooltipPinned(false);
+            setIsPreviewHovered(false);
+            setIsPreviewTooltipHovered(false);
+            setIsPreviewTooltipGraceOpen(false);
+            clearPreviewTooltipGraceTimeout();
+        };
+
+        window.addEventListener("pointerdown", handleWindowPointerDown, true);
+        return () => {
+            window.removeEventListener("pointerdown", handleWindowPointerDown, true);
+        };
+    }, [clearPreviewTooltipGraceTimeout, isPreviewTooltipPinned]);
+
     const handlePreviewPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
         event.stopPropagation();
+
         previewDragStartedRef.current = false;
 
         if (isPreviewTooltipPinned) {
@@ -1614,6 +1733,9 @@ function Game() {
             setIsPreviewTooltipHovered(false);
             setIsPreviewTooltipGraceOpen(false);
             clearPreviewTooltipGraceTimeout();
+            setIsPreviewPointerDown(true);
+            previewPointerDownStartRef.current = { x: event.clientX, y: event.clientY };
+            return;
         }
 
         const previewRect = previewRef.current?.getBoundingClientRect();
@@ -1633,11 +1755,16 @@ function Game() {
         };
 
         previewPointerClientRef.current = { x: event.clientX, y: event.clientY };
-        previewPointerDownStartRef.current = { x: event.clientX, y: event.clientY };
         setPreviewPointerOffset(offset);
         setPreviewPosition(initial);
-        previewPositionRef.current = initial;
         setIsPreviewPointerDown(true);
+        previewPointerDownStartRef.current = { x: event.clientX, y: event.clientY };
+        setIsPreviewTooltipGraceOpen(false);
+        clearPreviewTooltipGraceTimeout();
+        setIsPreviewHovered(false);
+        setIsPreviewTooltipHovered(false);
+        setIsPreviewAltLockActive(false);
+        previewPositionRef.current = initial;
     };
 
     const handlePreviewMouseEnter = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -1674,6 +1801,13 @@ function Game() {
     };
 
     const handlePreviewTooltipMouseEnter = (event: React.MouseEvent<HTMLDivElement>) => {
+        if (isPreviewTooltipPinned) {
+            clearPreviewTooltipGraceTimeout();
+            setIsPreviewTooltipGraceOpen(false);
+            setIsPreviewTooltipHovered(true);
+            return;
+        }
+
         if (event.altKey || isPreviewAltHeld || previewAltHeldRef.current) {
             previewAltHeldRef.current = true;
             setIsPreviewAltHeld(true);
@@ -1691,6 +1825,7 @@ function Game() {
 
     const handlePreviewTooltipMouseLeave = () => {
         if (isPreviewTooltipPinned) {
+            setIsPreviewTooltipHovered(false);
             return;
         }
 
@@ -1704,45 +1839,13 @@ function Game() {
     };
 
     const isPreviewAltStickyOpen = isPreviewAltLockActive && isPreviewAltHeld;
-    const isPreviewTooltipOpen = !isPreviewDragging && (isPreviewHovered || isPreviewTooltipHovered || isPreviewTooltipGraceOpen || isPreviewAltStickyOpen || isPreviewTooltipPinned);
-
-    useEffect(() => {
-        if (!isPreviewTooltipPinned) {
-            return;
-        }
-
-        const handleWindowPointerDown = (event: PointerEvent) => {
-            const target = event.target as Element | null;
-            if (!target) {
-                setIsPreviewTooltipPinned(false);
-                setIsPreviewHovered(false);
-                setIsPreviewTooltipHovered(false);
-                setIsPreviewTooltipGraceOpen(false);
-                clearPreviewTooltipGraceTimeout();
-                return;
-            }
-
-            // Multi-select: keep preview selected when modifier-clicking a draggable element.
-            if ((event.ctrlKey || event.metaKey) && target.closest("#Draggable")) {
-                return;
-            }
-
-            if (target.closest(".floating-tooltip")) {
-                return;
-            }
-
-            setIsPreviewTooltipPinned(false);
-            setIsPreviewHovered(false);
-            setIsPreviewTooltipHovered(false);
-            setIsPreviewTooltipGraceOpen(false);
-            clearPreviewTooltipGraceTimeout();
-        };
-
-        window.addEventListener("pointerdown", handleWindowPointerDown, true);
-        return () => {
-            window.removeEventListener("pointerdown", handleWindowPointerDown, true);
-        };
-    }, [clearPreviewTooltipGraceTimeout, isPreviewTooltipPinned]);
+    const isPreviewTooltipOpen = !isPreviewDragging && (
+        isPreviewTooltipPinned ||
+        isPreviewHovered ||
+        isPreviewTooltipHovered ||
+        isPreviewTooltipGraceOpen ||
+        isPreviewAltStickyOpen
+    );
 
     const handleSnapChange = (draggableId: number, zoneIndex: number | null) => {
         const enhanceZoneIndex = zoneOccupants.length;
@@ -2401,6 +2504,7 @@ function Game() {
                     letter={draggable.letter}
                     damage={draggable.damage}
                     energy={draggable.energy}
+                    enhancements={draggable.enhancements}
                     description={draggable.description}
                     showTutorialCue={draggable.id === 1 && !hasSeenDragTutorial}
                     onDismissTutorialCue={handleDismissDragTutorial}
@@ -2451,6 +2555,7 @@ function Game() {
                     <FloatingTooltip
                         anchorElement={previewRef.current}
                         open={isPreviewTooltipOpen}
+                        selected={isPreviewTooltipPinned}
                         className={`drag-description-popup${isPreviewTooltipPinned ? " is-pinned" : ""}`}
                         interactive={isPreviewAltHeld || isPreviewTooltipPinned}
                         onTooltipMouseEnter={handlePreviewTooltipMouseEnter}
@@ -2461,6 +2566,9 @@ function Game() {
                             return {
                                 letter: previewCombination.letter,
                                 damage: previewCombination.damage,
+                                energy: previewCombination.energy,
+                                baseEnergyBeforeCreation: previewCombination.baseEnergyBeforeCreation,
+                                enhancements: previewCombination.enhancements,
                                 isDamageEnhanced: previewCombination.isDamageEnhanced,
                                 baseDamageBeforeEnhance: previewCombination.baseDamageBeforeEnhance,
                                 isCombusted: previewCombination.isCombusted,

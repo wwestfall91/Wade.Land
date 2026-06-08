@@ -32,6 +32,7 @@ export type CombinationPreviewResolution = {
     effects?: SpellEffectConfig[];
     isDamageEnhanced?: boolean;
     baseDamageBeforeEnhance?: number;
+    baseEnergyBeforeCreation?: number;
 };
 
 const asPercentMultiplier = (amount?: number): number => {
@@ -56,8 +57,6 @@ const applyEfficientToEffects = (effects: SpellEffectConfig[], multiplier: numbe
     effects.map((effect) => ({
         ...effect,
         amount: effect.amount === undefined ? undefined : Math.round(effect.amount * multiplier),
-        hits: scaleEffectValue(effect.hits, multiplier),
-        duration: scaleEffectValue(effect.duration, multiplier),
     }));
 
 export const normalizeEffectLookupKey = (value?: string): string =>
@@ -135,6 +134,8 @@ export const resolveCombinationPreviewFromEffects = (
     let resolvedEffects = [...(base.effects ?? [])];
     let isDamageEnhanced = false;
     const baseDamageBeforeEnhance = base.damage;
+    const baseEnergyBeforeCreation = base.energy;
+    let isEnergyChanged = false;
 
     creationEffects.forEach((effect) => {
         const amount = Math.max(0, effect.amount ?? 0);
@@ -151,7 +152,11 @@ export const resolveCombinationPreviewFromEffects = (
 
         if (effect.kind === "energetic") {
             const reduction = Math.floor(amount);
-            resolvedEnergy = Math.max(0, (resolvedEnergy ?? 0) - reduction);
+            const prevEnergy = resolvedEnergy ?? 0;
+            resolvedEnergy = Math.max(0, prevEnergy - reduction);
+            if (resolvedEnergy !== prevEnergy) {
+                isEnergyChanged = true;
+            }
             return;
         }
 
@@ -167,6 +172,7 @@ export const resolveCombinationPreviewFromEffects = (
         effects: resolvedEffects,
         isDamageEnhanced: isDamageEnhanced || undefined,
         baseDamageBeforeEnhance: isDamageEnhanced ? baseDamageBeforeEnhance : undefined,
+        baseEnergyBeforeCreation: isEnergyChanged && typeof baseEnergyBeforeCreation === "number" ? baseEnergyBeforeCreation : undefined,
     };
 };
 

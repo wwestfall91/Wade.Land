@@ -1,9 +1,8 @@
 #Game {
     .drag {
         position: fixed;
-        min-width: fit-content;
-        width: 2rem;
-        height: 2rem;
+        width: 2.4rem;
+        height: 2.4rem;
 
             .element-icon {
                 width: 1.5rem;
@@ -44,7 +43,7 @@
             }
         }
 
-        border-radius: 16px;
+        border-radius: 22px;
         border: 2px solid #dce3ff;
         background: linear-gradient(180deg, #5f76ee 0%, #354ebf 100%);
         color: #fff7ab;
@@ -112,12 +111,11 @@
         }
 
         &.is-tooltip-pinned {
-            border-color: #ffd34d;
+            border-color: #ffd95b;
             box-shadow:
-                inset 0 0 0 1px #ffe899,
-                inset 0 0 0 2px #8a6500,
-                0 0 0 1px rgba(255, 210, 77, 0.45),
-                0 8px 16px rgba(84, 58, 0, 0.35);
+                inset 0 0 0 1px #ffe89d,
+                inset 0 0 0 2px #6f5619,
+                0 0 14px rgba(255, 217, 91, 0.45);
         }
 
         &.drag-preview {
@@ -166,11 +164,10 @@
         }
 
         &.is-tooltip-pinned {
-            border-color: #ffd34d;
+            border-color: #ffe37e;
             box-shadow:
-                inset 0 0 0 1px rgba(255, 238, 160, 0.7),
-                0 0 0 1px rgba(255, 210, 77, 0.45),
-                0 8px 16px rgba(84, 58, 0, 0.35);
+                inset 0 0 0 1px rgba(255, 236, 150, 0.65),
+                0 0 12px rgba(255, 217, 91, 0.38);
         }
 
         // Override the general is-invalid-drop rule — keep type bg, flash red border
@@ -263,15 +260,6 @@
             box-shadow: none !important;
 
             &::before { opacity: 0; }
-        }
-
-        &.is-tooltip-pinned {
-            background: #ffd34d;
-            filter: drop-shadow(0 0 6px rgba(255, 220, 120, 0.65));
-
-            &::before {
-                background: linear-gradient(160deg, #7a5a0f 0%, #a78022 100%);
-            }
         }
 
         // Discoverable pulse ring looks wrong on a triangle – suppress it

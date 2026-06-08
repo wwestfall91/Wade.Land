@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { SpellEffectConfig } from "../../combat/spellEffects";
 import FloatingTooltip from "./FloatingTooltip";
 import ElementIcon from "../../components/ElementIcon";
-import { usePlayer } from "../../context/PlayerContext";
+import { type ElementEnhancements, usePlayer } from "../../context/PlayerContext";
 import "./Draggable.scss";
 
 const DRAG_START_THRESHOLD_PX = 6;
@@ -17,6 +17,7 @@ type Props = {
 	letter: string;
 	damage: number;
 	energy?: number;
+	enhancements?: ElementEnhancements;
 	description: string;
 	showTutorialCue?: boolean;
 	onDismissTutorialCue?: () => void;
@@ -39,6 +40,7 @@ function Draggable({
 	letter,
 	damage,
 	energy,
+	enhancements,
 	description,
 	showTutorialCue = false,
 	onDismissTutorialCue,
@@ -74,6 +76,18 @@ function Draggable({
 	const pointerDownRef = useRef<Position | null>(null);
 	const dragStartedRef = useRef(false);
 	const suppressPinOnPointerUpRef = useRef(false);
+
+	const centerInDropZone = (dropZoneRect: DOMRect) => {
+		// Use offsetWidth/offsetHeight — these are NOT affected by CSS transforms
+		// (e.g. scale(1.05) during dragging), so the snap is always the natural size.
+		const dragWidth = draggableRef.current?.offsetWidth ?? 32;
+		const dragHeight = draggableRef.current?.offsetHeight ?? 32;
+
+		setPosition({
+			x: Math.round(dropZoneRect.left + (dropZoneRect.width - dragWidth) / 2),
+			y: Math.round(dropZoneRect.top + (dropZoneRect.height - dragHeight) / 2),
+		});
+	};
 
 	const clearTooltipGraceTimeout = () => {
 		if (tooltipGraceTimeoutRef.current !== null) {
@@ -258,16 +272,7 @@ function Draggable({
 					const dropZoneRect = dropZoneRefs[snapZoneIndex].current?.getBoundingClientRect();
 					if (dropZoneRect) {
 						setIsInvalidDrop(false);
-						setPosition({
-							x: Math.round(
-								dropZoneRect.left +
-								(dropZoneRect.width - dragWidth) / 2,
-							),
-							y: Math.round(
-								dropZoneRect.top +
-								(dropZoneRect.height - dragHeight) / 2,
-							),
-						});
+						centerInDropZone(dropZoneRect);
 						onSnapChange(id, snapZoneIndex);
 					}
 				} else {
@@ -290,7 +295,6 @@ function Draggable({
 		};
 	}, [
 		canSnapToZone,
-		containerRef,
 		dropZoneRefs,
 		hasBeenDragged,
 		id,
@@ -319,7 +323,6 @@ function Draggable({
 				return;
 			}
 
-			// Multi-select: keep existing selections when modifier-clicking another draggable.
 			if ((event.ctrlKey || event.metaKey) && target.closest("#Draggable")) {
 				return;
 			}
@@ -347,12 +350,13 @@ function Draggable({
 	useLayoutEffect(() => {
 		if (forcedSnapZone == null) return;
 		const dropZoneRect = dropZoneRefs[forcedSnapZone.zone]?.current?.getBoundingClientRect();
-		const dragWidth = draggableRef.current?.offsetWidth ?? 32;
-		const dragHeight = draggableRef.current?.offsetHeight ?? 32;
 		if (dropZoneRect) {
-			setPosition({
-				x: Math.round(dropZoneRect.left + (dropZoneRect.width - dragWidth) / 2),
-				y: Math.round(dropZoneRect.top + (dropZoneRect.height - dragHeight) / 2),
+			centerInDropZone(dropZoneRect);
+			window.requestAnimationFrame(() => {
+				const stableDropZoneRect = dropZoneRefs[forcedSnapZone.zone]?.current?.getBoundingClientRect();
+				if (stableDropZoneRect) {
+					centerInDropZone(stableDropZoneRect);
+				}
 			});
 		}
 	// eslint-disable-next-line react-hooks/exhaustive-deps
@@ -386,14 +390,21 @@ function Draggable({
 			setIsTooltipHovered(false);
 			setIsTooltipGraceOpen(false);
 			clearTooltipGraceTimeout();
+			setIsPointerDown(true);
+			pointerDownRef.current = { x: e.clientX, y: e.clientY };
+			return;
 		}
 
 		setMouseOffset({
 			x: e.clientX - position.x,
 			y: e.clientY - position.y,
 		});
-		pointerDownRef.current = { x: e.clientX, y: e.clientY };
 		setIsPointerDown(true);
+		pointerDownRef.current = { x: e.clientX, y: e.clientY };
+		setIsHovered(false);
+		setIsTooltipHovered(false);
+		setIsTooltipGraceOpen(false);
+		clearTooltipGraceTimeout();
 	};
 
 	const handleDraggableMouseEnter = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -430,6 +441,13 @@ function Draggable({
 	};
 
 	const handleTooltipMouseEnter = (event: React.MouseEvent<HTMLDivElement>) => {
+		if (isTooltipPinned) {
+			clearTooltipGraceTimeout();
+			setIsTooltipGraceOpen(false);
+			setIsTooltipHovered(true);
+			return;
+		}
+
 		if (event.altKey || isAltHeld || altHeldRef.current) {
 			altHeldRef.current = true;
 			setIsAltHeld(true);
@@ -447,6 +465,7 @@ function Draggable({
 
 	const handleTooltipMouseLeave = () => {
 		if (isTooltipPinned) {
+			setIsTooltipHovered(false);
 			return;
 		}
 
@@ -460,7 +479,7 @@ function Draggable({
 	};
 
 	const isAltStickyOpen = isAltLockActive && isAltHeld;
-	const isTooltipOpen = !isDragging && (isHovered || isTooltipHovered || isTooltipGraceOpen || isAltStickyOpen || isTooltipPinned);
+	const isTooltipOpen = !isDragging && (isTooltipPinned || isHovered || isTooltipHovered || isTooltipGraceOpen || isAltStickyOpen);
 	const isTooltipClosing = isTooltipGraceOpen && !isHovered && !isTooltipHovered;
 
 	return (
@@ -494,6 +513,7 @@ function Draggable({
 			<FloatingTooltip
 				anchorElement={draggableRef.current}
 				open={isTooltipOpen}
+				selected={isTooltipPinned}
 				className={`drag-description-popup${isTooltipClosing ? " is-closing" : ""}${isTooltipPinned ? " is-pinned" : ""}`}
 				interactive={isAltHeld || isTooltipPinned}
 				onTooltipMouseEnter={handleTooltipMouseEnter}
@@ -504,6 +524,7 @@ function Draggable({
 					letter,
 					damage,
 					energy,
+					enhancements,
 					description,
 					type1,
 					type2,

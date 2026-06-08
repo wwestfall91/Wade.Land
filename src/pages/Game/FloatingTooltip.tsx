@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { SpellEffectConfig } from "../../combat/spellEffects";
-import { effectTypeFactory } from "../../combat/effectTypeFactory";
+import type { ElementEnhancements } from "../../context/PlayerContext";
 import { statusEffectsRegistry } from "../../combat/statusEffectsRegistry";
 import "./FloatingTooltip.scss";
 
@@ -9,6 +9,8 @@ type TooltipLayout = {
     left: number;
     top: number;
     offsetX: number;
+    sideBySideOffsetX: number;
+    sideBySideOffsetY: number;
     isBelow: boolean;
     width: number;
     height: number;
@@ -18,6 +20,7 @@ type FloatingTooltipProps = {
     anchorElement: HTMLElement | null;
     open: boolean;
     className: string;
+    selected?: boolean;
     interactive?: boolean;
     onTooltipMouseEnter?: (event: MouseEvent<HTMLDivElement>) => void;
     onTooltipMouseLeave?: (event: MouseEvent<HTMLDivElement>) => void;
@@ -30,6 +33,8 @@ type FloatingTooltipProps = {
         isCombusted?: boolean;
         baseDamageBeforeCombust?: number;
         energy?: number;
+        baseEnergyBeforeCreation?: number;
+        enhancements?: ElementEnhancements;
         description: string;
         type1?: string;
         type2?: string;
@@ -48,15 +53,35 @@ const DEFAULT_LAYOUT: TooltipLayout = {
     left: 0,
     top: 0,
     offsetX: 0,
+    sideBySideOffsetX: 0,
+    sideBySideOffsetY: 0,
     isBelow: false,
     width: 0,
     height: 0,
 };
 
+const OVERLAP_PADDING_PX = 8;
+
+type TooltipRect = {
+    left: number;
+    right: number;
+    top: number;
+    bottom: number;
+};
+
+const rectsOverlap = (a: TooltipRect, b: TooltipRect) =>
+    a.left < b.right - OVERLAP_PADDING_PX &&
+    a.right > b.left + OVERLAP_PADDING_PX &&
+    a.top < b.bottom - OVERLAP_PADDING_PX &&
+    a.bottom > b.top + OVERLAP_PADDING_PX;
+
+const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+
 function FloatingTooltip({
     anchorElement,
     open,
     className,
+    selected = false,
     interactive = false,
     onTooltipMouseEnter,
     onTooltipMouseLeave,
@@ -97,16 +122,75 @@ function FloatingTooltip({
 
         const topIfAbove = anchorRect.top - offset - tooltipRect.height;
         const isBelow = topIfAbove < viewportPadding;
+        const baseTop = isBelow ? anchorRect.bottom + offset : anchorRect.top - offset;
+
+        let sideBySideOffsetX = 0;
+        let sideBySideOffsetY = 0;
+
+        if (selected && typeof document !== "undefined") {
+            const selfElement = tooltipRef.current;
+            const baseAbsoluteLeft = anchorCenterX - tooltipRect.width / 2 + offsetX;
+            const baseAbsoluteTop = isBelow
+                ? anchorRect.bottom + offset
+                : anchorRect.top - offset - tooltipRect.height;
+            const baseRect: TooltipRect = {
+                left: baseAbsoluteLeft,
+                right: baseAbsoluteLeft + tooltipRect.width,
+                top: baseAbsoluteTop,
+                bottom: baseAbsoluteTop + tooltipRect.height,
+            };
+
+            const selectedRects = Array.from(document.querySelectorAll<HTMLElement>(".floating-tooltip.is-selected"))
+                .filter((element) => element !== selfElement)
+                .map((element) => element.getBoundingClientRect())
+                .filter((rect) => rect.width > 0 && rect.height > 0)
+                .map((rect) => ({
+                    left: rect.left,
+                    right: rect.right,
+                    top: rect.top,
+                    bottom: rect.bottom,
+                }));
+
+            const overlapTarget = selectedRects.find((rect) => rectsOverlap(baseRect, rect));
+            if (overlapTarget) {
+                const viewportRight = window.innerWidth - viewportPadding;
+                const viewportBottom = window.innerHeight - viewportPadding;
+
+                const rightCandidateLeft = overlapTarget.right + OVERLAP_PADDING_PX;
+                const leftCandidateLeft = overlapTarget.left - tooltipRect.width - OVERLAP_PADDING_PX;
+
+                const rightFits = rightCandidateLeft + tooltipRect.width <= viewportRight;
+                const leftFits = leftCandidateLeft >= viewportPadding;
+
+                let chosenLeft = rightCandidateLeft;
+                if (!rightFits && leftFits) {
+                    chosenLeft = leftCandidateLeft;
+                } else if (!rightFits && !leftFits) {
+                    chosenLeft = clamp(rightCandidateLeft, viewportPadding, Math.max(viewportPadding, viewportRight - tooltipRect.width));
+                }
+
+                const chosenTop = clamp(
+                    overlapTarget.top,
+                    viewportPadding,
+                    Math.max(viewportPadding, viewportBottom - tooltipRect.height),
+                );
+
+                sideBySideOffsetX = chosenLeft - baseAbsoluteLeft;
+                sideBySideOffsetY = chosenTop - baseAbsoluteTop;
+            }
+        }
 
         setLayout({
             left: anchorCenterX,
-            top: isBelow ? anchorRect.bottom + offset : anchorRect.top - offset,
+            top: baseTop,
             offsetX,
+            sideBySideOffsetX,
+            sideBySideOffsetY,
             isBelow,
             width: tooltipRect.width,
             height: tooltipRect.height,
         });
-    }, [anchorElement, clampHorizontal, offset, viewportPadding]);
+    }, [anchorElement, clampHorizontal, offset, selected, viewportPadding]);
 
     useLayoutEffect(() => {
         if (!open || typeof document === "undefined") {
@@ -146,21 +230,13 @@ function FloatingTooltip({
         )
         : [];
 
-    const isPassiveEffect = (effect: SpellEffectConfig) =>
-        effectTypeFactory.getEffectType(effect.kind) === "passive";
-
-    const regularEffects = (elementDetails?.effects ?? []).filter((effect) => !isPassiveEffect(effect));
-    const passiveEffects = (elementDetails?.effects ?? []).filter((effect) => isPassiveEffect(effect));
-    const sourceRegularEffects = (elementDetails?.sourceEffects ?? []).filter((effect) => !isPassiveEffect(effect));
-    const sourcePassiveEffects = (elementDetails?.sourceEffects ?? []).filter((effect) => isPassiveEffect(effect));
-
-    const buildEffectKinds = (effects: SpellEffectConfig[], keyPrefix = "") => effects.map((effect, index) => {
+    const effectKinds = (elementDetails?.effects ?? []).map((effect, index) => {
         const descriptor = effect.kind === "multi_hit" ? undefined : statusEffectsRegistry.get(effect.kind);
         const detail = statusEffectsRegistry.getEffectDetail(effect);
         const chipLabel = statusEffectsRegistry.getChipLabel(effect);
 
         return {
-            key: `${keyPrefix}${effect.kind}-${index}`,
+            key: `${effect.kind}-${index}`,
             label: chipLabel,
             detail,
             chipClass: effect.kind === "multi_hit"
@@ -169,10 +245,20 @@ function FloatingTooltip({
         };
     });
 
-    const regularEffectKinds = buildEffectKinds(regularEffects);
-    const passiveEffectKinds = buildEffectKinds(passiveEffects, "passive-");
-    const sourceRegularEffectKinds = buildEffectKinds(sourceRegularEffects, "source-");
-    const sourcePassiveEffectKinds = buildEffectKinds(sourcePassiveEffects, "source-passive-");
+    const sourceEffectKinds = (elementDetails?.sourceEffects ?? []).map((effect, index) => {
+        const descriptor = effect.kind === "multi_hit" ? undefined : statusEffectsRegistry.get(effect.kind);
+        const detail = statusEffectsRegistry.getEffectDetail(effect);
+        const chipLabel = statusEffectsRegistry.getChipLabel(effect);
+
+        return {
+            key: `source-${effect.kind}-${index}`,
+            label: chipLabel,
+            detail,
+            chipClass: effect.kind === "multi_hit"
+                ? "effect-multi-hit"
+                : (descriptor?.chipClass ?? "effect-default"),
+        };
+    });
 
     const effectSignature = (effects?: SpellEffectConfig[]) =>
         JSON.stringify((effects ?? []).map((effect) => ({
@@ -184,18 +270,12 @@ function FloatingTooltip({
             targetType: effect.targetType ?? null,
         })));
 
-    const hasRegularEffectDifference = Boolean(
+    const hasEffectDifference = Boolean(
         elementDetails?.sourceEffects &&
-        effectSignature(sourceRegularEffects) !== effectSignature(regularEffects),
+        effectSignature(elementDetails.sourceEffects) !== effectSignature(elementDetails.effects),
     );
-    const hasPassiveEffectDifference = Boolean(
-        elementDetails?.sourceEffects &&
-        effectSignature(sourcePassiveEffects) !== effectSignature(passiveEffects),
-    );
-    const shouldShowRegularEffectDelta = hasRegularEffectDifference;
-    const shouldShowPassiveEffectDelta = hasPassiveEffectDifference;
-    const showSourceRegularNoneChip = shouldShowRegularEffectDelta && sourceRegularEffectKinds.length === 0 && regularEffectKinds.length > 0;
-    const showSourcePassiveNoneChip = shouldShowPassiveEffectDelta && sourcePassiveEffectKinds.length === 0 && passiveEffectKinds.length > 0;
+    const shouldShowEffectDelta = hasEffectDifference;
+    const showSourceNoneChip = shouldShowEffectDelta && sourceEffectKinds.length === 0 && effectKinds.length > 0;
 
     const toTypeBadgeClass = (value?: string) => {
         if (!value || value.trim().length === 0) {
@@ -244,17 +324,24 @@ function FloatingTooltip({
         ? Math.round((elementDetails?.baseDamageBeforeCombust ?? 0) * masteryMultiplier)
         : 0;
 
+    const enhancementItems = [
+        { key: "purified", label: "Purified", active: Boolean(elementDetails?.enhancements?.purified) },
+        { key: "polished", label: "Polished", active: Boolean(elementDetails?.enhancements?.polished) },
+        { key: "cleansed", label: "Cleansed", active: Boolean(elementDetails?.enhancements?.cleansed) },
+        { key: "refined", label: "Refined", active: Boolean(elementDetails?.enhancements?.refined) },
+    ];
+
     return createPortal(
         <div
             ref={tooltipRef}
-            className={`floating-tooltip ${className} ${layout.isBelow ? "is-below" : ""}`}
+            className={`floating-tooltip ${className} ${layout.isBelow ? "is-below" : ""} ${selected ? "is-selected" : ""}`}
             onMouseEnter={onTooltipMouseEnter}
             onMouseLeave={onTooltipMouseLeave}
             style={{
                 position: "absolute",
                 left: layout.left,
-                top: layout.top,
-                marginLeft: `${-layout.width / 2 + layout.offsetX}px`,
+                top: layout.top + layout.sideBySideOffsetY,
+                marginLeft: `${-layout.width / 2 + layout.offsetX + layout.sideBySideOffsetX}px`,
                 marginTop: layout.isBelow ? "0px" : `${-layout.height}px`,
                 pointerEvents: interactive ? "auto" : "none",
                 zIndex: 2147483647,
@@ -264,8 +351,17 @@ function FloatingTooltip({
                 {elementDetails ? (
                     <div className="tooltip-container">
                         {typeof elementDetails.energy === "number" ? (
-                            <span className="element-energy-badge" aria-label={`Energy ${elementDetails.energy}`}>
-                                {elementDetails.energy}
+                            <span
+                                className={`element-energy-badge${typeof elementDetails.baseEnergyBeforeCreation === "number" ? " is-energy-delta" : ""}`}
+                                aria-label={`Energy ${elementDetails.energy}`}
+                            >
+                                {typeof elementDetails.baseEnergyBeforeCreation === "number" ? (
+                                    <>
+                                        <span className="energy-value-before">{elementDetails.baseEnergyBeforeCreation}</span>
+                                        <span className="energy-value-arrow" aria-hidden="true">➔</span>
+                                        <span className="energy-value-after">{elementDetails.energy}</span>
+                                    </>
+                                ) : elementDetails.energy}
                                 <span className="element-energy-badge-tooltip" role="tooltip">
                                     Energy required to use.
                                 </span>
@@ -274,6 +370,16 @@ function FloatingTooltip({
                         <div className="element-title">
                             <div>{elementDetails.letter}</div>
                             <div className="description">{elementDetails.description}</div>
+                        </div>
+                        <div className="enhancements" aria-label="Enhancements">
+                            {enhancementItems.map((item) => (
+                                <span
+                                    key={item.key}
+                                    className={`enhancement-chip${item.active ? " is-active" : ""}`}
+                                >
+                                    {item.label}
+                                </span>
+                            ))}
                         </div>
                         <div className="tooltip-header">
                             <span className={`element-info-badge ${primaryBadgeClass}`}>{primaryBadgeLabel}</span>
@@ -312,14 +418,14 @@ function FloatingTooltip({
                             </span>
                         ) : null}
 
-                        {(regularEffectKinds.length > 0 || shouldShowRegularEffectDelta) ? (
+                        {(effectKinds.length > 0 || shouldShowEffectDelta) ? (
                             <span className="effects-details">Effects:
-                                {shouldShowRegularEffectDelta ? (
+                                {shouldShowEffectDelta ? (
                                     <>
-                                        {showSourceRegularNoneChip ? (
+                                        {showSourceNoneChip ? (
                                             <span className="effect-chip effect-chip-none">none</span>
                                         ) : (
-                                            sourceRegularEffectKinds.map((effectKind) => (
+                                            sourceEffectKinds.map((effectKind) => (
                                                 <span
                                                     key={effectKind.key}
                                                     className={`effect-chip ${effectKind.chipClass}`}
@@ -334,8 +440,8 @@ function FloatingTooltip({
                                             ))
                                         )}
                                         <span className="effects-delta-arrow" aria-hidden="true">➔</span>
-                                        {regularEffectKinds.length > 0 ? (
-                                            regularEffectKinds.map((effectKind) => (
+                                        {effectKinds.length > 0 ? (
+                                            effectKinds.map((effectKind) => (
                                                 <span
                                                     key={`delta-${effectKind.key}`}
                                                     className={`effect-chip ${effectKind.chipClass}`}
@@ -353,70 +459,7 @@ function FloatingTooltip({
                                         )}
                                     </>
                                 ) : (
-                                    regularEffectKinds.map((effectKind) => (
-                                        <span
-                                            key={effectKind.key}
-                                            className={`effect-chip ${effectKind.chipClass}`}
-                                        >
-                                            {effectKind.label}
-                                            {effectKind.detail ? (
-                                                <span className="effect-chip-popup" role="tooltip">
-                                                    {effectKind.detail}
-                                                </span>
-                                            ) : null}
-                                        </span>
-                                    ))
-                                )}
-                            </span>
-                        ) : null}
-                        {(passiveEffectKinds.length > 0 || shouldShowPassiveEffectDelta) ? (
-                            <span className="passive-effects-details">
-                                <span className="passive-effects-label">
-                                    Passive:
-                                    <span className="effect-chip-popup" role="tooltip">
-                                        Available as long as this element exists
-                                    </span>
-                                </span>
-                                {shouldShowPassiveEffectDelta ? (
-                                    <>
-                                        {showSourcePassiveNoneChip ? (
-                                            <span className="effect-chip effect-chip-none">none</span>
-                                        ) : (
-                                            sourcePassiveEffectKinds.map((effectKind) => (
-                                                <span
-                                                    key={effectKind.key}
-                                                    className={`effect-chip ${effectKind.chipClass}`}
-                                                >
-                                                    {effectKind.label}
-                                                    {effectKind.detail ? (
-                                                        <span className="effect-chip-popup" role="tooltip">
-                                                            {effectKind.detail}
-                                                        </span>
-                                                    ) : null}
-                                                </span>
-                                            ))
-                                        )}
-                                        <span className="effects-delta-arrow" aria-hidden="true">➔</span>
-                                        {passiveEffectKinds.length > 0 ? (
-                                            passiveEffectKinds.map((effectKind) => (
-                                                <span
-                                                    key={`delta-${effectKind.key}`}
-                                                    className={`effect-chip ${effectKind.chipClass}`}
-                                                >
-                                                    {effectKind.label}
-                                                    {effectKind.detail ? (
-                                                        <span className="effect-chip-popup" role="tooltip">
-                                                            {effectKind.detail}
-                                                        </span>
-                                                    ) : null}
-                                                </span>
-                                            ))
-                                        ) : (
-                                            <span className="effect-chip effect-chip-none">none</span>
-                                        )}
-                                    </>
-                                ) : (
-                                    passiveEffectKinds.map((effectKind) => (
+                                    effectKinds.map((effectKind) => (
                                         <span
                                             key={effectKind.key}
                                             className={`effect-chip ${effectKind.chipClass}`}

@@ -23,12 +23,20 @@ export type LevelDefinition = {
     hp: number;
 };
 
+export type ElementEnhancements = {
+    purified?: boolean;
+    polished?: boolean;
+    cleansed?: boolean;
+    refined?: boolean;
+};
+
 
 export type PlayerElement = {
     id: number;
     letter: string;
     damage: number;
     energy?: number;
+    enhancements?: ElementEnhancements;
     level: number;
     description: string;
     type1?: string;

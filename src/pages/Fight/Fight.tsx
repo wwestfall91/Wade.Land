@@ -139,7 +139,6 @@ function Fight() {
         burnMultiplier,
         maxHpMultiplier,
         permanentMaxHpReduction,
-        battleEnergyCarryover,
         setBattleEnergyCarryover: setBattleEnergyCarryoverFromContext,
     } = usePlayer();
     const playerStatuses = playerStatusesFromContext ?? {
@@ -161,7 +160,6 @@ function Fight() {
     const effectiveSoakMultiplier = soakMultiplier ?? 1;
     const effectiveBurnMultiplier = burnMultiplier ?? 1;
     const effectiveMaxHpMultiplier = maxHpMultiplier ?? 1;
-    const effectiveBattleEnergyCarryover = battleEnergyCarryover ?? 0;
     const [flashingSlotId, setFlashingSlotId] = useState<number | null>(null);
     const [hoveredSpellId, setHoveredSpellId] = useState<number | null>(null);
     const [hoveredSpellTooltipId, setHoveredSpellTooltipId] = useState<number | null>(null);
@@ -169,7 +167,7 @@ function Fight() {
     const [hoveredEnemyAttack, setHoveredEnemyAttack] = useState(false);
     const [isEnemyIntentTooltipHovered, setIsEnemyIntentTooltipHovered] = useState(false);
     const [isEnemyIntentTooltipGraceOpen, setIsEnemyIntentTooltipGraceOpen] = useState(false);
-    const [remainingEnergy, setRemainingEnergy] = useState(() => Math.min(MAX_TURN_ENERGY, ENERGY_PER_TURN + effectiveBattleEnergyCarryover));
+    const [remainingEnergy, setRemainingEnergy] = useState(() => ENERGY_PER_TURN);
     const [eventLogEntries, setEventLogEntries] = useState<EventLogEntry[]>([]);
     const [isBattleLogExpanded, setIsBattleLogExpanded] = useState(false);
     const [isGameOver, setIsGameOver] = useState(false);
@@ -377,6 +375,15 @@ function Fight() {
         getSpellEnergyComboEffect(effects)?.targetType ?? null;
     const hasCombustEffect = (effects?: SpellEffectConfig[]) =>
         Boolean(effects?.some((effect) => effect.kind === "explode"));
+
+    const castableSpells = useMemo(
+        () => player.elements.filter((element) => {
+            const category = normalizeType(element.category);
+            const letter = normalizeType(element.letter);
+            return category !== "soul" && letter !== "soul";
+        }),
+        [player.elements],
+    );
 
     /** Passive float percent from player's owned elements (affects incoming damage). */
     const playerPassiveFloatPercent = useMemo(
@@ -651,7 +658,7 @@ function Fight() {
     useEffect(() => {
         if (enemyHealth <= 0 && !hasResolvedVictory.current) {
             hasResolvedVictory.current = true;
-            setBattleEnergyCarryover(Math.min(MAX_TURN_ENERGY, remainingEnergy));
+            setBattleEnergyCarryover(0);
             const shuffled = [...elementPool].sort(() => Math.random() - 0.5);
             const chosen = shuffled.slice(0, Math.min(3, shuffled.length));
             setPlayerStatuses({
@@ -674,7 +681,7 @@ function Fight() {
                 } as GameLocationState,
             });
         }
-    }, [elementPool, enemy.souls, enemyHealth, navigate, playerBurnStatus, playerSoakStatus, playerFreezeStatus, playerEnergizeStatus, remainingEnergy, setBattleEnergyCarryover, setPlayerStatuses]);
+    }, [elementPool, enemy.souls, enemyHealth, navigate, playerBurnStatus, playerSoakStatus, playerFreezeStatus, playerEnergizeStatus, setBattleEnergyCarryover, setPlayerStatuses]);
 
     useEffect(() => {
         if (levels.length === 0 || enemyHealth <= 0 || player.hp > 0) {
@@ -1256,6 +1263,34 @@ function Fight() {
         launchProjectileBurst(spell.letter, buttonEl, enemySpriteRef.current, hitCount, 180);
     };
 
+    const getSpellDamageForCastPreview = (
+        spell: CastableSpell,
+        spellEnergyCost: number,
+        spellTypes: string[],
+    ) => {
+        const preMod = effectFactory.resolvePreHitDamage(
+            effectTypeFactory.getBattleTriggerEffects(spell.effects ?? []),
+            {
+                spellEnergyCost,
+                playerCurrentHp: player.hp,
+                playerMaxHp,
+                playerShield,
+            },
+        );
+
+        const exponentialBonus = spellExponentialDamage[spell.letter] ?? 0;
+        const followUpBonus = followUpStatus?.letter === spell.letter
+            ? 1 + (followUpStatus.bonusPercent / 100) * followUpStatus.count
+            : 1;
+        const powerComboBonusMultiplier = (playerPowerComboStatus && spellTypes.includes(playerPowerComboStatus.requiredType))
+            ? 1 + playerPowerComboStatus.bonusPercent / 100
+            : 1;
+
+        return Math.round(
+            (spell.damage + exponentialBonus) * preMod.multiplier * followUpBonus * powerComboBonusMultiplier,
+        ) + preMod.flatBonus;
+    };
+
     const handleSlotClick = async (spell: CastableSpell) => {
         const activeComboType = playerComboStatus?.requiredType ?? null;
         const spellTypes = getSpellTypeList(spell);
@@ -1273,30 +1308,8 @@ function Fight() {
         const powerComboEffect = spell.effects?.find(e => e.kind === "power_combo");
         const combustSpellEffect = spell.effects?.find(e => e.kind === "explode");
 
-        // Pre-hit damage modifiers (rage, charge, hardened)
-        const preMod = effectFactory.resolvePreHitDamage(
-            effectTypeFactory.getBattleTriggerEffects(spell.effects ?? []),
-            {
-                spellEnergyCost,
-                playerCurrentHp: player.hp,
-                playerMaxHp,
-                playerShield,
-            },
-        );
-        // Apply exponential bonus from previous casts of this spell
-        const exponentialBonus = spellExponentialDamage[spell.letter] ?? 0;
-        // Follow-up: consecutive casts of same spell get +X% per stack
-        const followUpBonus = followUpStatus?.letter === spell.letter
-            ? 1 + (followUpStatus.bonusPercent / 100) * followUpStatus.count
-            : 1;
-        // Power-combo: +X% if this spell matches the required type
-        const powerComboBonusMultiplier = (playerPowerComboStatus && spellTypes.includes(playerPowerComboStatus.requiredType))
-            ? 1 + playerPowerComboStatus.bonusPercent / 100
-            : 1;
-
-        const spellDamageForCast = Math.round(
-            (spell.damage + exponentialBonus) * preMod.multiplier * followUpBonus * powerComboBonusMultiplier
-        ) + preMod.flatBonus;        const isWeapon = spell.category?.toLowerCase() === "weapon";
+        const spellDamageForCast = getSpellDamageForCastPreview(spell, spellEnergyCost, spellTypes);
+        const isWeapon = spell.category?.toLowerCase() === "weapon";
         if (
             enemyHealth <= 0 ||
             isGameOver ||
@@ -1787,7 +1800,7 @@ function Fight() {
             {/* ─── Spell Hand ─── */}
             <div className="spell-hand">
                 <div className="spell-hand-scroll">
-                    {player.elements.map((spell) => (
+                    {castableSpells.map((spell) => (
                         (() => {
                             const activeComboType = playerComboStatus?.requiredType ?? null;
                             const spellTypes = getSpellTypeList(spell);
@@ -1795,7 +1808,7 @@ function Fight() {
                             const isFireSpell = spellTypes.includes("fire");
                             const displayedEnergyCost = getSpellEnergyCost(spell, activeComboType);
                             const isCombustSpell = hasCombustEffect(spell.effects);
-                            const displayedDamage = spell.damage;
+                            const displayedDamage = getSpellDamageForCastPreview(spell, displayedEnergyCost, spellTypes);
                             const spellTypeMultiplier = Math.max(
                                 ...spellTypes.map((t) => effectiveTypeMultipliers[normalizeType(t)] ?? 1),
                                 1,

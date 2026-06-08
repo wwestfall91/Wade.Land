@@ -15,6 +15,13 @@
     &.is-closing {
         opacity: 0;
     }
+
+    &.is-pinned .floating-tooltip__panel {
+        border-color: #ffd95b;
+        box-shadow:
+            0 0 0 1px #ffe6a0,
+            0 0 16px rgba(255, 217, 91, 0.4);
+    }
 }
 
 .tooltip-container{
@@ -42,7 +49,43 @@
     border: 2px solid #fff3b8;
     box-shadow: 0 5px 10px rgba(82, 54, 4, 0.4);
     pointer-events: auto;
-    
+
+    &.is-energy-delta {
+        width: auto;
+        min-width: 1.55rem;
+        height: auto;
+        min-height: 1.55rem;
+        padding: 0.1rem 0.35rem;
+        border-radius: 8px;
+        gap: 0.18rem;
+        font-size: 0.66rem;
+    }
+
+    // Legacy :has fallback — kept for browsers that support it
+    &:has(.energy-value-before) {
+        width: auto;
+        min-width: 1.55rem;
+        height: auto;
+        min-height: 1.55rem;
+        padding: 0.1rem 0.35rem;
+        border-radius: 8px;
+        gap: 0.18rem;
+        font-size: 0.66rem;
+    }
+
+    .energy-value-before {
+        opacity: 0.6;
+        text-decoration: line-through;
+    }
+
+    .energy-value-arrow {
+        font-size: 0.55rem;
+        opacity: 0.75;
+    }
+
+    .energy-value-after {
+        font-weight: 900;
+    }
 
     .element-energy-badge-tooltip {
         position: absolute;
@@ -81,6 +124,37 @@
     width:100%;
     justify-content: space-between;
     gap:5px;
+}
+
+.enhancements {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    padding: 0.2rem 0.25rem;
+    border-radius: 5px;
+    background: linear-gradient(rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.12));
+    border: 1px solid rgba(255, 255, 255, 0.55);
+
+    .enhancement-chip {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.08rem 0.35rem;
+        border-radius: 999px;
+        font-size: 0.62rem;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        color: rgba(27, 27, 27, 0.65);
+        background: rgba(255, 255, 255, 0.4);
+        border: 1px solid rgba(255, 255, 255, 0.5);
+    }
+
+    .enhancement-chip.is-active {
+        color: #2f2200;
+        background: linear-gradient(180deg, #ffe69a 0%, #ffd05f 100%);
+        border-color: #ffefb3;
+        box-shadow: 0 0 0 1px rgba(145, 102, 10, 0.25);
+    }
 }
 
 .reward-element-info{
@@ -198,11 +272,9 @@
     }
 }
 
-.effects-details,
-.passive-effects-details{
+.effects-details{
     display: flex;
     align-items: end;
-    flex-wrap: wrap;
     padding:.25rem .25rem;
     border-radius: 5px;
     color:rgb(22, 22, 22);
@@ -211,19 +283,6 @@
     background: linear-gradient(rgba(255, 255, 255, 0.377), rgba(255, 255, 255, 0.568));
     border:1px solid white;
     gap:5px;
-}
-
-.passive-effects-label {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-}
-
-.passive-effects-label:hover .effect-chip-popup,
-.passive-effects-label:focus-within .effect-chip-popup {
-    opacity: 1;
-    visibility: visible;
-    transform: translateY(0);
 }
 
 .effects-delta-arrow {
@@ -362,16 +421,6 @@
         inset 0 0 0 2px #0c1451,
         0 6px 0 rgba(0, 0, 0, 0.3);
 }
-
-    .floating-tooltip.is-pinned .floating-tooltip__panel {
-        border-color: #ffd34d;
-        box-shadow:
-        inset 0 0 0 1px #ffe7b6,
-        inset 0 0 0 2px #d4a12a,
-        0 0 0 1px rgba(255, 210, 77, 0.45),
-        0 8px 0 rgba(0, 0, 0, 0.29),
-        0 12px 24px rgba(84, 58, 0, 0.3);
-    }
 
 .floating-tooltip .spell-hover-tooltip-line {
     display: block;
