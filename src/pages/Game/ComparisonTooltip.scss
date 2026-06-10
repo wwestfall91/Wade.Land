@@ -13,6 +13,7 @@
     min-width: min(13rem, 36vw);
     max-width: min(15.5rem, 40vw);
     display: flex;
+    pointer-events: auto;
 
     .floating-tooltip__panel {
         flex: 1;

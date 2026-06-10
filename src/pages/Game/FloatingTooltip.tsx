@@ -213,21 +213,28 @@ export function TooltipPanelContent({ elementDetails, changedKeys, typeMultiplie
                     </span>
                 ) : null}
                 {effectKinds.length > 0 ? (
-                    <span className={`effects-details${changedKeys?.has("effects") ? " property-changed" : ""}`}>Effects:
-                        {effectKinds.map((effectKind) => (
-                            <span
-                                key={effectKind.key}
-                                className={`effect-chip ${effectKind.chipClass}`}
-                            >
-                                {effectKind.label}
-                                {effectKind.detail ? (
-                                    <span className="effect-chip-popup" role="tooltip">
-                                        {effectKind.detail}
+                    <div className={`effects-details${changedKeys?.has("effects") ? " property-changed" : ""}`}>
+                        <span className="effects-label">Effects</span>
+                        <div className="effects-list">
+                            {effectKinds.map((effectKind) => (
+                                <div
+                                    key={effectKind.key}
+                                    className={`effect-entry${changedKeys?.has("effects") ? " is-changed" : ""}`}
+                                >
+                                    <span
+                                        className={`effect-chip ${effectKind.chipClass}${changedKeys?.has("effects") ? " is-changed" : ""}`}
+                                    >
+                                        {effectKind.label}
                                     </span>
-                                ) : null}
-                            </span>
-                        ))}
-                    </span>
+                                    {effectKind.detail ? (
+                                        <span className="effect-description">
+                                            {effectKind.detail}
+                                        </span>
+                                    ) : null}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 ) : null}
                 <div className="enhancements" aria-label="Enhancements">
                     {enhancementItems.map((item) => (

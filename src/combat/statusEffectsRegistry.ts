@@ -57,6 +57,18 @@ const formatChipAmount = (effect: SpellEffectConfig): string | null => {
     return amount > 0 ? `+${amount}` : null;
 };
 
+const interpolateEffectAmount = (description: string, effect: SpellEffectConfig): string => {
+    if (typeof effect.amount !== "number" || !Number.isFinite(effect.amount)) {
+        return description;
+    }
+
+    const amountText = Number.isInteger(effect.amount)
+        ? String(effect.amount)
+        : String(effect.amount);
+
+    return description.replace(/\bX\b/gi, amountText);
+};
+
 const STATUS_EFFECT_DESCRIPTORS: StatusEffectDescriptor[] = [
     {
         kind: EFFECTS.HEAL,
@@ -290,9 +302,14 @@ export class StatusEffectsRegistry {
     }
 
     getEffectDetail(effect: SpellEffectConfig): string | null {
+        const longDescription = effect.longDescription?.trim();
+        if (longDescription && longDescription.length > 0) {
+            return interpolateEffectAmount(longDescription, effect);
+        }
+
         const shortDescription = effect.shortDescription?.trim();
         if (shortDescription && shortDescription.length > 0) {
-            return shortDescription;
+            return interpolateEffectAmount(shortDescription, effect);
         }
 
         if (effect.kind === EFFECTS.MULTI_HIT) {
