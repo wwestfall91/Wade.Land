@@ -2681,7 +2681,7 @@ function Game() {
                     </div>
                     <FloatingTooltip
                         anchorElement={previewRef.current}
-                        open={isPreviewTooltipOpen && !(slotTwoPreviewDraggable && (isOutputHovered || isPreviewHovered))}
+                        open={isPreviewTooltipOpen && !(slotTwoPreviewDraggable && (isOutputHovered || isPreviewHovered || isCombineButtonHovered))}
                         selected={isPreviewTooltipPinned}
                         className={`drag-description-popup${isPreviewTooltipPinned ? " is-pinned" : ""}`}
                         interactive={isPreviewAltHeld || isPreviewTooltipPinned}
@@ -2706,7 +2706,7 @@ function Game() {
                             category: previewCombination.category,
                         }}
                     />
-                    {slotTwoPreviewDraggable && (isOutputHovered || isPreviewHovered) ? (
+                    {slotTwoPreviewDraggable && (isOutputHovered || isPreviewHovered || isCombineButtonHovered) ? (
                         <ComparisonTooltip
                             anchorElement={previewRef.current}
                             open={true}
