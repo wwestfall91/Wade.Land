@@ -1,3 +1,29 @@
+.property-changed {
+    outline: 1px solid rgba(255, 210, 60, 0.75) !important;
+    box-shadow: 0 0 10px rgba(255, 200, 60, 0.45) !important;
+    background: rgba(255, 200, 60, 0.08) !important;
+
+    &.damage-details {
+        background: linear-gradient(rgba(255, 255, 255, 0.568), rgba(255, 255, 255, 0.377)) !important;
+        border: 1px solid white !important;
+    }
+
+    &.effects-details {
+        background: linear-gradient(rgba(255, 255, 255, 0.377), rgba(255, 255, 255, 0.568)) !important;
+        border: 1px solid white !important;
+    }
+
+    &.enhancement-chip {
+        color: #fff5c0 !important;
+        border-color: rgba(255, 210, 60, 0.8) !important;
+        background: linear-gradient(180deg, rgba(255, 220, 80, 0.45) 0%, rgba(255, 190, 40, 0.35) 100%) !important;
+    }
+
+    &.element-info-badge {
+        outline-offset: 1px;
+    }
+}
+
 .floating-tooltip {
     display: flex;
     position: absolute;
@@ -482,7 +508,8 @@
     border: 1px solid rgba(27, 52, 127, 0.28);
 }
 
-.floating-tooltip .element-info-badge {
+.floating-tooltip .element-info-badge,
+.comparison-tooltip .element-info-badge {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -499,79 +526,92 @@
     flex-shrink: 0;
 }
 
-.floating-tooltip .element-info-badge.tooltip-badge-spell {
+.floating-tooltip .element-info-badge.tooltip-badge-spell,
+.comparison-tooltip .element-info-badge.tooltip-badge-spell {
     border-color: #8c1515;
     background: #d83a31;
     color: #fff;
 }
 
-.floating-tooltip .element-info-badge.tooltip-badge-weapon {
+.floating-tooltip .element-info-badge.tooltip-badge-weapon,
+.comparison-tooltip .element-info-badge.tooltip-badge-weapon {
     border-color: #222222;
     background: linear-gradient(180deg, #c4c4c4 0%, #696969 100%);
     color: #111111;
 }
 
-.floating-tooltip .element-info-badge.type-badge-fire {
+.floating-tooltip .element-info-badge.type-badge-fire,
+.comparison-tooltip .element-info-badge.type-badge-fire {
     background: linear-gradient(180deg, var(--element-fire-accent-top) 0%, var(--element-fire-accent-bottom) 100%);
     border-color: var(--element-fire-accent-border);
     color: var(--element-fire-accent-text);
 }
 
-.floating-tooltip .element-info-badge.type-badge-water {
+.floating-tooltip .element-info-badge.type-badge-water,
+.comparison-tooltip .element-info-badge.type-badge-water {
     background: linear-gradient(180deg, var(--element-water-accent-top) 0%, var(--element-water-accent-bottom) 100%);
     border-color: var(--element-water-accent-border);
     color: var(--element-water-accent-text);
 }
 
-.floating-tooltip .element-info-badge.type-badge-earth {
+.floating-tooltip .element-info-badge.type-badge-earth,
+.comparison-tooltip .element-info-badge.type-badge-earth {
     background: linear-gradient(180deg, var(--element-earth-accent-top) 0%, var(--element-earth-accent-bottom) 100%);
     border-color: var(--element-earth-accent-border);
     color: var(--element-earth-accent-text);
 }
 
-.floating-tooltip .element-info-badge.type-badge-steel {
+.floating-tooltip .element-info-badge.type-badge-steel,
+.comparison-tooltip .element-info-badge.type-badge-steel {
     border-color: #2e2e2e;
     background: linear-gradient(180deg, #e0e0e0 0%, #575757 100%);
     color: #111111;
 }
 
-.floating-tooltip .element-info-badge.type-badge-air {
+.floating-tooltip .element-info-badge.type-badge-air,
+.comparison-tooltip .element-info-badge.type-badge-air {
     background: linear-gradient(180deg, var(--element-air-accent-top) 0%, var(--element-air-accent-bottom) 100%);
     border-color: var(--element-air-accent-border);
     color: var(--element-air-accent-text);
 }
 
-.floating-tooltip .element-info-badge.type-badge-lightning {
+.floating-tooltip .element-info-badge.type-badge-lightning,
+.comparison-tooltip .element-info-badge.type-badge-lightning {
     background: linear-gradient(180deg, var(--element-lightning-accent-top) 0%, var(--element-lightning-accent-bottom) 100%);
     border-color: var(--element-lightning-accent-border);
     color: #302400;
 }
 
-.floating-tooltip .element-info-badge.type-badge-ice {
+.floating-tooltip .element-info-badge.type-badge-ice,
+.comparison-tooltip .element-info-badge.type-badge-ice {
     background: linear-gradient(180deg, var(--element-ice-accent-top) 0%, var(--element-ice-accent-bottom) 100%);
     border-color: var(--element-ice-accent-border);
     color: var(--element-ice-accent-text);
 }
 
-.floating-tooltip .element-info-badge.type-badge-light {
+.floating-tooltip .element-info-badge.type-badge-light,
+.comparison-tooltip .element-info-badge.type-badge-light {
     background: linear-gradient(180deg, var(--element-light-accent-top) 0%, var(--element-light-accent-bottom) 100%);
     border-color: var(--element-light-accent-border);
     color: var(--element-light-accent-text);
 }
 
-.floating-tooltip .element-info-badge.type-badge-dark {
+.floating-tooltip .element-info-badge.type-badge-dark,
+.comparison-tooltip .element-info-badge.type-badge-dark {
     background: linear-gradient(180deg, var(--element-dark-accent-top) 0%, var(--element-dark-accent-bottom) 100%);
     border-color: var(--element-dark-accent-border);
     color: var(--element-dark-accent-text);
 }
 
-.floating-tooltip .element-info-badge.type-badge-arcane {
+.floating-tooltip .element-info-badge.type-badge-arcane,
+.comparison-tooltip .element-info-badge.type-badge-arcane {
     background: linear-gradient(180deg, var(--element-arcane-accent-top) 0%, var(--element-arcane-accent-bottom) 100%);
     border-color: var(--element-arcane-accent-border);
     color: var(--element-arcane-accent-text);
 }
 
-.floating-tooltip .element-info-badge.type-badge-none {
+.floating-tooltip .element-info-badge.type-badge-none,
+.comparison-tooltip .element-info-badge.type-badge-none {
     background: linear-gradient(180deg, #efefef 0%, #d6d6d6 100%);
     border-color: #8d8d8d;
     color: #353535;

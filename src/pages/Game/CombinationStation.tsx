@@ -104,6 +104,7 @@ type CombinationResultPanelProps = {
     outputRef: RefObject<HTMLDivElement>;
     onHoverInsertSlot: (slot: 1 | 2 | null) => void;
     shouldShowSlotTwoInsertPrompt: boolean;
+    onOutputHover: (hovered: boolean) => void;
 };
 
 const CombinationResultPanel = ({
@@ -116,6 +117,7 @@ const CombinationResultPanel = ({
     outputRef,
     onHoverInsertSlot,
     shouldShowSlotTwoInsertPrompt,
+    onOutputHover,
 }: CombinationResultPanelProps) => (
     <div className={className}>
         <div className="drop-zone-area">
@@ -141,7 +143,12 @@ const CombinationResultPanel = ({
                 <div className="drop-zone" ref={dropZoneRefC}>3</div>
             ) : null}
             <div className={secondSlotConnectorClassName} aria-hidden="true" />
-            <div className="output" ref={outputRef} />
+            <div
+                className="output"
+                ref={outputRef}
+                onMouseEnter={() => onOutputHover(true)}
+                onMouseLeave={() => onOutputHover(false)}
+            />
         </div>
     </div>
 );
@@ -165,6 +172,7 @@ type CombinationStationProps = {
     hoveredInsertSlot: 1 | 2 | null;
     isCombineButtonHovered: boolean;
     onCombineButtonHoverChange: (isHovered: boolean) => void;
+    onOutputHover: (hovered: boolean) => void;
 };
 
 function CombinationStation({
@@ -186,6 +194,7 @@ function CombinationStation({
     hoveredInsertSlot,
     isCombineButtonHovered,
     onCombineButtonHoverChange,
+    onOutputHover,
 }: CombinationStationProps) {
     const combineButtonElementClass = hasActiveCombinationState && combinationStationState.elementKey
         ? `combine-button--${combinationStationState.elementKey}`
@@ -249,6 +258,7 @@ function CombinationStation({
                     outputRef={outputRef}
                     onHoverInsertSlot={onHoverInsertSlot}
                     shouldShowSlotTwoInsertPrompt={shouldShowSlotTwoInsertPrompt}
+                    onOutputHover={onOutputHover}
                 />
             </div>
             <div

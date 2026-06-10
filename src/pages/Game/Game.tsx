@@ -9,6 +9,7 @@ import { parseSpellEffectsFromRow, type SpellEffectConfig } from "../../combat/s
 import { type ElementEnhancements, type RewardElement, usePlayer } from "../../context/PlayerContext";
 import { type MonsterReward } from "../../combat/rewardFactory";
 import FloatingTooltip from "./FloatingTooltip";
+import ComparisonTooltip from "./ComparisonTooltip";
 import CombinationStation, {
     COMBINATION_STATE_WORKBOOK_PATHS,
     getCombinationStationState,
@@ -347,6 +348,7 @@ function Game() {
     const [isSoulPanelErrorFeedback, setIsSoulPanelErrorFeedback] = useState(false);
     const [hoveredInsertSlot, setHoveredInsertSlot] = useState<1 | 2 | null>(null);
     const [isCombineButtonHovered, setIsCombineButtonHovered] = useState(false);
+    const [isOutputHovered, setIsOutputHovered] = useState(false);
     const [isPostBattleSoulSequenceActive, setIsPostBattleSoulSequenceActive] = useState(false);
     const [postBattleSoulFillDurationMs, setPostBattleSoulFillDurationMs] = useState(0);
     const [isOldOnePreludeActive, setIsOldOnePreludeActive] = useState(false);
@@ -1661,6 +1663,7 @@ function Game() {
         setIsPreviewTooltipPinned(false);
         setIsPreviewAltLockActive(false);
         clearPreviewTooltipGraceTimeout();
+        setIsOutputHovered(false);
         setPreviewHomePosition(null);
         setPreviewPosition(null);
         previewPositionRef.current = null;
@@ -2337,6 +2340,34 @@ function Game() {
             ? (starterChoiceElements[hoveredStarterChoiceIndex] ?? null)
             : null;
     const slotTwoPreviewDraggable = getDraggableById(zoneOccupants[1] ?? null);
+
+    const effectSignature = (effects?: SpellEffectConfig[]) =>
+        JSON.stringify((effects ?? []).map((effect) => ({
+            kind: effect.kind,
+            amount: effect.amount ?? null,
+            duration: effect.duration ?? null,
+            hits: effect.hits ?? null,
+            target: effect.target ?? null,
+            targetType: effect.targetType ?? null,
+        })));
+
+    const changedKeys = useMemo(() => {
+        if (!slotTwoPreviewDraggable || !previewCombination) return new Set<string>();
+        const changed = new Set<string>();
+        if (slotTwoPreviewDraggable.damage !== previewCombination.damage) changed.add("damage");
+        if ((slotTwoPreviewDraggable.energy ?? 0) !== (previewCombination.energy ?? 0)) changed.add("energy");
+        if (slotTwoPreviewDraggable.type1 !== previewCombination.type1) changed.add("type1");
+        if (slotTwoPreviewDraggable.type2 !== previewCombination.type2) changed.add("type2");
+        if (slotTwoPreviewDraggable.description !== previewCombination.description) changed.add("description");
+        if (slotTwoPreviewDraggable.level !== previewCombination.level) changed.add("level");
+        if (effectSignature(slotTwoPreviewDraggable.effects) !== effectSignature(previewCombination.effects)) changed.add("effects");
+        if (Boolean(slotTwoPreviewDraggable.enhancements?.purified) !== Boolean(previewCombination.enhancements?.purified)) changed.add("enhancement-purified");
+        if (Boolean(slotTwoPreviewDraggable.enhancements?.polished) !== Boolean(previewCombination.enhancements?.polished)) changed.add("enhancement-polished");
+        if (Boolean(slotTwoPreviewDraggable.enhancements?.cleansed) !== Boolean(previewCombination.enhancements?.cleansed)) changed.add("enhancement-cleansed");
+        if (Boolean(slotTwoPreviewDraggable.enhancements?.refined) !== Boolean(previewCombination.enhancements?.refined)) changed.add("enhancement-refined");
+        return changed;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [slotTwoPreviewDraggable, previewCombination]);
     const hasActiveUpgrades = Object.keys(typeMultipliers).length > 0 || shieldMultiplier > 1 || soakMultiplier > 1 || burnMultiplier > 1;
     const selectedStarterChoiceElement =
         selectedStarterChoiceIndex !== null
@@ -2650,7 +2681,7 @@ function Game() {
                     </div>
                     <FloatingTooltip
                         anchorElement={previewRef.current}
-                        open={isPreviewTooltipOpen}
+                        open={isPreviewTooltipOpen && !(slotTwoPreviewDraggable && (isOutputHovered || isPreviewHovered))}
                         selected={isPreviewTooltipPinned}
                         className={`drag-description-popup${isPreviewTooltipPinned ? " is-pinned" : ""}`}
                         interactive={isPreviewAltHeld || isPreviewTooltipPinned}
@@ -2658,26 +2689,55 @@ function Game() {
                         onTooltipMouseLeave={handlePreviewTooltipMouseLeave}
                         clampHorizontal={false}
                         typeMultipliers={typeMultipliers}
-                        elementDetails={(() => {
-                            return {
+                        elementDetails={{
+                            letter: previewCombination.letter,
+                            damage: previewCombination.damage,
+                            energy: previewCombination.energy,
+                            baseEnergyBeforeCreation: previewCombination.baseEnergyBeforeCreation,
+                            enhancements: previewCombination.enhancements,
+                            isDamageEnhanced: previewCombination.isDamageEnhanced,
+                            baseDamageBeforeEnhance: previewCombination.baseDamageBeforeEnhance,
+                            isCombusted: previewCombination.isCombusted,
+                            baseDamageBeforeCombust: previewCombination.baseDamageBeforeCombust,
+                            description: previewCombination.description,
+                            type1: previewCombination.type1,
+                            type2: previewCombination.type2,
+                            effects: previewCombination.effects,
+                            category: previewCombination.category,
+                        }}
+                    />
+                    {slotTwoPreviewDraggable && (isOutputHovered || isPreviewHovered) ? (
+                        <ComparisonTooltip
+                            anchorElement={previewRef.current}
+                            open={true}
+                            beforeElement={{
+                                letter: slotTwoPreviewDraggable.letter,
+                                damage: slotTwoPreviewDraggable.damage,
+                                energy: slotTwoPreviewDraggable.energy,
+                                enhancements: slotTwoPreviewDraggable.enhancements,
+                                description: slotTwoPreviewDraggable.description,
+                                type1: slotTwoPreviewDraggable.type1,
+                                type2: slotTwoPreviewDraggable.type2,
+                                effects: slotTwoPreviewDraggable.effects,
+                                level: slotTwoPreviewDraggable.level,
+                                category: slotTwoPreviewDraggable.category,
+                            }}
+                            afterElement={{
                                 letter: previewCombination.letter,
                                 damage: previewCombination.damage,
                                 energy: previewCombination.energy,
-                                baseEnergyBeforeCreation: previewCombination.baseEnergyBeforeCreation,
                                 enhancements: previewCombination.enhancements,
-                                isDamageEnhanced: previewCombination.isDamageEnhanced,
-                                baseDamageBeforeEnhance: previewCombination.baseDamageBeforeEnhance,
-                                isCombusted: previewCombination.isCombusted,
-                                baseDamageBeforeCombust: previewCombination.baseDamageBeforeCombust,
                                 description: previewCombination.description,
                                 type1: previewCombination.type1,
                                 type2: previewCombination.type2,
                                 effects: previewCombination.effects,
-                                sourceEffects: slotTwoPreviewDraggable?.effects,
+                                level: previewCombination.level,
                                 category: previewCombination.category,
-                            };
-                        })()}
-                    />
+                            }}
+                            changedKeys={changedKeys}
+                            typeMultipliers={typeMultipliers}
+                        />
+                    ) : null}
                 </>
             ) : null}
             <div className="element-start" ref={elementStartRef}></div>
@@ -2737,6 +2797,7 @@ function Game() {
                             onHoverInsertSlot={setHoveredInsertSlot}
                             isCombineButtonHovered={isCombineButtonHovered}
                             onCombineButtonHoverChange={setIsCombineButtonHovered}
+                            onOutputHover={setIsOutputHovered}
                         />
                     ) : null}
 
