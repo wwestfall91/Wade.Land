@@ -5,6 +5,7 @@ import "./Fight.scss";
 import {
     getPerHitSpellEffects,
     getSpellHitCount,
+    EFFECTS,
     type ActiveBurnStatus,
     type ActiveEnergizeStatus,
     type ActiveFreezeStatus,
@@ -370,11 +371,11 @@ function Fight() {
     const getSpellTypeList = (spell: { type1?: string; type2?: string }) =>
         [spell.type1, spell.type2].map(normalizeType).filter(Boolean);
     const getSpellEnergyComboEffect = (effects?: SpellEffectConfig[]) =>
-        effects?.find((effect) => effect.kind === "combo" || effect.kind === "energy_combo") ?? null;
+        effects?.find((effect) => effect.kind === EFFECTS.COMBO || effect.kind === EFFECTS.ENERGY_COMBO) ?? null;
     const getSpellComboType = (effects?: SpellEffectConfig[]) =>
         getSpellEnergyComboEffect(effects)?.targetType ?? null;
     const hasCombustEffect = (effects?: SpellEffectConfig[]) =>
-        Boolean(effects?.some((effect) => effect.kind === "explode"));
+        Boolean(effects?.some((effect) => effect.kind === EFFECTS.EXPLODE));
 
     const castableSpells = useMemo(
         () => player.elements.filter((element) => {
@@ -896,14 +897,14 @@ function Fight() {
             setPlayerBurnStatus((previous) => {
                 if (!previous) {
                     return {
-                        kind: "burn",
+                        kind: EFFECTS.BURN,
                         stacks: totalPlayerBurnApplied,
                         remainingTurns: playerBurnDuration,
                     };
                 }
 
                 return {
-                    kind: "burn",
+                    kind: EFFECTS.BURN,
                     stacks: previous.stacks + totalPlayerBurnApplied,
                     remainingTurns: Math.max(previous.remainingTurns, playerBurnDuration),
                 };
@@ -914,7 +915,7 @@ function Fight() {
         if (totalPlayerSoakApplied > 0 && simulatedPlayerHp > 0) {
             const soakRemainingTurns = totalPlayerSoakDuration > 0 ? totalPlayerSoakDuration : undefined;
             setPlayerSoakStatus((previous) => ({
-                kind: "soak",
+                kind: EFFECTS.SOAK,
                 stacks: (previous?.stacks ?? 0) + totalPlayerSoakApplied,
                 remainingTurns: soakRemainingTurns ?? previous?.remainingTurns,
             }));
@@ -932,9 +933,9 @@ function Fight() {
                 convertedPlayerFreezeStacksFromEffect = Math.floor(currentSoak * Math.min(100, totalPlayerFreezeSoakConvertPercent) / 100);
                 if (convertedPlayerFreezeStacksFromEffect > 0) {
                     const remaining = currentSoak - convertedPlayerFreezeStacksFromEffect;
-                    setPlayerSoakStatus(remaining > 0 ? { kind: "soak", stacks: remaining, remainingTurns: currentPlayerSoak?.remainingTurns } : null);
+                    setPlayerSoakStatus(remaining > 0 ? { kind: EFFECTS.SOAK, stacks: remaining, remainingTurns: currentPlayerSoak?.remainingTurns } : null);
                     const freezeRemainingTurns = totalPlayerFreezeSoakConvertDuration > 0 ? totalPlayerFreezeSoakConvertDuration : undefined;
-                    setPlayerFreezeStatus((prev) => ({ kind: "freeze", stacks: (prev?.stacks ?? 0) + convertedPlayerFreezeStacksFromEffect, remainingTurns: freezeRemainingTurns ?? prev?.remainingTurns }));
+                    setPlayerFreezeStatus((prev) => ({ kind: EFFECTS.FREEZE, stacks: (prev?.stacks ?? 0) + convertedPlayerFreezeStacksFromEffect, remainingTurns: freezeRemainingTurns ?? prev?.remainingTurns }));
                     await wait(EFFECT_STEP_DELAY_MS);
                 }
             }
@@ -943,7 +944,7 @@ function Fight() {
         if (totalPlayerThornsApplied > 0 && simulatedPlayerHp > 0) {
             const thornsRemainingTurns = totalPlayerThornsDuration > 0 ? totalPlayerThornsDuration : undefined;
             setPlayerThornsStatus((previous) => ({
-                kind: "thorns",
+                kind: EFFECTS.THORNS,
                 stacks: (previous?.stacks ?? 0) + totalPlayerThornsApplied,
                 remainingTurns: thornsRemainingTurns ?? previous?.remainingTurns,
             }));
@@ -1472,14 +1473,14 @@ function Fight() {
             setEnemyBurnStatus((previous) => {
                 if (!previous) {
                     return {
-                        kind: "burn",
+                        kind: EFFECTS.BURN,
                         stacks: totalBurnApplied,
                         remainingTurns: burnDuration,
                     };
                 }
 
                 return {
-                    kind: "burn",
+                    kind: EFFECTS.BURN,
                     stacks: previous.stacks + totalBurnApplied,
                     remainingTurns: Math.max(previous.remainingTurns, burnDuration),
                 };
@@ -1500,7 +1501,7 @@ function Fight() {
         if (nextEnemyHealth > 0 && totalSoakApplied > 0) {
             const soakRemainingTurns = totalSoakDuration > 0 ? totalSoakDuration : undefined;
             setEnemySoakStatus((previous) => ({
-                kind: "soak",
+                kind: EFFECTS.SOAK,
                 stacks: (previous?.stacks ?? 0) + totalSoakApplied,
                 remainingTurns: soakRemainingTurns ?? previous?.remainingTurns,
             }));
@@ -1514,9 +1515,9 @@ function Fight() {
                 convertedFreezeStacksFromEffect = Math.floor(currentSoak * Math.min(100, totalEnemyFreezeSoakConvertPercent) / 100);
                 if (convertedFreezeStacksFromEffect > 0) {
                     const remaining = currentSoak - convertedFreezeStacksFromEffect;
-                    setEnemySoakStatus(remaining > 0 ? { kind: "soak", stacks: remaining, remainingTurns: enemySoakStatus?.remainingTurns } : null);
+                    setEnemySoakStatus(remaining > 0 ? { kind: EFFECTS.SOAK, stacks: remaining, remainingTurns: enemySoakStatus?.remainingTurns } : null);
                     const freezeRemainingTurns = totalEnemyFreezeSoakConvertDuration > 0 ? totalEnemyFreezeSoakConvertDuration : undefined;
-                    setEnemyFreezeStatus((prev) => ({ kind: "freeze", stacks: (prev?.stacks ?? 0) + convertedFreezeStacksFromEffect, remainingTurns: freezeRemainingTurns ?? prev?.remainingTurns }));
+                    setEnemyFreezeStatus((prev) => ({ kind: EFFECTS.FREEZE, stacks: (prev?.stacks ?? 0) + convertedFreezeStacksFromEffect, remainingTurns: freezeRemainingTurns ?? prev?.remainingTurns }));
                     await wait(EFFECT_STEP_DELAY_MS);
                 }
             }
@@ -1525,7 +1526,7 @@ function Fight() {
         if (nextEnemyHealth > 0 && totalEnemyThornsApplied > 0) {
             const thornsRemainingTurns = totalEnemyThornsDuration > 0 ? totalEnemyThornsDuration : undefined;
             setEnemyThornsStatus((previous) => ({
-                kind: "thorns",
+                kind: EFFECTS.THORNS,
                 stacks: (previous?.stacks ?? 0) + totalEnemyThornsApplied,
                 remainingTurns: thornsRemainingTurns ?? previous?.remainingTurns,
             }));
@@ -1540,10 +1541,10 @@ function Fight() {
         if (totalEnergizeApplied > 0) {
             setPlayerEnergizeStatus((previous) => {
                 if (!previous) {
-                    return { kind: "energize", stacks: totalEnergizeApplied };
+                    return { kind: EFFECTS.ENERGIZE, stacks: totalEnergizeApplied };
                 }
 
-                return { kind: "energize", stacks: previous.stacks + totalEnergizeApplied };
+                return { kind: EFFECTS.ENERGIZE, stacks: previous.stacks + totalEnergizeApplied };
             });
             await wait(EFFECT_STEP_DELAY_MS);
         }

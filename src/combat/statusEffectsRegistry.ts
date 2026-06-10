@@ -1,7 +1,8 @@
 import type { SpellEffectConfig, SpellEffectKind } from "./spellEffects";
+import { EFFECTS } from "./spellEffects";
 import { BURN_FIRE_BONUS_PERCENT_PER_STACK } from "./statusMath";
 
-type SupportedStatusEffectKind = Exclude<SpellEffectKind, "multi_hit">;
+type SupportedStatusEffectKind = Exclude<SpellEffectKind, typeof EFFECTS.MULTI_HIT>;
 
 type StatusEffectDescriptor = {
     kind: SupportedStatusEffectKind;
@@ -27,12 +28,12 @@ const formatAmountLine = (label: string, effect: SpellEffectConfig): string | nu
 };
 
 const formatChipAmount = (effect: SpellEffectConfig): string | null => {
-    if (effect.kind === "multi_hit") {
+    if (effect.kind === EFFECTS.MULTI_HIT) {
         const hits = Math.max(1, Math.floor(effect.hits ?? 1));
         return hits > 1 ? `${hits}x` : null;
     }
 
-    if (effect.kind === "lifesteal") {
+    if (effect.kind === EFFECTS.LIFESTEAL) {
         const amount = Math.max(0, effect.amount ?? 0);
         if (amount <= 0) {
             return null;
@@ -43,11 +44,11 @@ const formatChipAmount = (effect: SpellEffectConfig): string | null => {
     }
 
     if (
-        effect.kind === "soak"
-        || effect.kind === "energize"
-        || effect.kind === "freeze"
-        || effect.kind === "thorns"
-        || effect.kind === "float"
+        effect.kind === EFFECTS.SOAK
+        || effect.kind === EFFECTS.ENERGIZE
+        || effect.kind === EFFECTS.FREEZE
+        || effect.kind === EFFECTS.THORNS
+        || effect.kind === EFFECTS.FLOAT
     ) {
         return String(Math.max(1, effect.amount ?? 1));
     }
@@ -58,7 +59,7 @@ const formatChipAmount = (effect: SpellEffectConfig): string | null => {
 
 const STATUS_EFFECT_DESCRIPTORS: StatusEffectDescriptor[] = [
     {
-        kind: "heal",
+        kind: EFFECTS.HEAL,
         label: "Heal",
         chipClass: "effect-heal",
         formatLine: (effect) => {
@@ -73,7 +74,7 @@ const STATUS_EFFECT_DESCRIPTORS: StatusEffectDescriptor[] = [
         },
     },
     {
-        kind: "burn",
+        kind: EFFECTS.BURN,
         label: "Burn",
         chipClass: "effect-burn",
         formatLine: (effect) => {
@@ -83,7 +84,7 @@ const STATUS_EFFECT_DESCRIPTORS: StatusEffectDescriptor[] = [
         formatDetail: (effect) => `Each stack increases fire attack damage by ${Math.max(0, Math.floor(effect.amount ?? 0)) * BURN_FIRE_BONUS_PERCENT_PER_STACK}% while it lasts.`,
     },
     {
-        kind: "shield",
+        kind: EFFECTS.SHIELD,
         label: "Shield",
         chipClass: "effect-shield",
         formatLine: (effect) => {
@@ -93,7 +94,7 @@ const STATUS_EFFECT_DESCRIPTORS: StatusEffectDescriptor[] = [
         formatDetail: () => "Absorbs incoming damage.",
     },
     {
-        kind: "lifesteal",
+        kind: EFFECTS.LIFESTEAL,
         label: "Lifesteal",
         chipClass: "effect-lifesteal",
         formatLine: (effect) => {
@@ -108,7 +109,7 @@ const STATUS_EFFECT_DESCRIPTORS: StatusEffectDescriptor[] = [
         formatDetail: () => "Heal yourself based on damage dealt by the hit.",
     },
     {
-        kind: "soak",
+        kind: EFFECTS.SOAK,
         label: "Soak",
         chipClass: "effect-soak",
         formatLine: (effect) => {
@@ -118,7 +119,7 @@ const STATUS_EFFECT_DESCRIPTORS: StatusEffectDescriptor[] = [
         formatDetail: () => "Each stack increases LIGHTNING damage; Reduces FIRE damage.",
     },
     {
-        kind: "energize",
+        kind: EFFECTS.ENERGIZE,
         label: "Energize",
         chipClass: "effect-energize",
         formatLine: (effect) => {
@@ -128,7 +129,7 @@ const STATUS_EFFECT_DESCRIPTORS: StatusEffectDescriptor[] = [
         formatDetail: () => "Gain +1 energy at the start of your next turn",
     },
     {
-        kind: "freeze",
+        kind: EFFECTS.FREEZE,
         label: "Freeze",
         chipClass: "effect-freeze",
         formatLine: (effect) => {
@@ -138,7 +139,7 @@ const STATUS_EFFECT_DESCRIPTORS: StatusEffectDescriptor[] = [
         formatDetail: () => "Each stack significantly increases damage from FIRE attacks.",
     },
     {
-        kind: "thorns",
+        kind: EFFECTS.THORNS,
         label: "Thorns",
         chipClass: "effect-thorns",
         formatLine: (effect) => {
@@ -148,7 +149,7 @@ const STATUS_EFFECT_DESCRIPTORS: StatusEffectDescriptor[] = [
         formatDetail: () => "Reflect a portion of incoming damage to the attacker.",
     },
     {
-        kind: "float",
+        kind: EFFECTS.FLOAT,
         label: "Float",
         chipClass: "effect-float",
         formatLine: (effect) => {
@@ -158,7 +159,7 @@ const STATUS_EFFECT_DESCRIPTORS: StatusEffectDescriptor[] = [
         formatDetail: () => "Reduce EARTH damage taken; Increase LIGHTNING damage taken.",
     },
     {
-        kind: "combo",
+        kind: EFFECTS.COMBO,
         label: "Combo",
         chipClass: "effect-combo",
         formatLine: (effect) => `Combo: ${formatComboType(effect.targetType)} costs -1 energy`,
@@ -168,21 +169,21 @@ const STATUS_EFFECT_DESCRIPTORS: StatusEffectDescriptor[] = [
         },
     },
     {
-        kind: "explode",
+        kind: EFFECTS.EXPLODE,
         label: "Combust",
         chipClass: "effect-explode",
         formatLine: () => "Combust: +150% power",
         formatDetail: () => "Increases attack power by 150%, but the caster takes recoil damage equal to 10% of that boosted attack power.",
     },
     {
-        kind: "poison",
+        kind: EFFECTS.POISON,
         label: "Poison",
         chipClass: "effect-poison",
         formatLine: (effect) => formatAmountLine("Poison", effect),
         formatDetail: () => "Deals damage over time at the end of each turn.",
     },
     {
-        kind: "energy_combo",
+        kind: EFFECTS.ENERGY_COMBO,
         label: "Energy Combo",
         chipClass: "effect-energy-combo",
         formatLine: (effect) => `Energy Combo: ${formatComboType(effect.targetType)} costs -1 energy`,
@@ -192,7 +193,7 @@ const STATUS_EFFECT_DESCRIPTORS: StatusEffectDescriptor[] = [
         },
     },
     {
-        kind: "power_combo",
+        kind: EFFECTS.POWER_COMBO,
         label: "Power Combo",
         chipClass: "effect-power-combo",
         formatLine: (effect) => `Power Combo: ${formatComboType(effect.targetType)} costs -1 energy`,
@@ -202,49 +203,49 @@ const STATUS_EFFECT_DESCRIPTORS: StatusEffectDescriptor[] = [
         },
     },
     {
-        kind: "follow_up",
+        kind: EFFECTS.FOLLOW_UP,
         label: "Follow Up",
         chipClass: "effect-follow-up",
         formatLine: (effect) => formatAmountLine("Follow Up", effect),
         formatDetail: () => "Sets up a follow-up attack or bonus effect.",
     },
     {
-        kind: "charge",
+        kind: EFFECTS.CHARGE,
         label: "Charge",
         chipClass: "effect-charge",
         formatLine: (effect) => formatAmountLine("Charge", effect),
         formatDetail: () => "Builds momentum for a later action.",
     },
     {
-        kind: "exhaust",
+        kind: EFFECTS.EXHAUST,
         label: "Exhaust",
         chipClass: "effect-exhaust",
         formatLine: (effect) => formatAmountLine("Exhaust", effect),
         formatDetail: () => "Saps stamina and makes the target less effective.",
     },
     {
-        kind: "consume",
+        kind: EFFECTS.CONSUME,
         label: "Consume",
         chipClass: "effect-consume",
         formatLine: (effect) => formatAmountLine("Consume", effect),
         formatDetail: () => "Consumes this effect to trigger its payoff.",
     },
     {
-        kind: "hardened",
+        kind: EFFECTS.HARDENED,
         label: "Hardened",
         chipClass: "effect-hardened",
         formatLine: (effect) => formatAmountLine("Hardened", effect),
         formatDetail: () => "Consumes all energy to increase attack power.",
     },
     {
-        kind: "rage",
+        kind: EFFECTS.RAGE,
         label: "Rage",
         chipClass: "effect-rage",
         formatLine: (effect) => formatAmountLine("Rage", effect),
         formatDetail: () => "Increases damage while it is active.",
     },
     {
-        kind: "brittle",
+        kind: EFFECTS.BRITTLE,
         label: "Brittle",
         chipClass: "effect-brittle",
         formatLine: (effect) => {
@@ -276,7 +277,7 @@ export class StatusEffectsRegistry {
     }
 
     getSummaryLine(effect: SpellEffectConfig): string | null {
-        if (effect.kind === "multi_hit") {
+        if (effect.kind === EFFECTS.MULTI_HIT) {
             return null;
         }
 
@@ -294,7 +295,7 @@ export class StatusEffectsRegistry {
             return shortDescription;
         }
 
-        if (effect.kind === "multi_hit") {
+        if (effect.kind === EFFECTS.MULTI_HIT) {
             const hits = Math.max(1, Math.floor(effect.hits ?? 1));
             return hits > 1
                 ? `This cast strikes ${hits} times.`
@@ -310,7 +311,7 @@ export class StatusEffectsRegistry {
     }
 
     getChipLabel(effect: SpellEffectConfig): string {
-        if (effect.kind === "multi_hit") {
+        if (effect.kind === EFFECTS.MULTI_HIT) {
             const amountText = formatChipAmount(effect);
             return amountText ? `Hits ${amountText}` : "Hits";
         }

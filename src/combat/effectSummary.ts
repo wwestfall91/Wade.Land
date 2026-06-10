@@ -1,4 +1,5 @@
 import type { SpellEffectConfig } from "./spellEffects";
+import { EFFECTS as SK } from "./spellEffects";
 import { statusEffectsRegistry } from "./statusEffectsRegistry";
 
 type EffectTarget = "self" | "enemy";
@@ -7,7 +8,7 @@ export const getEffectSummaryLines = (effects?: SpellEffectConfig[] | null): str
     const lines: string[] = [];
     const normalizedEffects = effects ?? [];
 
-    const multiHit = normalizedEffects.find((effect) => effect.kind === "multi_hit");
+    const multiHit = normalizedEffects.find((effect) => effect.kind === SK.MULTI_HIT);
     if (multiHit?.hits && multiHit.hits > 1) {
         lines.push(`Hits: ${multiHit.hits}x`);
     }
@@ -29,13 +30,13 @@ export const getEffectSummaryLinesForTarget = (
     const lines: string[] = [];
     const normalizedEffects = effects ?? [];
 
-    const multiHit = normalizedEffects.find((effect) => effect.kind === "multi_hit");
+    const multiHit = normalizedEffects.find((effect) => effect.kind === SK.MULTI_HIT);
     if (multiHit?.hits && multiHit.hits > 1) {
         lines.push(`Hits: ${multiHit.hits}x`);
     }
 
     normalizedEffects.forEach((effect) => {
-        if (effect.kind !== "multi_hit" && effect.target !== target) {
+        if (effect.kind !== SK.MULTI_HIT && effect.target !== target) {
             return;
         }
 

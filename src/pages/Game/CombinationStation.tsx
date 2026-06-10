@@ -1,5 +1,6 @@
 import type { RefObject } from "react";
 import type { SpellEffectConfig } from "../../combat/spellEffects";
+import "./CombinationStation.scss";
 
 export type CombinationStationState = {
     key: "idle" | "cleanse" | "polish" | "purify" | "refine" | "enhance";
@@ -135,7 +136,7 @@ function CombinationStation({
                             onHoverInsertSlot(null);
                         }}
                     >
-                        Catalyst
+                        Mode
                         {shouldShowSlotOneInsertPrompt ? (
                             <CombineStationTooltip
                                 className="combine-station-tooltip--slot-one"
@@ -154,7 +155,7 @@ function CombinationStation({
                             onHoverInsertSlot(null);
                         }}
                     >
-                        Base
+                        Element
                         {shouldShowSlotTwoInsertPrompt ? (
                             <CombineStationTooltip
                                 className="combine-station-tooltip--slot-two"
@@ -169,7 +170,6 @@ function CombinationStation({
                 </div>
                 <div className="output" ref={outputRef} />
             </div>
-
             <div
                 className={`combine-button-wrap ${isCombineButtonDisabled ? "is-disabled" : ""}`}
                 onMouseEnter={() => {

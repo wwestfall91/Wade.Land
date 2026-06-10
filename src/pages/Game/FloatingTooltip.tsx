@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { SpellEffectConfig } from "../../combat/spellEffects";
+import { EFFECTS as SK } from "../../combat/spellEffects";
 import type { ElementEnhancements } from "../../context/PlayerContext";
 import { statusEffectsRegistry } from "../../combat/statusEffectsRegistry";
 import "./FloatingTooltip.scss";
@@ -231,7 +232,7 @@ function FloatingTooltip({
         : [];
 
     const effectKinds = (elementDetails?.effects ?? []).map((effect, index) => {
-        const descriptor = effect.kind === "multi_hit" ? undefined : statusEffectsRegistry.get(effect.kind);
+        const descriptor = effect.kind === SK.MULTI_HIT ? undefined : statusEffectsRegistry.get(effect.kind);
         const detail = statusEffectsRegistry.getEffectDetail(effect);
         const chipLabel = statusEffectsRegistry.getChipLabel(effect);
 
@@ -239,14 +240,14 @@ function FloatingTooltip({
             key: `${effect.kind}-${index}`,
             label: chipLabel,
             detail,
-            chipClass: effect.kind === "multi_hit"
+            chipClass: effect.kind === SK.MULTI_HIT
                 ? "effect-multi-hit"
                 : (descriptor?.chipClass ?? "effect-default"),
         };
     });
 
     const sourceEffectKinds = (elementDetails?.sourceEffects ?? []).map((effect, index) => {
-        const descriptor = effect.kind === "multi_hit" ? undefined : statusEffectsRegistry.get(effect.kind);
+        const descriptor = effect.kind === SK.MULTI_HIT ? undefined : statusEffectsRegistry.get(effect.kind);
         const detail = statusEffectsRegistry.getEffectDetail(effect);
         const chipLabel = statusEffectsRegistry.getChipLabel(effect);
 
@@ -254,7 +255,7 @@ function FloatingTooltip({
             key: `source-${effect.kind}-${index}`,
             label: chipLabel,
             detail,
-            chipClass: effect.kind === "multi_hit"
+            chipClass: effect.kind === SK.MULTI_HIT
                 ? "effect-multi-hit"
                 : (descriptor?.chipClass ?? "effect-default"),
         };

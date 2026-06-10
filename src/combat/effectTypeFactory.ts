@@ -1,4 +1,5 @@
 import type { SpellEffectConfig, SpellEffectKind } from "./spellEffects";
+import { EFFECTS } from "./spellEffects";
 
 export type RuntimeEffectType = "active" | "passive" | "stack" | "create" | "element";
 
@@ -11,33 +12,33 @@ export type EffectLifecycleBuckets = {
 };
 
 const EFFECT_TYPE_BY_KIND: Record<SpellEffectKind, RuntimeEffectType> = {
-    heal: "active",
-    multi_hit: "active",
-    burn: "stack",
-    shield: "active",
-    lifesteal: "active",
-    soak: "stack",
-    energize: "stack",
-    freeze: "stack",
-    thorns: "stack",
-    float: "passive",
-    combo: "active",
-    explode: "active",
-    poison: "stack",
-    energy_combo: "active",
-    power_combo: "active",
-    follow_up: "active",
-    charge: "active",
-    exhaust: "active",
-    consume: "active",
-    hardened: "active",
-    rage: "active",
-    squishy: "active",
-    exponential: "active",
-    powerful: "create",
-    energetic: "create",
-    efficient: "create",
-    brittle: "element",
+    [EFFECTS.HEAL]:         "active",
+    [EFFECTS.MULTI_HIT]:    "active",
+    [EFFECTS.BURN]:         "stack",
+    [EFFECTS.SHIELD]:       "active",
+    [EFFECTS.LIFESTEAL]:    "active",
+    [EFFECTS.SOAK]:         "stack",
+    [EFFECTS.ENERGIZE]:     "stack",
+    [EFFECTS.FREEZE]:       "stack",
+    [EFFECTS.THORNS]:       "stack",
+    [EFFECTS.FLOAT]:        "passive",
+    [EFFECTS.COMBO]:        "active",
+    [EFFECTS.EXPLODE]:      "active",
+    [EFFECTS.POISON]:       "stack",
+    [EFFECTS.ENERGY_COMBO]: "active",
+    [EFFECTS.POWER_COMBO]:  "active",
+    [EFFECTS.FOLLOW_UP]:    "active",
+    [EFFECTS.CHARGE]:       "active",
+    [EFFECTS.EXHAUST]:      "active",
+    [EFFECTS.CONSUME]:      "active",
+    [EFFECTS.HARDENED]:     "active",
+    [EFFECTS.RAGE]:         "active",
+    [EFFECTS.SQUISHY]:      "active",
+    [EFFECTS.EXPONENTIAL]:  "active",
+    [EFFECTS.POWERFUL]:     "create",
+    [EFFECTS.ENERGETIC]:    "create",
+    [EFFECTS.EFFICIENT]:    "create",
+    [EFFECTS.BRITTLE]:      "element",
 };
 
 export class EffectTypeFactory {

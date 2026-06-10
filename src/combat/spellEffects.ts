@@ -1,31 +1,41 @@
-export type SpellEffectKind =
-    | "heal"
-    | "multi_hit"
-    | "burn"
-    | "shield"
-    | "lifesteal"
-    | "soak"
-    | "energize"
-    | "freeze"
-    | "thorns"
-    | "float"
-    | "combo"
-    | "explode"
-    | "poison"
-    | "energy_combo"
-    | "power_combo"
-    | "follow_up"
-    | "charge"
-    | "exhaust"
-    | "consume"
-    | "hardened"
-    | "rage"
-    | "squishy"
-    | "exponential"
-    | "powerful"
-    | "energetic"
-    | "efficient"
-    | "brittle";
+/**
+ * All canonical internal effect kind names — the single source of truth.
+ * To rename an effect internally, change its value here. TypeScript will
+ * surface every reference that needs updating across the entire codebase.
+ */
+export const EFFECTS = {
+    HEAL:         "heal",
+    MULTI_HIT:    "multi_hit",
+    BURN:         "burn",
+    SHIELD:       "shield",
+    LIFESTEAL:    "lifesteal",
+    SOAK:         "soak",
+    ENERGIZE:     "energize",
+    FREEZE:       "freeze",
+    THORNS:       "thorns",
+    FLOAT:        "float",
+    COMBO:        "combo",
+    EXPLODE:      "explode",
+    POISON:       "poison",
+    ENERGY_COMBO: "energy_combo",
+    POWER_COMBO:  "power_combo",
+    FOLLOW_UP:    "follow_up",
+    CHARGE:       "charge",
+    EXHAUST:      "exhaust",
+    CONSUME:      "consume",
+    HARDENED:     "hardened",
+    RAGE:         "rage",
+    SQUISHY:      "squishy",
+    EXPONENTIAL:  "exponential",
+    POWERFUL:     "powerful",
+    ENERGETIC:    "energetic",
+    EFFICIENT:    "efficient",
+    BRITTLE:      "brittle",
+} as const;
+
+
+// Derived union — never edit this line; rename values in SPELL_EFFECT_KINDS instead.
+export type SpellEffectKind = typeof EFFECTS[keyof typeof EFFECTS];
 
 export type SpellEffectTarget = "self" | "enemy";
 
@@ -45,36 +55,36 @@ export type SpellEffectConfig = {
 };
 
 export type ActiveBurnStatus = {
-    kind: "burn";
+    kind: typeof EFFECTS.BURN;
     stacks: number;
     remainingTurns: number;
 };
 
 export type ActiveSoakStatus = {
-    kind: "soak";
+    kind: typeof EFFECTS.SOAK;
     stacks: number;
     remainingTurns?: number;
 };
 
 export type ActiveFreezeStatus = {
-    kind: "freeze";
+    kind: typeof EFFECTS.FREEZE;
     stacks: number;
     remainingTurns?: number;
 };
 
 export type ActiveEnergizeStatus = {
-    kind: "energize";
+    kind: typeof EFFECTS.ENERGIZE;
     stacks: number;
 };
 
 export type ActiveThornsStatus = {
-    kind: "thorns";
+    kind: typeof EFFECTS.THORNS;
     stacks: number;
     remainingTurns?: number;
 };
 
 export type ActiveFloatStatus = {
-    kind: "float";
+    kind: typeof EFFECTS.FLOAT;
     stacks: number;
 };
 
@@ -101,93 +111,61 @@ const readFirstString = (row: Record<string, unknown>, keys: string[]): string =
     return String(value ?? "").trim();
 };
 
-const SELF_TARGET_EFFECT_KINDS: SpellEffectKind[] = [
-    "heal",
-    "shield",
-    "lifesteal",
-    "energize",
-    "thorns",
-    "float",
-    "combo",
-    "energy_combo",
-    "power_combo",
-    "follow_up",
-    "charge",
-    "consume",
-    "hardened",
-    "rage",
-    "powerful",
-    "energetic",
-    "efficient",
-    "brittle",
+const SELF_TARGET_EFFECT_KINDS: ReadonlyArray<SpellEffectKind> = [
+    EFFECTS.HEAL, EFFECTS.SHIELD, EFFECTS.LIFESTEAL, EFFECTS.ENERGIZE, EFFECTS.THORNS, EFFECTS.FLOAT,
+    EFFECTS.COMBO, EFFECTS.ENERGY_COMBO, EFFECTS.POWER_COMBO, EFFECTS.FOLLOW_UP, EFFECTS.CHARGE,
+    EFFECTS.CONSUME, EFFECTS.HARDENED, EFFECTS.RAGE, EFFECTS.POWERFUL, EFFECTS.ENERGETIC, EFFECTS.EFFICIENT, EFFECTS.BRITTLE,
 ];
+
+/**
+ * Maps every spreadsheet-facing name to its internal SpellEffectKind.
+ *
+ * This is the SINGLE place to update when an effect is renamed in the
+ * spreadsheet. Add an alias entry here; nothing else in the codebase needs
+ * to change. Keys must be lowercase with spaces/dashes already replaced by
+ * underscores (the normalization step below handles that before lookup).
+ */
+export const EFFECT_KIND_ALIASES: Readonly<Record<string, SpellEffectKind>> = {
+    // ── canonical internal names ──────────────────────────────────────────
+    heal:         EFFECTS.HEAL,
+    multi_hit:    EFFECTS.MULTI_HIT,
+    burn:         EFFECTS.BURN,
+    shield:       EFFECTS.SHIELD,
+    lifesteal:    EFFECTS.LIFESTEAL,
+    soak:         EFFECTS.SOAK,
+    energize:     EFFECTS.ENERGIZE,
+    freeze:       EFFECTS.FREEZE,
+    thorns:       EFFECTS.THORNS,
+    float:        EFFECTS.FLOAT,
+    combo:        EFFECTS.COMBO,
+    explode:      EFFECTS.EXPLODE,
+    poison:       EFFECTS.POISON,
+    energy_combo: EFFECTS.ENERGY_COMBO,
+    power_combo:  EFFECTS.POWER_COMBO,
+    follow_up:    EFFECTS.FOLLOW_UP,
+    charge:       EFFECTS.CHARGE,
+    exhaust:      EFFECTS.EXHAUST,
+    consume:      EFFECTS.CONSUME,
+    hardened:     EFFECTS.HARDENED,
+    rage:         EFFECTS.RAGE,
+    squishy:      EFFECTS.SQUISHY,
+    exponential:  EFFECTS.EXPONENTIAL,
+    powerful:     EFFECTS.POWERFUL,
+    energetic:    EFFECTS.ENERGETIC,
+    efficient:    EFFECTS.EFFICIENT,
+    brittle:      EFFECTS.BRITTLE,
+    // ── spreadsheet aliases ───────────────────────────────────────────────
+    multihit:     EFFECTS.MULTI_HIT,    // "multi hit" / "multihit" in sheet
+    combust:      EFFECTS.EXPLODE,      // "combust" in sheet
+    energycombo:  EFFECTS.ENERGY_COMBO,
+    powercombo:   EFFECTS.POWER_COMBO,
+    followup:     EFFECTS.FOLLOW_UP,
+    soaker:       EFFECTS.SOAK,         // renamed in sheet
+};
 
 const normalizeEffectKind = (value: string): SpellEffectKind | null => {
     const normalized = value.trim().toLowerCase().replace(/[\s-]+/g, "_");
-
-    switch (normalized) {
-        case "heal":
-            return "heal";
-        case "multihit":
-        case "multi_hit":
-            return "multi_hit";
-        case "burn":
-            return "burn";
-        case "shield":
-            return "shield";
-        case "lifesteal":
-            return "lifesteal";
-        case "soak":
-            return "soak";
-        case "energize":
-            return "energize";
-        case "freeze":
-            return "freeze";
-        case "thorns":
-            return "thorns";
-        case "float":
-            return "float";
-        case "combo":
-            return "combo";
-        case "explode":
-        case "combust":
-            return "explode";
-        case "poison":
-            return "poison";
-        case "energy_combo":
-        case "energycombo":
-            return "energy_combo";
-        case "power_combo":
-        case "powercombo":
-            return "power_combo";
-        case "follow_up":
-        case "followup":
-            return "follow_up";
-        case "charge":
-            return "charge";
-        case "exhaust":
-            return "exhaust";
-        case "consume":
-            return "consume";
-        case "hardened":
-            return "hardened";
-        case "rage":
-            return "rage";
-        case "squishy":
-            return "squishy";
-        case "exponential":
-            return "exponential";
-        case "powerful":
-            return "powerful";
-        case "energetic":
-            return "energetic";
-        case "efficient":
-            return "efficient";
-        case "brittle":
-            return "brittle";
-        default:
-            return null;
-    }
+    return EFFECT_KIND_ALIASES[normalized] ?? null;
 };
 
 const normalizeBattleType = (value: string): string =>
@@ -232,20 +210,20 @@ export const parseSpellEffectsFromRow = (
             continue;
         }
 
-            const amount = safeNumber(readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Amount")));
-            const hits = safeNumber(readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Hits")));
-            const duration = safeNumber(readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Duration")));
-            const growth = normalizeGrowth(readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Growth")));
-            const shortDescription = readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Short Description"));
-            const defaultTarget: SpellEffectTarget = SELF_TARGET_EFFECT_KINDS.includes(kind) ? "self" : "enemy";
-            const rawTarget = readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Target"));
-            const target = normalizeTarget(rawTarget, defaultTarget);
+        const amount = safeNumber(readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Amount")));
+        const hits = safeNumber(readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Hits")));
+        const duration = safeNumber(readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Duration")));
+        const growth = normalizeGrowth(readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Growth")));
+        const shortDescription = readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Short Description"));
+        const defaultTarget: SpellEffectTarget = SELF_TARGET_EFFECT_KINDS.includes(kind) ? "self" : "enemy";
+        const rawTarget = readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Target"));
+        const target = normalizeTarget(rawTarget, defaultTarget);
 
         const effect: SpellEffectConfig = { kind, target };
 
-            if ((kind === "combo" || kind === "energy_combo" || kind === "power_combo") && rawTarget.length > 0 && target === defaultTarget) {
-                effect.targetType = normalizeBattleType(rawTarget);
-            }
+        if ((kind === EFFECTS.COMBO || kind === EFFECTS.ENERGY_COMBO || kind === EFFECTS.POWER_COMBO) && rawTarget.length > 0 && target === defaultTarget) {
+            effect.targetType = normalizeBattleType(rawTarget);
+        }
 
         if (amount !== undefined) {
             effect.amount = amount;
@@ -270,9 +248,9 @@ export const parseSpellEffectsFromRow = (
 };
 
 export const getSpellHitCount = (effects?: SpellEffectConfig[]): number => {
-    const multiHit = effects?.find((effect) => effect.kind === "multi_hit");
+    const multiHit = effects?.find((effect) => effect.kind === EFFECTS.MULTI_HIT);
     return Math.max(1, Math.floor(multiHit?.hits ?? 1));
 };
 
 export const getPerHitSpellEffects = (effects?: SpellEffectConfig[]): SpellEffectConfig[] =>
-    (effects ?? []).filter((effect) => effect.kind !== "multi_hit");
+    (effects ?? []).filter((effect) => effect.kind !== EFFECTS.MULTI_HIT);

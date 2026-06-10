@@ -1,5 +1,6 @@
 import type { SpellEffectConfig } from "../../combat/spellEffects";
 import type { SpellEffectGrowth } from "../../combat/spellEffects";
+import { EFFECTS as SK } from "../../combat/spellEffects";
 import { effectTypeFactory } from "../../combat/effectTypeFactory";
 
 export type EffectWorkbookRow = {
@@ -140,7 +141,7 @@ export const resolveCombinationPreviewFromEffects = (
     creationEffects.forEach((effect) => {
         const amount = Math.max(0, effect.amount ?? 0);
 
-        if (effect.kind === "powerful") {
+        if (effect.kind === SK.POWERFUL) {
             const multiplier = asPercentMultiplier(amount);
             const nextDamage = Math.max(0, Math.round(resolvedDamage * multiplier));
             if (nextDamage !== resolvedDamage) {
@@ -150,7 +151,7 @@ export const resolveCombinationPreviewFromEffects = (
             return;
         }
 
-        if (effect.kind === "energetic") {
+        if (effect.kind === SK.ENERGETIC) {
             const reduction = Math.floor(amount);
             const prevEnergy = resolvedEnergy ?? 0;
             resolvedEnergy = Math.max(0, prevEnergy - reduction);
@@ -160,7 +161,7 @@ export const resolveCombinationPreviewFromEffects = (
             return;
         }
 
-        if (effect.kind === "efficient") {
+        if (effect.kind === SK.EFFICIENT) {
             const multiplier = asPercentMultiplier(amount);
             resolvedEffects = applyEfficientToEffects(resolvedEffects, multiplier);
         }

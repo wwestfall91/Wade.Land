@@ -1,4 +1,5 @@
 import type { SpellEffectConfig } from "./spellEffects";
+import { EFFECTS as SK } from "./spellEffects";
 
 // ── Delta types ───────────────────────────────────────────────────────────────
 
@@ -111,14 +112,14 @@ export class EffectFactory {
         for (const effect of effects) {
             const amount = Math.max(0, effect.amount ?? 0);
 
-            if (effect.kind === "rage") {
+            if (effect.kind === SK.RAGE) {
                 // +X damage per 1 HP missing
                 const missing = Math.max(0, context.playerMaxHp - context.playerCurrentHp);
                 flatBonus += missing * amount;
-            } else if (effect.kind === "charge") {
+            } else if (effect.kind === SK.CHARGE) {
                 // ×(1 + energyCost × X%) — deals +X% more per energy in cost
                 multiplier *= 1 + context.spellEnergyCost * (amount / 100);
-            } else if (effect.kind === "hardened") {
+            } else if (effect.kind === SK.HARDENED) {
                 // ×(1 + shield × X%) — gets +X% attack power per shield
                 if (context.playerShield > 0) {
                     multiplier *= 1 + context.playerShield * (amount / 100);
@@ -131,7 +132,7 @@ export class EffectFactory {
 
     resolvePlayerAttackEffect(effect: SpellEffectConfig, hitDamage: number): PlayerAttackEffectDelta {
         switch (effect.kind) {
-            case "heal": {
+            case SK.HEAL: {
                 // Restores X HP
                 if (effect.target === "enemy") return EMPTY_PLAYER_ATTACK_DELTA;
                 const amount = Math.max(0, effect.amount ?? 0);
@@ -139,7 +140,7 @@ export class EffectFactory {
                     ? { ...EMPTY_PLAYER_ATTACK_DELTA, playerHealing: amount }
                     : EMPTY_PLAYER_ATTACK_DELTA;
             }
-            case "burn": {
+            case SK.BURN: {
                 // Applies X BURN stacks on hit
                 if (effect.target === "self") return EMPTY_PLAYER_ATTACK_DELTA;
                 const amount = Math.max(0, effect.amount ?? 0);
@@ -148,7 +149,7 @@ export class EffectFactory {
                     ? { ...EMPTY_PLAYER_ATTACK_DELTA, enemyBurnApplied: amount, enemyBurnDuration: duration }
                     : EMPTY_PLAYER_ATTACK_DELTA;
             }
-            case "shield": {
+            case SK.SHIELD: {
                 // Absorbs X damage per 1 shield granted
                 if (effect.target === "enemy") return EMPTY_PLAYER_ATTACK_DELTA;
                 const amount = Math.max(0, effect.amount ?? 0);
@@ -156,7 +157,7 @@ export class EffectFactory {
                     ? { ...EMPTY_PLAYER_ATTACK_DELTA, playerShieldGranted: amount }
                     : EMPTY_PLAYER_ATTACK_DELTA;
             }
-            case "lifesteal": {
+            case SK.LIFESTEAL: {
                 if (effect.target === "enemy") return EMPTY_PLAYER_ATTACK_DELTA;
                 const amount = Math.max(0, effect.amount ?? 0);
                 const multiplier = amount > 1 ? amount / 100 : amount;
@@ -165,7 +166,7 @@ export class EffectFactory {
                     ? { ...EMPTY_PLAYER_ATTACK_DELTA, playerHealing: healing }
                     : EMPTY_PLAYER_ATTACK_DELTA;
             }
-            case "soak": {
+            case SK.SOAK: {
                 // Applies X SOAK stacks on hit
                 if (effect.target === "self") return EMPTY_PLAYER_ATTACK_DELTA;
                 return {
@@ -174,12 +175,12 @@ export class EffectFactory {
                     enemySoakDuration: effect.duration ?? 0,
                 };
             }
-            case "energize": {
+            case SK.ENERGIZE: {
                 // Each stack provides +X energy next turn
                 if (effect.target === "enemy") return EMPTY_PLAYER_ATTACK_DELTA;
                 return { ...EMPTY_PLAYER_ATTACK_DELTA, playerEnergizeApplied: Math.max(1, effect.amount ?? 1) };
             }
-            case "freeze": {
+            case SK.FREEZE: {
                 // Transforms X% of target SOAK stacks into ICE (freeze) stacks
                 if (effect.target === "self") return EMPTY_PLAYER_ATTACK_DELTA;
                 const convertPercent = Math.max(0, effect.amount ?? 100);
@@ -189,7 +190,7 @@ export class EffectFactory {
                     enemyFreezeSoakConvertDuration: effect.duration ?? 0,
                 };
             }
-            case "thorns": {
+            case SK.THORNS: {
                 // Applies X THORNS stacks on self when used
                 if (effect.target !== "self") return EMPTY_PLAYER_ATTACK_DELTA;
                 return {
@@ -198,19 +199,19 @@ export class EffectFactory {
                     enemyThornsDuration: effect.duration ?? 0,
                 };
             }
-            case "exhaust": {
+            case SK.EXHAUST: {
                 // Removes X% of caster's remaining energy when used
                 if (effect.target === "enemy") return EMPTY_PLAYER_ATTACK_DELTA;
                 const pct = Math.max(0, effect.amount ?? 0);
                 return { ...EMPTY_PLAYER_ATTACK_DELTA, playerExhaustEnergyPercent: pct };
             }
-            case "squishy": {
+            case SK.SQUISHY: {
                 // Removes X% of caster's shield when used
                 if (effect.target === "enemy") return EMPTY_PLAYER_ATTACK_DELTA;
                 const pct = Math.max(0, effect.amount ?? 0);
                 return { ...EMPTY_PLAYER_ATTACK_DELTA, playerSquishyShieldPercent: pct };
             }
-            case "consume": {
+            case SK.CONSUME: {
                 // Each use permanently reduces caster's max HP by X
                 if (effect.target === "enemy") return EMPTY_PLAYER_ATTACK_DELTA;
                 const amount = Math.max(0, effect.amount ?? 0);
@@ -223,9 +224,9 @@ export class EffectFactory {
 
     resolveEnemyAttackEffect(effect: SpellEffectConfig, remainingDamage: number): EnemyAttackEffectDelta {
         switch (effect.kind) {
-            case "heal":
+            case SK.HEAL:
                 return EMPTY_ENEMY_ATTACK_DELTA;
-            case "burn": {
+            case SK.BURN: {
                 if (effect.target !== "enemy") return EMPTY_ENEMY_ATTACK_DELTA;
                 const amount = Math.max(0, effect.amount ?? 0);
                 const duration = Math.max(1, effect.duration ?? 1);
@@ -233,14 +234,14 @@ export class EffectFactory {
                     ? { ...EMPTY_ENEMY_ATTACK_DELTA, playerBurnApplied: amount, playerBurnDuration: duration }
                     : EMPTY_ENEMY_ATTACK_DELTA;
             }
-            case "shield": {
+            case SK.SHIELD: {
                 if (effect.target !== "enemy") return EMPTY_ENEMY_ATTACK_DELTA;
                 const amount = Math.max(0, effect.amount ?? 0);
                 return amount > 0
                     ? { ...EMPTY_ENEMY_ATTACK_DELTA, playerShieldGranted: amount }
                     : EMPTY_ENEMY_ATTACK_DELTA;
             }
-            case "lifesteal": {
+            case SK.LIFESTEAL: {
                 if (effect.target !== "self") return EMPTY_ENEMY_ATTACK_DELTA;
                 const amount = Math.max(0, effect.amount ?? 0);
                 const multiplier = amount > 1 ? amount / 100 : amount;
@@ -249,7 +250,7 @@ export class EffectFactory {
                     ? { ...EMPTY_ENEMY_ATTACK_DELTA, enemyHealing: healing }
                     : EMPTY_ENEMY_ATTACK_DELTA;
             }
-            case "soak": {
+            case SK.SOAK: {
                 if (effect.target !== "enemy") return EMPTY_ENEMY_ATTACK_DELTA;
                 return {
                     ...EMPTY_ENEMY_ATTACK_DELTA,
@@ -257,7 +258,7 @@ export class EffectFactory {
                     playerSoakDuration: effect.duration ?? 0,
                 };
             }
-            case "freeze": {
+            case SK.FREEZE: {
                 // Transforms X% of target SOAK stacks into ICE (freeze) stacks
                 if (effect.target !== "enemy") return EMPTY_ENEMY_ATTACK_DELTA;
                 const convertPercent = Math.max(0, effect.amount ?? 100);
@@ -267,7 +268,7 @@ export class EffectFactory {
                     playerFreezeSoakConvertDuration: effect.duration ?? 0,
                 };
             }
-            case "thorns": {
+            case SK.THORNS: {
                 if (effect.target !== "enemy") return EMPTY_ENEMY_ATTACK_DELTA;
                 return {
                     ...EMPTY_ENEMY_ATTACK_DELTA,
