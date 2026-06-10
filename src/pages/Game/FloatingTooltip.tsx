@@ -190,7 +190,7 @@ export function TooltipPanelContent({ elementDetails, changedKeys, typeMultiplie
                 </div>
                 <span className={`damage-details${changedKeys?.has("damage") ? " property-changed" : ""}`}>
                     <span className="damage-label">Damage:</span>
-                    <span className={`damage-value${elementDetails.isDamageEnhanced ? " damage-value--enhanced" : ""}${elementDetails.isCombusted ? " damage-value--combusted" : ""}`}>
+                    <span className={`damage-value${elementDetails.isDamageEnhanced ? " damage-value--enhanced" : ""}${elementDetails.isCombusted ? " damage-value--combusted" : ""}${changedKeys?.has("damage") ? " property-changed-value" : ""}`}>
                         {hasEnhanceDamagePreview ? (
                             <>
                                 <span className="damage-value-before">{enhancedDamageBefore}</span>
