@@ -55,6 +55,97 @@ const CombineStationTooltip = ({ message, className = "" }: CombineStationToolti
     </div>
 );
 
+type CombinationModePanelProps = {
+    className: string;
+    dropZoneClassName: string;
+    dropZoneRefA: RefObject<HTMLDivElement>;
+    onHoverInsertSlot: (slot: 1 | 2 | null) => void;
+    shouldShowSlotOneInsertPrompt: boolean;
+};
+
+const CombinationModePanel = ({
+    className,
+    dropZoneClassName,
+    dropZoneRefA,
+    onHoverInsertSlot,
+    shouldShowSlotOneInsertPrompt,
+}: CombinationModePanelProps) => (
+    <div className={className}>
+        <div className="drop-zone-area">
+            <div
+                className={dropZoneClassName}
+                ref={dropZoneRefA}
+                onMouseEnter={() => {
+                    onHoverInsertSlot(1);
+                }}
+                onMouseLeave={() => {
+                    onHoverInsertSlot(null);
+                }}
+            >
+                Mode
+                {shouldShowSlotOneInsertPrompt ? (
+                    <CombineStationTooltip
+                        className="combine-station-tooltip--slot-one"
+                        message="Please insert element"
+                    />
+                ) : null}
+            </div>
+        </div>
+    </div>
+);
+
+type CombinationResultPanelProps = {
+    className: string;
+    secondaryDropZoneClassName: string;
+    secondSlotConnectorClassName: string;
+    zoneOccupants: Array<number | null>;
+    dropZoneRefB: RefObject<HTMLDivElement>;
+    dropZoneRefC: RefObject<HTMLDivElement>;
+    outputRef: RefObject<HTMLDivElement>;
+    onHoverInsertSlot: (slot: 1 | 2 | null) => void;
+    shouldShowSlotTwoInsertPrompt: boolean;
+};
+
+const CombinationResultPanel = ({
+    className,
+    secondaryDropZoneClassName,
+    secondSlotConnectorClassName,
+    zoneOccupants,
+    dropZoneRefB,
+    dropZoneRefC,
+    outputRef,
+    onHoverInsertSlot,
+    shouldShowSlotTwoInsertPrompt,
+}: CombinationResultPanelProps) => (
+    <div className={className}>
+        <div className="drop-zone-area">
+            <div
+                className={secondaryDropZoneClassName}
+                ref={dropZoneRefB}
+                onMouseEnter={() => {
+                    onHoverInsertSlot(2);
+                }}
+                onMouseLeave={() => {
+                    onHoverInsertSlot(null);
+                }}
+            >
+                Element
+                {shouldShowSlotTwoInsertPrompt ? (
+                    <CombineStationTooltip
+                        className="combine-station-tooltip--slot-two"
+                        message="Please insert element"
+                    />
+                ) : null}
+            </div>
+            {zoneOccupants.length === 3 ? (
+                <div className="drop-zone" ref={dropZoneRefC}>3</div>
+            ) : null}
+            <div className={secondSlotConnectorClassName} aria-hidden="true" />
+            <div className="output" ref={outputRef} />
+        </div>
+    </div>
+);
+
 type CombinationStationProps = {
     zoneOccupants: Array<number | null>;
     hasStartedDraggingElement: boolean;
@@ -111,11 +202,25 @@ function CombinationStation({
         zoneOccupants[0] !== null && zoneOccupants[1] !== null ? "is-lit" : "",
         zoneOccupants[0] !== null && zoneOccupants[1] !== null ? "slot-connector--yellow" : "",
     ].filter((name) => name.length > 0).join(" ");
+    const interPanelConnectorClassName = [
+        "slot-connector",
+        "slot-connector--between",
+        "slot-connector--inter-panel",
+        zoneOccupants[0] !== null ? "is-lit" : "",
+        zoneOccupants[0] !== null ? `slot-connector--${firstSlotConnectorKey || "default"}` : "",
+    ].filter((name) => name.length > 0).join(" ");
     const combinationStationClassName = [
         "combination-station",
         zoneOccupants[0] !== null ? "is-lit" : "",
         zoneOccupants[0] !== null ? `combination-station--${firstSlotConnectorKey || "default"}` : "",
     ].filter((name) => name.length > 0).join(" ");
+    const combinationEquationPanelClassName = [
+        "combination-equation-panel",
+        zoneOccupants[0] !== null ? "is-lit" : "",
+        zoneOccupants[0] !== null ? `combination-equation-panel--${firstSlotConnectorKey || "default"}` : "",
+    ].filter((name) => name.length > 0).join(" ");
+    const modeDropZoneClassName = `drop-zone ${hasStartedDraggingElement && !hasSeenDropZoneOneTutorial ? "is-discoverable" : ""} ${isEnhanceCombinationReady ? "is-enhance-ready-primary" : ""} ${isNonEnhanceCombinationReady ? "is-combination-ready-primary" : ""}`;
+    const secondaryDropZoneClassName = `drop-zone ${isEnhanceCombinationReady ? "is-enhance-ready-secondary" : ""} ${isNonEnhanceCombinationReady ? "is-combination-ready-secondary" : ""}`;
     const isCombineButtonDisabled = !canCombine || !hasActiveCombinationState;
     const shouldShowSlotOneInsertPrompt = (hoveredInsertSlot === 1 && zoneOccupants[0] === null)
         || (isCombineButtonHovered && hoveredInsertSlot === null && zoneOccupants[0] === null);
@@ -125,50 +230,26 @@ function CombinationStation({
     return (
         <div className={combinationStationClassName}>
             <div className="combination-equation">
-                <div className="drop-zone-area">
-                    <div
-                        className={`drop-zone ${hasStartedDraggingElement && !hasSeenDropZoneOneTutorial ? "is-discoverable" : ""} ${isEnhanceCombinationReady ? "is-enhance-ready-primary" : ""} ${isNonEnhanceCombinationReady ? "is-combination-ready-primary" : ""}`}
-                        ref={dropZoneRefA}
-                        onMouseEnter={() => {
-                            onHoverInsertSlot(1);
-                        }}
-                        onMouseLeave={() => {
-                            onHoverInsertSlot(null);
-                        }}
-                    >
-                        Mode
-                        {shouldShowSlotOneInsertPrompt ? (
-                            <CombineStationTooltip
-                                className="combine-station-tooltip--slot-one"
-                                message="Please insert element"
-                            />
-                        ) : null}
-                    </div>
-                    <div className={slotConnectorClassName} aria-hidden="true" />
-                    <div
-                        className={`drop-zone ${isEnhanceCombinationReady ? "is-enhance-ready-secondary" : ""} ${isNonEnhanceCombinationReady ? "is-combination-ready-secondary" : ""}`}
-                        ref={dropZoneRefB}
-                        onMouseEnter={() => {
-                            onHoverInsertSlot(2);
-                        }}
-                        onMouseLeave={() => {
-                            onHoverInsertSlot(null);
-                        }}
-                    >
-                        Element
-                        {shouldShowSlotTwoInsertPrompt ? (
-                            <CombineStationTooltip
-                                className="combine-station-tooltip--slot-two"
-                                message="Please insert element"
-                            />
-                        ) : null}
-                    </div>
-                    {zoneOccupants.length === 3 ? (
-                        <div className="drop-zone" ref={dropZoneRefC}>3</div>
-                    ) : null}
-                    <div className={secondSlotConnectorClassName} aria-hidden="true" />
-                </div>
-                <div className="output" ref={outputRef} />
+                <CombinationModePanel
+                    className={`${combinationEquationPanelClassName} combination-equation-panel--mode`}
+                    dropZoneClassName={modeDropZoneClassName}
+                    dropZoneRefA={dropZoneRefA}
+                    onHoverInsertSlot={onHoverInsertSlot}
+                    shouldShowSlotOneInsertPrompt={shouldShowSlotOneInsertPrompt}
+                />
+                <div className={interPanelConnectorClassName} aria-hidden="true" />
+
+                <CombinationResultPanel
+                    className={`${combinationEquationPanelClassName} combination-equation-panel--result`}
+                    secondaryDropZoneClassName={secondaryDropZoneClassName}
+                    secondSlotConnectorClassName={secondSlotConnectorClassName}
+                    zoneOccupants={zoneOccupants}
+                    dropZoneRefB={dropZoneRefB}
+                    dropZoneRefC={dropZoneRefC}
+                    outputRef={outputRef}
+                    onHoverInsertSlot={onHoverInsertSlot}
+                    shouldShowSlotTwoInsertPrompt={shouldShowSlotTwoInsertPrompt}
+                />
             </div>
             <div
                 className={`combine-button-wrap ${isCombineButtonDisabled ? "is-disabled" : ""}`}
