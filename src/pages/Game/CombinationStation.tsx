@@ -74,7 +74,9 @@ type CombinationStationProps = {
     modeInsertedElementLetter?: string;
     modeInsertedElementCategory?: string;
     showModeInsertedElementOverlay: boolean;
+    sealedModeElementKeys: ModeTabElementKey[];
     activeModeTabElementKey?: string;
+    selectedModeTabElementKey: ModeTabElementKey | null;
     onModeTabSelect: (elementKey: ModeTabElementKey) => void;
     onInsertMode: () => void;
 };
@@ -105,7 +107,9 @@ function CombinationStation({
     modeInsertedElementLetter,
     modeInsertedElementCategory,
     showModeInsertedElementOverlay,
+    sealedModeElementKeys,
     activeModeTabElementKey,
+    selectedModeTabElementKey,
     onModeTabSelect,
     onInsertMode,
 }: CombinationStationProps) {
@@ -160,10 +164,13 @@ function CombinationStation({
                     modeInsertedElementLetter={modeInsertedElementLetter}
                     modeInsertedElementCategory={modeInsertedElementCategory}
                     showModeInsertedElementOverlay={showModeInsertedElementOverlay}
+                    sealedModeElementKeys={sealedModeElementKeys}
+                    hasSelectedModeTab={selectedModeTabElementKey !== null}
                     activeModeTabElementKey={combinationStationState.elementKey}
                     onModeTabSelect={onModeTabSelect}
                     onInsertMode={onInsertMode}
                 />
+                <div className={`combination-result-group ${isModeInserted ? "" : "is-hidden"}`.trim()}>
                 <div className={interPanelConnectorClassName} aria-hidden="true" />
 
                 <CombinationResultPanel
@@ -183,6 +190,7 @@ function CombinationStation({
                     shouldShowSlotTwoInsertPrompt={shouldShowSlotTwoInsertPrompt}
                     onOutputHover={onOutputHover}
                 />
+                </div>
             </div>
         </div>
     );

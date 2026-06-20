@@ -1353,7 +1353,7 @@ function Game() {
     }, [consumeElements, getDraggableById, normalizeZoneOccupants, sealCombinationMode, selectedModeTabElementKey, zoneOccupants]);
 
     const handleModeTabSelect = useCallback((elementKey: ModeTabElementKey) => {
-        setSelectedModeTabElementKey(elementKey);
+        setSelectedModeTabElementKey((current) => (current === elementKey ? null : elementKey));
     }, []);
 
     useEffect(() => {
@@ -1413,6 +1413,7 @@ function Game() {
     const slotZeroOccupantId = zoneOccupants[0] ?? null;
     const slotZeroDraggable = getDraggableById(slotZeroOccupantId);
     const slotZeroElementKey = normalizeElementName(slotZeroDraggable?.letter);
+    const sealedModeTabElementKeys = Array.from(sealedCombinationModes).filter(isModeTabElementKey);
     const activeModeElementKeyForState: string = activeModeElementKey ?? "";
     const isInsertEnabled = insertedModeElementId === null
         && !isActiveModeSealed
@@ -3016,10 +3017,12 @@ function Game() {
                             onCombineButtonHoverChange={setIsCombineButtonHovered}
                             onOutputHover={setIsOutputHovered}
                             isModeInserted={insertedModeElementId !== null || isActiveModeSealed}
+                            sealedModeElementKeys={sealedModeTabElementKeys}
                             shouldAnimateModeShutter={insertedModeElementId !== null && isModeInsertAnimating}
                             modeInsertedElementLetter={insertedModeDraggable?.letter}
                             modeInsertedElementCategory={insertedModeDraggable?.category}
                             showModeInsertedElementOverlay={insertedModeElementId !== null && isModeInsertAnimating}
+                            selectedModeTabElementKey={selectedModeTabElementKey}
                             onModeTabSelect={handleModeTabSelect}
                             onInsertMode={handleInsertMode}
                         />
