@@ -2887,6 +2887,7 @@ function Game() {
                             onOutputHover={setIsOutputHovered}
                             isModeInserted={insertedModeElementId !== null}
                             modeInsertedElementLetter={insertedModeDraggable?.letter}
+                            modeInsertedElementCategory={insertedModeDraggable?.category}
                             showModeInsertedElementOverlay={insertedModeElementId !== null && isModeInsertAnimating}
                             onInsertMode={handleInsertMode}
                         />

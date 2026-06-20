@@ -65,6 +65,7 @@ type CombinationModePanelProps = {
     isInsertEnabled: boolean;
     isModeInserted: boolean;
     modeInsertedElementLetter?: string;
+    modeInsertedElementCategory?: string;
     showModeInsertedElementOverlay: boolean;
     onInsertMode: () => void;
 };
@@ -78,6 +79,7 @@ const CombinationModePanel = ({
     isInsertEnabled,
     isModeInserted,
     modeInsertedElementLetter,
+    modeInsertedElementCategory,
     showModeInsertedElementOverlay,
     onInsertMode,
 }: CombinationModePanelProps) => (
@@ -103,12 +105,17 @@ const CombinationModePanel = ({
                     ) : null}
                 </div>
                 {showModeInsertedElementOverlay && modeInsertedElementLetter ? (
-                    <span className="mode-drop-zone-inserted-element" aria-hidden="true">
+                    <span
+                        className={`mode-drop-zone-inserted-element ${modeInsertedElementCategory === "soul" ? "is-soul" : ""}`.trim()}
+                        aria-hidden="true"
+                    >
                         <ElementIcon name={modeInsertedElementLetter} />
                     </span>
                 ) : null}
                 <span className="mode-drop-zone-shutter" aria-hidden="true" />
             </div>
+        </div>
+        <div className="insert-mode-button-wrap">
             <button
                 type="button"
                 className="insert-mode-button"
@@ -125,11 +132,16 @@ type CombinationResultPanelProps = {
     className: string;
     secondaryDropZoneClassName: string;
     secondSlotConnectorClassName: string;
+    combineButtonElementClass: string;
+    isCombineButtonDisabled: boolean;
+    combineActionLabel: string;
     zoneOccupants: Array<number | null>;
     dropZoneRefB: RefObject<HTMLDivElement>;
     dropZoneRefC: RefObject<HTMLDivElement>;
     outputRef: RefObject<HTMLDivElement>;
     onHoverInsertSlot: (slot: 1 | 2 | null) => void;
+    onCombineButtonHoverChange: (isHovered: boolean) => void;
+    onCombine: () => void;
     shouldShowSlotTwoInsertPrompt: boolean;
     onOutputHover: (hovered: boolean) => void;
 };
@@ -138,11 +150,16 @@ const CombinationResultPanel = ({
     className,
     secondaryDropZoneClassName,
     secondSlotConnectorClassName,
+    combineButtonElementClass,
+    isCombineButtonDisabled,
+    combineActionLabel,
     zoneOccupants,
     dropZoneRefB,
     dropZoneRefC,
     outputRef,
     onHoverInsertSlot,
+    onCombineButtonHoverChange,
+    onCombine,
     shouldShowSlotTwoInsertPrompt,
     onOutputHover,
 }: CombinationResultPanelProps) => (
@@ -177,6 +194,31 @@ const CombinationResultPanel = ({
                 onMouseLeave={() => onOutputHover(false)}
             />
         </div>
+        <div className="combine-button-dock">
+            <div
+                className={`combine-button-wrap ${isCombineButtonDisabled ? "is-disabled" : ""}`}
+                onMouseEnter={() => {
+                    onCombineButtonHoverChange(true);
+                }}
+                onMouseLeave={() => {
+                    onCombineButtonHoverChange(false);
+                }}
+                onFocusCapture={() => {
+                    onCombineButtonHoverChange(true);
+                }}
+                onBlurCapture={() => {
+                    onCombineButtonHoverChange(false);
+                }}
+            >
+                <button
+                    className={`combine-button ${combineButtonElementClass}`.trim()}
+                    disabled={isCombineButtonDisabled}
+                    onClick={onCombine}
+                >
+                    {combineActionLabel}
+                </button>
+            </div>
+        </div>
     </div>
 );
 
@@ -202,6 +244,7 @@ type CombinationStationProps = {
     onOutputHover: (hovered: boolean) => void;
     isModeInserted: boolean;
     modeInsertedElementLetter?: string;
+    modeInsertedElementCategory?: string;
     showModeInsertedElementOverlay: boolean;
     onInsertMode: () => void;
 };
@@ -228,6 +271,7 @@ function CombinationStation({
     onOutputHover,
     isModeInserted,
     modeInsertedElementLetter,
+    modeInsertedElementCategory,
     showModeInsertedElementOverlay,
     onInsertMode,
 }: CombinationStationProps) {
@@ -283,6 +327,7 @@ function CombinationStation({
                     isInsertEnabled={zoneOccupants[0] !== null && !isModeInserted}
                     isModeInserted={isModeInserted}
                     modeInsertedElementLetter={modeInsertedElementLetter}
+                    modeInsertedElementCategory={modeInsertedElementCategory}
                     showModeInsertedElementOverlay={showModeInsertedElementOverlay}
                     onInsertMode={onInsertMode}
                 />
@@ -292,37 +337,19 @@ function CombinationStation({
                     className={`${combinationEquationPanelClassName} combination-equation-panel--result`}
                     secondaryDropZoneClassName={secondaryDropZoneClassName}
                     secondSlotConnectorClassName={secondSlotConnectorClassName}
+                    combineButtonElementClass={combineButtonElementClass}
+                    isCombineButtonDisabled={isCombineButtonDisabled}
+                    combineActionLabel={combinationStationState.actionLabel}
                     zoneOccupants={zoneOccupants}
                     dropZoneRefB={dropZoneRefB}
                     dropZoneRefC={dropZoneRefC}
                     outputRef={outputRef}
                     onHoverInsertSlot={onHoverInsertSlot}
+                    onCombineButtonHoverChange={onCombineButtonHoverChange}
+                    onCombine={onCombine}
                     shouldShowSlotTwoInsertPrompt={shouldShowSlotTwoInsertPrompt}
                     onOutputHover={onOutputHover}
                 />
-            </div>
-            <div
-                className={`combine-button-wrap ${isCombineButtonDisabled ? "is-disabled" : ""}`}
-                onMouseEnter={() => {
-                    onCombineButtonHoverChange(true);
-                }}
-                onMouseLeave={() => {
-                    onCombineButtonHoverChange(false);
-                }}
-                onFocusCapture={() => {
-                    onCombineButtonHoverChange(true);
-                }}
-                onBlurCapture={() => {
-                    onCombineButtonHoverChange(false);
-                }}
-            >
-                <button
-                    className={`combine-button ${combineButtonElementClass}`.trim()}
-                    disabled={isCombineButtonDisabled}
-                    onClick={onCombine}
-                >
-                    {combinationStationState.actionLabel}
-                </button>
             </div>
         </div>
     );
