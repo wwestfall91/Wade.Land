@@ -1,7 +1,9 @@
 import type { RefObject } from "react";
 import type { SpellEffectConfig } from "../../combat/spellEffects";
 import CombinationModePanel, { type ModeTabElementKey } from "./CombinationModePanel";
+import CombinationLogicPanel from "./CombinationLogicPanel";
 import CombinationResultPanel from "./CombinationResultPanel";
+import CombinationCombineButton from "./CombinationCombineButton";
 import "./CombinationStation.scss";
 
 export type { ModeTabElementKey } from "./CombinationModePanel";
@@ -124,7 +126,7 @@ function CombinationStation({
     ].filter((name) => name.length > 0).join(" ");
     const secondSlotConnectorClassName = [
         "slot-connector",
-        "slot-connector--between",
+        "slot-connector--inter-panel",
         zoneOccupants[0] !== null && zoneOccupants[1] !== null ? "is-lit" : "",
         zoneOccupants[0] !== null && zoneOccupants[1] !== null ? "slot-connector--yellow" : "",
     ].filter((name) => name.length > 0).join(" ");
@@ -173,25 +175,31 @@ function CombinationStation({
                 <div className={`combination-result-group ${isModeInserted ? "" : "is-hidden"}`.trim()}>
                 <div className={interPanelConnectorClassName} aria-hidden="true" />
 
-                <CombinationResultPanel
+                <CombinationLogicPanel
                     className={panelModifierClass}
                     secondaryDropZoneClassName={secondaryDropZoneClassName}
-                    secondSlotConnectorClassName={secondSlotConnectorClassName}
-                    combineButtonElementClass={combineButtonElementClass}
-                    isCombineButtonDisabled={isCombineButtonDisabled}
-                    combineActionLabel={combinationStationState.actionLabel}
                     zoneOccupants={zoneOccupants}
                     dropZoneRefB={dropZoneRefB}
                     dropZoneRefC={dropZoneRefC}
-                    outputRef={outputRef}
                     onHoverInsertSlot={onHoverInsertSlot}
-                    onCombineButtonHoverChange={onCombineButtonHoverChange}
-                    onCombine={onCombine}
                     shouldShowSlotTwoInsertPrompt={shouldShowSlotTwoInsertPrompt}
+                />
+                <div className={secondSlotConnectorClassName} aria-hidden="true" />
+
+                <CombinationResultPanel
+                    className={panelModifierClass}
+                    outputRef={outputRef}
                     onOutputHover={onOutputHover}
                 />
                 </div>
             </div>
+            <CombinationCombineButton
+                combineButtonElementClass={combineButtonElementClass}
+                isCombineButtonDisabled={isCombineButtonDisabled}
+                combineActionLabel={combinationStationState.actionLabel}
+                onCombineButtonHoverChange={onCombineButtonHoverChange}
+                onCombine={onCombine}
+            />
         </div>
     );
 }
