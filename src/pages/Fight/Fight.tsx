@@ -1727,24 +1727,57 @@ function Fight() {
                     <div className="enemy-hp-fill" style={{ width: `${enemyHpFillPercent}%` }} />
                     <span className="enemy-hp-label">{enemyHealth} / {enemyMaxHp} HP</span>
                 </div>
-                <EnemyStage
-                    spriteRef={enemySpriteRef}
-                    enemyName={enemy.name}
-                    spritePath={enemy.sprite ?? ""}
-                    enemyHealth={enemyHealth}
-                    enemyMaxHp={enemyMaxHp}
-                    enemyPower={enemy.power}
-                    weaknesses={enemyWeaknesses}
-                    elements={enemy.elements}
-                    souls={enemy.souls}
-                    isHitFlashing={isEnemySpriteFlashing}
-                    hitFlashColor={enemySpriteFlashColor}
-                    isSteamVisible={isEnemySteamVisible}
-                    damagePopups={enemyDamagePopups}
-                    burnStatus={enemyBurnStatus}
-                    soakStatus={enemySoakStatus}
-                    freezeStatus={enemyFreezeStatus}
-                />
+                <div className="enemy-stage-row">
+                    <div className="enemy-stage-shell">
+                        <EnemyStage
+                            spriteRef={enemySpriteRef}
+                            enemyName={enemy.name}
+                            spritePath={enemy.sprite ?? ""}
+                            enemyHealth={enemyHealth}
+                            enemyMaxHp={enemyMaxHp}
+                            enemyPower={enemy.power}
+                            weaknesses={enemyWeaknesses}
+                            elements={enemy.elements}
+                            souls={enemy.souls}
+                            isHitFlashing={isEnemySpriteFlashing}
+                            hitFlashColor={enemySpriteFlashColor}
+                            isSteamVisible={isEnemySteamVisible}
+                            damagePopups={enemyDamagePopups}
+                            burnStatus={enemyBurnStatus}
+                            soakStatus={enemySoakStatus}
+                            freezeStatus={enemyFreezeStatus}
+                        />
+                    </div>
+
+                    {/* Intent badge — pinned to the right side of centered sprite */}
+                    <div
+                        ref={enemyAttackMarkerRef}
+                        className={`enemy-intent-badge ${queuedEnemyAttack ? "" : "is-hidden"} ${isReadyingNextAttack ? "is-readying" : ""}`}
+                        aria-label={queuedEnemyAttack ? `Enemy intends to attack with ${queuedEnemyAttack.letter}` : "Enemy attack not yet queued"}
+                        aria-hidden={!queuedEnemyAttack}
+                        onMouseEnter={handleEnemyIntentMouseEnter}
+                        onMouseLeave={handleEnemyIntentMouseLeave}
+                    >
+                        <div ref={enemyIntentIconRef} className="enemy-intent-icon">
+                            {queuedEnemyAttack ? (
+                                <ElementIcon name={queuedEnemyAttack.letter} className="enemy-attack-marker-icon" />
+                            ) : "?"}
+                        </div>
+                        <div className="enemy-intent-damage">
+                            {queuedEnemyAttack
+                                ? (() => {
+                                    const baseDamage = Number(queuedEnemyAttack.damage ?? 0);
+                                    return baseDamage + (
+                                        getSpellTypeList(queuedEnemyAttack).includes("fire")
+                                            ? getBurnFireBonus(playerBurnStatus?.stacks ?? 0, baseDamage)
+                                            : 0
+                                    );
+                                })()
+                                : "?"}
+                        </div>
+                        <div className="enemy-intent-label">NEXT ATTACK</div>
+                    </div>
+                </div>
                 {queuedEnemyAttack ? (
                     <ElementDetailsTooltip
                             element={{
@@ -1767,35 +1800,6 @@ function Fight() {
                         onTooltipMouseLeave={handleEnemyIntentTooltipMouseLeave}
                     />
                 ) : null}
-
-                {/* Intent badge — always visible next to sprite */}
-                <div
-                    ref={enemyAttackMarkerRef}
-                    className={`enemy-intent-badge ${queuedEnemyAttack ? "" : "is-hidden"} ${isReadyingNextAttack ? "is-readying" : ""}`}
-                    aria-label={queuedEnemyAttack ? `Enemy intends to attack with ${queuedEnemyAttack.letter}` : "Enemy attack not yet queued"}
-                    aria-hidden={!queuedEnemyAttack}
-                    onMouseEnter={handleEnemyIntentMouseEnter}
-                    onMouseLeave={handleEnemyIntentMouseLeave}
-                >
-                    <div ref={enemyIntentIconRef} className="enemy-intent-icon">
-                        {queuedEnemyAttack ? (
-                            <ElementIcon name={queuedEnemyAttack.letter} className="enemy-attack-marker-icon" />
-                        ) : "?"}
-                    </div>
-                    <div className="enemy-intent-damage">
-                        {queuedEnemyAttack
-                            ? (() => {
-                                const baseDamage = Number(queuedEnemyAttack.damage ?? 0);
-                                return baseDamage + (
-                                    getSpellTypeList(queuedEnemyAttack).includes("fire")
-                                        ? getBurnFireBonus(playerBurnStatus?.stacks ?? 0, baseDamage)
-                                        : 0
-                                );
-                            })()
-                            : "?"}
-                    </div>
-                    <div className="enemy-intent-label">NEXT ATTACK</div>
-                </div>
             </div>{/* end .enemy-zone */}
 
             {/* ─── Spell Hand ─── */}
@@ -1925,11 +1929,8 @@ function Fight() {
                         >
                             <span className="player-status-icon" aria-hidden="true">🔥</span>
                             <span className="player-status-count">{playerBurnStatus?.stacks ?? ""}</span>
-                            <span className="player-status-tooltip">
-                                <span>Burn Stacks: {playerBurnStatus?.stacks ?? 0}</span>
-                                <span>Expires in: {playerBurnStatus?.remainingTurns ?? 0} turns</span>
-                                <span>Fire bonus: {getBurnFireBonusPercent(playerBurnStatus?.stacks ?? 0)}%</span>
-                                <span>Boosts fire attacks while it lasts</span>
+                            <span className="player-status-description">
+                                Fire +{getBurnFireBonusPercent(playerBurnStatus?.stacks ?? 0)}% | {playerBurnStatus?.remainingTurns ?? 0} turns
                             </span>
                         </span>
                         <span
@@ -1939,12 +1940,10 @@ function Fight() {
                         >
                             <span className="player-status-icon" aria-hidden="true">💧</span>
                             <span className="player-status-count">{playerSoakStatus?.stacks ?? ""}</span>
-                            <span className="player-status-tooltip">
-                                <span>Soak Stacks: {playerSoakStatus?.stacks ?? 0}</span>
-                                <span>Lightning +{(playerSoakStatus?.stacks ?? 0) * SOAK_LIGHTNING_BONUS_PER_STACK}</span>
-                                <span>Fire -{(playerSoakStatus?.stacks ?? 0) * SOAK_FIRE_PENALTY_PER_STACK}</span>
+                            <span className="player-status-description">
+                                Lightning +{(playerSoakStatus?.stacks ?? 0) * SOAK_LIGHTNING_BONUS_PER_STACK} | Fire -{(playerSoakStatus?.stacks ?? 0) * SOAK_FIRE_PENALTY_PER_STACK}
+                            </span>
                         </span>
-                    </span>
                     <span
                         className={`player-status-badge player-status-badge--freeze ${playerFreezeStatus ? "" : "is-hidden"}`}
                         aria-label={playerFreezeStatus ? `Freeze ${playerFreezeStatus.stacks}` : undefined}
@@ -1952,9 +1951,8 @@ function Fight() {
                     >
                         <span className="player-status-icon" aria-hidden="true">❄</span>
                         <span className="player-status-count">{playerFreezeStatus?.stacks ?? ""}</span>
-                        <span className="player-status-tooltip">
-                            <span>Freeze Stacks: {playerFreezeStatus?.stacks ?? 0}</span>
-                            <span>Fire gains +{(playerFreezeStatus?.stacks ?? 0) * FREEZE_FIRE_BONUS_PER_STACK} damage</span>
+                        <span className="player-status-description">
+                            Fire +{(playerFreezeStatus?.stacks ?? 0) * FREEZE_FIRE_BONUS_PER_STACK} damage
                         </span>
                     </span>
                     <span
@@ -1965,9 +1963,8 @@ function Fight() {
                     >
                         <span className="player-status-icon" aria-hidden="true"><img src={energizeIcon} alt="" style={{ width: "0.85rem", height: "0.85rem", objectFit: "contain" }} /></span>
                         <span className="player-status-count">{playerEnergizeStatus?.stacks ?? ""}</span>
-                        <span className="player-status-tooltip">
-                            <span>Energize Stacks: {playerEnergizeStatus?.stacks ?? 0}</span>
-                            <span>Next turn: +{playerEnergizeStatus?.stacks ?? 0} energy</span>
+                        <span className="player-status-description">
+                            Next turn +{playerEnergizeStatus?.stacks ?? 0} energy
                         </span>
                     </span>
                     </div>

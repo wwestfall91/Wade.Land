@@ -154,6 +154,7 @@
 
 .enhancements {
     display: flex;
+    justify-content: center;
     flex-wrap: nowrap;
     gap: 0.25rem;
     padding: 0.2rem 0.25rem;
@@ -314,7 +315,8 @@
 
 .effects-details{
     display: flex;
-    align-items: end;
+    align-items: flex-start;
+    flex-wrap: wrap;
     padding:.25rem .25rem;
     border-radius: 5px;
     color:rgb(22, 22, 22);
@@ -323,6 +325,20 @@
     background: linear-gradient(rgba(255, 255, 255, 0.377), rgba(255, 255, 255, 0.568));
     border:1px solid white;
     gap:5px;
+}
+
+.effects-label {
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    line-height: 1.5;
+}
+
+.effects-chip-list {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    align-items: flex-start;
 }
 
 .effects-delta-arrow {
@@ -719,14 +735,18 @@
 }
 
 .floating-tooltip .type-chip,
-.floating-tooltip .effect-chip {
+.floating-tooltip .effect-chip,
+.comparison-tooltip .type-chip,
+.comparison-tooltip .effect-chip {
     display: inline-flex;
-    align-items: center;
+    flex-direction: column;
+    align-items: flex-start;
     position: relative;
     cursor: default;
     border: 2px solid rgba(0, 0, 0, 0.25);
-    border-radius: 999px;
-    padding: 0.04rem 0.28rem;
+    border-radius: 12px;
+    padding: 0.16rem 0.35rem 0.2rem;
+    max-width: min(14rem, 72vw);
     font-size: 0.65rem;
     line-height: 1.2;
     color: #000000;
@@ -736,57 +756,36 @@
         0 4px 24px rgba(11, 16, 48, 0.24);
 }
 
-.floating-tooltip .effect-chip * {
+.floating-tooltip .effect-chip *,
+.comparison-tooltip .effect-chip * {
     cursor: default;
 }
 
-.floating-tooltip .effect-chip-popup {
-    position: absolute;
-    left: 50%;
-    bottom: calc(100% + 0.45rem);
-    transform: translateX(-50%) translateY(2px);
-    min-width: 10rem;
-    max-width: min(16rem, 70vw);
-    padding: 0.34rem 0.42rem;
-    border: 2px solid #102060;
-    border-radius: 6px;
-    background: linear-gradient(180deg, #fff6d6 0%, #f1dcaa 100%);
+.floating-tooltip .effect-chip-label,
+.comparison-tooltip .effect-chip-label {
+    font-size: 0.63rem;
+    font-weight: 800;
+    letter-spacing: 0.015em;
+    line-height: 1.2;
+    text-transform: uppercase;
+}
+
+.floating-tooltip .effect-chip-description,
+.comparison-tooltip .effect-chip-description {
+    margin-top: 0.12rem;
+    padding-top: 0.12rem;
+    border-top: 1px solid rgba(20, 32, 89, 0.25);
     color: #1b1b1b;
-    font-size: 0.66rem;
+    font-size: 0.58rem;
     font-weight: 700;
     line-height: 1.32;
     text-transform: none;
-    text-align: center;
+    text-align: left;
     white-space: normal;
-    box-shadow:
-        inset 0 0 0 1px #ffe7b6,
-        inset 0 0 0 2px #c9b071,
-        0 7px 0 rgba(0, 0, 0, 0.32);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 120ms ease, transform 120ms ease;
-    z-index: 15;
 }
 
-.floating-tooltip .effect-chip-popup::after {
-    content: "";
-    position: absolute;
-    left: 50%;
-    top: calc(100% - 1px);
-    width: 0;
-    height: 0;
-    margin-left: -0.4rem;
-    border-left: 0.4rem solid transparent;
-    border-right: 0.4rem solid transparent;
-    border-top: 0.45rem solid #102060;
-}
-
-.floating-tooltip .effect-chip:hover .effect-chip-popup {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-}
-
-.floating-tooltip .effect-combo {
+.floating-tooltip .effect-combo,
+.comparison-tooltip .effect-combo {
     background: linear-gradient(180deg, #9ed4ff 0%, #5ba7ff 100%);
     color: #07203d;
 }
@@ -837,48 +836,56 @@
     color: #505050;
 }
 
-.floating-tooltip .effect-default {
+.floating-tooltip .effect-default,
+.comparison-tooltip .effect-default {
     background-color: #e8ecff;
     color: #111;
 }
 
-.floating-tooltip .effect-heal {
+.floating-tooltip .effect-heal,
+.comparison-tooltip .effect-heal {
     background-color: #c9f4d2;
     color: #1d4f2c;
     border-color: rgba(44, 120, 67, 0.45);
 }
 
-.floating-tooltip .effect-burn {
+.floating-tooltip .effect-burn,
+.comparison-tooltip .effect-burn {
     background-color: #ffd2b1;
     color: #6a2d11;
     border-color: rgba(157, 73, 32, 0.5);
 }
 
-.floating-tooltip .effect-shield {
+.floating-tooltip .effect-shield,
+.comparison-tooltip .effect-shield {
     background-color: #cde8ff;
     color: #133a69;
     border-color: rgba(39, 101, 168, 0.45);
 }
 
-.floating-tooltip .effect-lifesteal {
+.floating-tooltip .effect-lifesteal,
+.comparison-tooltip .effect-lifesteal {
     background-color: #f4c8d9;
     color: #6b1d3a;
     border-color: rgba(133, 41, 79, 0.45);
 }
 
-.floating-tooltip .effect-soak {
+.floating-tooltip .effect-soak,
+.comparison-tooltip .effect-soak {
     background-color: #ccecff;
     color: #11486b;
     border-color: rgba(43, 124, 171, 0.45);
 }
 
-.floating-tooltip .effect-multi-hit {
+.floating-tooltip .effect-multi-hit,
+.comparison-tooltip .effect-multi-hit {
     background-color: #e2d6ff;
     color: #402a7a;
     border-color: rgba(86, 62, 157, 0.45);
 }
 
-.floating-tooltip .effect-brittle {
+.floating-tooltip .effect-brittle,
+.comparison-tooltip .effect-brittle {
     background-color: #ffe2c8;
     color: #5d3315;
     border-color: rgba(152, 92, 46, 0.48);

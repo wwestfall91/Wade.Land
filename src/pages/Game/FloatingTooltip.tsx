@@ -213,20 +213,21 @@ export function TooltipPanelContent({ elementDetails, changedKeys, typeMultiplie
                     </span>
                 ) : null}
                 {effectKinds.length > 0 ? (
-                    <span className={`effects-details${changedKeys?.has("effects") ? " property-changed" : ""}`}>Effects:
-                        {effectKinds.map((effectKind) => (
-                            <span
-                                key={effectKind.key}
-                                className={`effect-chip ${effectKind.chipClass}`}
-                            >
-                                {effectKind.label}
-                                {effectKind.detail ? (
-                                    <span className="effect-chip-popup" role="tooltip">
-                                        {effectKind.detail}
-                                    </span>
-                                ) : null}
-                            </span>
-                        ))}
+                    <span className={`effects-details${changedKeys?.has("effects") ? " property-changed" : ""}`}>
+                        <span className="effects-label">Effects:</span>
+                        <span className="effects-chip-list">
+                            {effectKinds.map((effectKind) => (
+                                <span
+                                    key={effectKind.key}
+                                    className={`effect-chip ${effectKind.chipClass}`}
+                                >
+                                    <span className="effect-chip-label">{effectKind.label}</span>
+                                    {effectKind.detail ? (
+                                        <span className="effect-chip-description">{effectKind.detail}</span>
+                                    ) : null}
+                                </span>
+                            ))}
+                        </span>
                     </span>
                 ) : null}
                 <div className="enhancements" aria-label="Enhancements">

@@ -200,11 +200,8 @@ function EnemyStage({
                         <span className="enemy-burn-indicator" aria-label={`Burn ${burnStatus.stacks}`}>
                             <span className="burn-icon" role="img" aria-hidden="true">🔥</span>
                             <span className="burn-stacks">{burnStatus.stacks}</span>
-                            <span className="burn-tooltip">
-                                <span>Burn Stacks: {burnStatus.stacks}</span>
-                                <span>Expires in: {burnStatus.remainingTurns} turns</span>
-                                <span>Fire bonus: {burnStatus.stacks * BURN_FIRE_BONUS_PERCENT_PER_STACK}%</span>
-                                <span>Boosts fire attacks while it lasts</span>
+                            <span className="enemy-effect-description enemy-effect-description--burn">
+                                Fire +{burnStatus.stacks * BURN_FIRE_BONUS_PERCENT_PER_STACK}% | {burnStatus.remainingTurns} turns
                             </span>
                         </span>
                     ) : null}
@@ -212,7 +209,7 @@ function EnemyStage({
                         <span className="enemy-soak-indicator" aria-label={`Soak ${soakStatus.stacks}`}>
                             <span className="soak-icon" role="img" aria-hidden="true">💧</span>
                             <span className="soak-stacks">{soakStatus.stacks}</span>
-                            <span className="soak-tooltip">
+                            <span className="enemy-effect-description enemy-effect-description--soak">
                                 Lightning +{soakStatus.stacks * SOAK_LIGHTNING_BONUS_PER_STACK}. Fire -{soakStatus.stacks * SOAK_FIRE_PENALTY_PER_STACK}
                             </span>
                         </span>
@@ -221,7 +218,7 @@ function EnemyStage({
                         <span className="enemy-freeze-indicator" aria-label={`Freeze ${freezeStatus.stacks}`}>
                             <span className="freeze-icon" role="img" aria-hidden="true">❄</span>
                             <span className="freeze-stacks">{freezeStatus.stacks}</span>
-                            <span className="freeze-tooltip">
+                            <span className="enemy-effect-description enemy-effect-description--freeze">
                                 Fire gains +{freezeStatus.stacks * FREEZE_FIRE_BONUS_PER_STACK} damage
                             </span>
                         </span>
