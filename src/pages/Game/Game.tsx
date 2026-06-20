@@ -6,7 +6,12 @@ import PlayerStats from "../../components/PlayerStats";
 import EnemyStage from "../../components/EnemyStage";
 import ElementIcon from "../../components/ElementIcon";
 import { parseSpellEffectsFromRow, type SpellEffectConfig } from "../../combat/spellEffects";
-import { type ElementEnhancements, type RewardElement, usePlayer } from "../../context/PlayerContext";
+import {
+    type CombinationModeKey,
+    type ElementEnhancements,
+    type RewardElement,
+    usePlayer,
+} from "../../context/PlayerContext";
 import { type MonsterReward } from "../../combat/rewardFactory";
 import FloatingTooltip from "./FloatingTooltip";
 import ComparisonTooltip from "./ComparisonTooltip";
@@ -16,6 +21,7 @@ import CombinationStation, {
     type CombinationStationActionStateKey,
     type CombinationStateEffectsLookup,
     type CombinationStateWorkbookRow,
+    type ModeTabElementKey,
 } from "./CombinationStation";
 import {
     buildEffectValuesByKey,
@@ -214,6 +220,27 @@ type ElementFlightIcon = {
 
 const normalizeType = (value?: string): string => value?.trim().toLowerCase() ?? "";
 const normalizeElementName = (value?: string): string => value?.trim().toLowerCase() ?? "";
+const isModeTabElementKey = (value: string): value is ModeTabElementKey =>
+    value === "water" || value === "fire" || value === "earth" || value === "air" || value === "soul";
+const MODE_SENTINEL_IDS: Record<ModeTabElementKey, number> = {
+    water: -101,
+    fire: -102,
+    earth: -103,
+    air: -104,
+    soul: -105,
+};
+const MODE_KEY_BY_SENTINEL_ID: Record<number, ModeTabElementKey> = {
+    [-101]: "water",
+    [-102]: "fire",
+    [-103]: "earth",
+    [-104]: "air",
+    [-105]: "soul",
+};
+const isModeSentinelId = (value: number | null | undefined): value is number =>
+    typeof value === "number" && value <= -100;
+const getModeSentinelId = (elementKey: ModeTabElementKey): number => MODE_SENTINEL_IDS[elementKey];
+const getModeKeyFromSentinelId = (value: number | null | undefined): ModeTabElementKey | null =>
+    isModeSentinelId(value) ? (MODE_KEY_BY_SENTINEL_ID[value] ?? null) : null;
 
 const isPlasmaName = (value?: string): boolean => normalizeElementName(value) === "plasma";
 const isUnstableName = (value?: string): boolean => {
@@ -275,6 +302,8 @@ function Game() {
         discoveredCraftedLetters,
         addDiscoveredCraftedLetter,
         updateElementEffects,
+        sealedCombinationModes,
+        sealCombinationMode,
     } = usePlayer();
     const gameRef = useRef<HTMLDivElement | null>(null);
     const elementStartRef = useRef<HTMLDivElement | null>(null);
@@ -352,6 +381,7 @@ function Game() {
     const [insertedModeElementId, setInsertedModeElementId] = useState<number | null>(null);
     const [hiddenInsertedModeElementId, setHiddenInsertedModeElementId] = useState<number | null>(null);
     const [isModeInsertAnimating, setIsModeInsertAnimating] = useState(false);
+    const [selectedModeTabElementKey, setSelectedModeTabElementKey] = useState<ModeTabElementKey | null>(null);
     const [isCombineButtonHovered, setIsCombineButtonHovered] = useState(false);
     const [isOutputHovered, setIsOutputHovered] = useState(false);
     const [isPostBattleSoulSequenceActive, setIsPostBattleSoulSequenceActive] = useState(false);
@@ -702,7 +732,26 @@ function Game() {
             return null;
         }
 
-        return draggables.find((item) => item.id === draggableId) ?? null;
+        const existing = draggables.find((item) => item.id === draggableId);
+        if (existing) {
+            return existing;
+        }
+
+        const sentinelModeKey = getModeKeyFromSentinelId(draggableId);
+        if (!sentinelModeKey) {
+            return null;
+        }
+
+        return {
+            id: draggableId,
+            letter: sentinelModeKey,
+            damage: 0,
+            energy: 0,
+            level: 0,
+            description: "Mode lock",
+            category: "element",
+            initialPosition: { x: 0, y: 0 },
+        };
     }, [draggables]);
 
     const normalizeZoneOccupants = useCallback((occupants: Array<number | null>): Array<number | null> => {
@@ -1126,6 +1175,7 @@ function Game() {
         setZoneOccupants((previous) =>
             previous.map((occupantId, index) =>
                 playerProgress.elements.some((element) => element.id === occupantId)
+                    || isModeSentinelId(occupantId)
                     || (index === 0 && insertedModeElementId !== null && occupantId === insertedModeElementId)
                     ? occupantId
                     : null,
@@ -1260,6 +1310,15 @@ function Game() {
             return;
         }
 
+        const slotZeroDraggable = getDraggableById(slotZeroOccupantId);
+        const slotZeroElementKey = normalizeElementName(slotZeroDraggable?.letter);
+        if (
+            selectedModeTabElementKey === null
+            || slotZeroElementKey !== selectedModeTabElementKey
+        ) {
+            return;
+        }
+
         if (modeInsertConsumeTimeoutRef.current !== null) {
             window.clearTimeout(modeInsertConsumeTimeoutRef.current);
             modeInsertConsumeTimeoutRef.current = null;
@@ -1268,12 +1327,34 @@ function Game() {
         setInsertedModeElementId(slotZeroOccupantId);
         setHiddenInsertedModeElementId(slotZeroOccupantId);
         setIsModeInsertAnimating(true);
+        const insertedItem = getDraggableById(slotZeroOccupantId);
+        const insertedElementKey = normalizeElementName(insertedItem?.letter);
+        const insertedModeKey: CombinationModeKey | null = isModeTabElementKey(insertedElementKey)
+            ? insertedElementKey
+            : null;
+        if (insertedModeKey) {
+            setSelectedModeTabElementKey(insertedModeKey);
+        }
         modeInsertConsumeTimeoutRef.current = window.setTimeout(() => {
             consumeElements([slotZeroOccupantId]);
+            if (insertedModeKey) {
+                sealCombinationMode(insertedModeKey);
+                setZoneOccupants((previous) => {
+                    const next = [...previous];
+                    next[0] = getModeSentinelId(insertedModeKey);
+                    return normalizeZoneOccupants(next);
+                });
+            }
             setIsModeInsertAnimating(false);
+            setInsertedModeElementId(null);
+            setHiddenInsertedModeElementId(null);
             modeInsertConsumeTimeoutRef.current = null;
         }, MODE_SHUTTER_CLOSE_MS);
-    }, [consumeElements, zoneOccupants]);
+    }, [consumeElements, getDraggableById, normalizeZoneOccupants, sealCombinationMode, selectedModeTabElementKey, zoneOccupants]);
+
+    const handleModeTabSelect = useCallback((elementKey: ModeTabElementKey) => {
+        setSelectedModeTabElementKey(elementKey);
+    }, []);
 
     useEffect(() => {
         if (hiddenInsertedModeElementId === null) {
@@ -1294,11 +1375,51 @@ function Game() {
         }
     }, []);
 
+    useEffect(() => {
+        if (selectedModeTabElementKey === null) {
+            return;
+        }
+
+        const sentinelId = getModeSentinelId(selectedModeTabElementKey);
+        const isSelectedModeSealed = sealedCombinationModes.has(selectedModeTabElementKey);
+
+        setZoneOccupants((previous) => {
+            const slotZeroOccupantId = previous[0] ?? null;
+
+            if (isSelectedModeSealed) {
+                if (slotZeroOccupantId === sentinelId) {
+                    return previous;
+                }
+
+                const next = [...previous];
+                next[0] = sentinelId;
+                return normalizeZoneOccupants(next);
+            }
+
+            if (isModeSentinelId(slotZeroOccupantId)) {
+                const next = [...previous];
+                next[0] = null;
+                return normalizeZoneOccupants(next);
+            }
+
+            return previous;
+        });
+    }, [normalizeZoneOccupants, sealedCombinationModes, selectedModeTabElementKey]);
+
     const insertedModeDraggable = getDraggableById(insertedModeElementId);
     const insertedModeElementKey = normalizeElementName(insertedModeDraggable?.letter);
-    const insertedModeState = insertedModeElementId !== null
-        ? getCombinationStationState(insertedModeElementKey)
-        : getCombinationStationState("");
+    const activeModeElementKey = selectedModeTabElementKey ?? (isModeTabElementKey(insertedModeElementKey) ? insertedModeElementKey : null);
+    const isActiveModeSealed = activeModeElementKey !== null && sealedCombinationModes.has(activeModeElementKey);
+    const slotZeroOccupantId = zoneOccupants[0] ?? null;
+    const slotZeroDraggable = getDraggableById(slotZeroOccupantId);
+    const slotZeroElementKey = normalizeElementName(slotZeroDraggable?.letter);
+    const activeModeElementKeyForState: string = activeModeElementKey ?? "";
+    const isInsertEnabled = insertedModeElementId === null
+        && !isActiveModeSealed
+        && slotZeroOccupantId !== null
+        && selectedModeTabElementKey !== null
+        && slotZeroElementKey === selectedModeTabElementKey;
+    const insertedModeState = getCombinationStationState(activeModeElementKeyForState);
     const insertedModeStateKey = insertedModeState.key;
 
     const previewCombination = useMemo<PreviewCombination | null>(() => {
@@ -1342,17 +1463,13 @@ function Game() {
         };
 
         const consumedIds = zoneOccupants.filter(
-            (occupantId): occupantId is number => occupantId !== null,
+            (occupantId): occupantId is number => occupantId !== null && !isModeSentinelId(occupantId),
         );
         const occupantItems = zoneOccupants.map((occupantId) =>
-            draggables.find((draggable) => draggable.id === occupantId),
+            getDraggableById(occupantId) ?? undefined,
         );
 
         if (occupantItems.some((item) => !item)) {
-            return null;
-        }
-
-        if (consumedIds.length !== zoneOccupants.length) {
             return null;
         }
 
@@ -1492,8 +1609,9 @@ function Game() {
                 allEnhanceInputEffects,
             );
 
+            const enhanceConsumedIds = isModeSentinelId(leftItem.id) ? [] : [leftItem.id];
             return applyCombustPreview({
-                consumedIds: withBrittleFormulaConsumedIds([leftItem.id], [leftItem, rightItem]),
+                consumedIds: withBrittleFormulaConsumedIds(enhanceConsumedIds, [leftItem, rightItem]),
                 letter: rightItem.letter,
                 damage: enhanceResolved.damage,
                 isDamageEnhanced: true,
@@ -1545,10 +1663,10 @@ function Game() {
             effects: resolvedPreview.effects,
             category: rightItem.category,
         });
-    }, [combinationStateEffectsLookup, draggables, insertedModeStateKey, zoneOccupants]);
+    }, [combinationStateEffectsLookup, getDraggableById, insertedModeStateKey, zoneOccupants]);
 
     const canCombine = previewCombination !== null;
-    const firstSlotConnectorKey = normalizeType(insertedModeDraggable?.type1) || insertedModeElementKey;
+    const firstSlotConnectorKey: string = activeModeElementKeyForState;
     const combinationStationState = insertedModeState;
     const hasActiveCombinationState = combinationStationState.key !== "idle";
     const areBothCombinationSlotsFilled = zoneOccupants[0] !== null && zoneOccupants[1] !== null;
@@ -2103,6 +2221,17 @@ function Game() {
         const draggable = draggables.find((item) => item.id === draggableId);
         if (!draggable) {
             return false;
+        }
+
+        if (zoneIndex === 0 && selectedModeTabElementKey !== null) {
+            if (isActiveModeSealed) {
+                return false;
+            }
+
+            const draggableElementKey = normalizeElementName(draggable.letter);
+            if (draggableElementKey !== selectedModeTabElementKey) {
+                return false;
+            }
         }
 
         const enhanceZoneIndex = zoneOccupants.length;
@@ -2869,6 +2998,7 @@ function Game() {
                             zoneOccupants={zoneOccupants}
                             hasStartedDraggingElement={hasStartedDraggingElement}
                             hasSeenDropZoneOneTutorial={hasSeenDropZoneOneTutorial}
+                            isInsertEnabled={isInsertEnabled}
                             isEnhanceCombinationReady={isEnhanceCombinationReady}
                             isNonEnhanceCombinationReady={isNonEnhanceCombinationReady}
                             firstSlotConnectorKey={firstSlotConnectorKey}
@@ -2885,10 +3015,12 @@ function Game() {
                             isCombineButtonHovered={isCombineButtonHovered}
                             onCombineButtonHoverChange={setIsCombineButtonHovered}
                             onOutputHover={setIsOutputHovered}
-                            isModeInserted={insertedModeElementId !== null}
+                            isModeInserted={insertedModeElementId !== null || isActiveModeSealed}
+                            shouldAnimateModeShutter={insertedModeElementId !== null && isModeInsertAnimating}
                             modeInsertedElementLetter={insertedModeDraggable?.letter}
                             modeInsertedElementCategory={insertedModeDraggable?.category}
                             showModeInsertedElementOverlay={insertedModeElementId !== null && isModeInsertAnimating}
+                            onModeTabSelect={handleModeTabSelect}
                             onInsertMode={handleInsertMode}
                         />
                     ) : null}

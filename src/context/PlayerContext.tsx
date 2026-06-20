@@ -76,6 +76,8 @@ export type PlayerStatuses = {
     shield: number;
 };
 
+export type CombinationModeKey = "water" | "fire" | "earth" | "air" | "soul";
+
 const DEFAULT_PLAYER_STATUSES: PlayerStatuses = {
     burn: null,
     soak: null,
@@ -123,6 +125,8 @@ type PlayerContextValue = {
     applyBurnMultiplier: (multiplier: number) => void;
     battleEnergyCarryover: number;
     setBattleEnergyCarryover: (amount: number) => void;
+    sealedCombinationModes: Set<CombinationModeKey>;
+    sealCombinationMode: (mode: CombinationModeKey) => void;
 };
 
 const DEFAULT_PLAYER_PROGRESS: PlayerProgress = {
@@ -217,6 +221,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
     const [burnMultiplier, setBurnMultiplier] = useState(1);
     const [battleEnergyCarryover, setBattleEnergyCarryoverState] = useState(0);
     const [permanentMaxHpReduction, setPermanentMaxHpReduction] = useState(0);
+    const [sealedCombinationModes, setSealedCombinationModes] = useState<Set<CombinationModeKey>>(new Set());
 
     useEffect(() => {
         fetch("/levels.xlsx")
@@ -346,6 +351,18 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
         setBattleEnergyCarryoverState(Math.max(0, Math.floor(amount)));
     }, []);
 
+    const sealCombinationMode = useCallback((mode: CombinationModeKey) => {
+        setSealedCombinationModes((previous) => {
+            if (previous.has(mode)) {
+                return previous;
+            }
+
+            const next = new Set(previous);
+            next.add(mode);
+            return next;
+        });
+    }, []);
+
     const resetGame = useCallback(() => {
         setSouls(0);
         setElements([]);
@@ -361,6 +378,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
         setBattleEnergyCarryoverState(0);
         setPermanentMaxHpReduction(0);
         setDiscoveredCraftedLetters(new Set());
+        setSealedCombinationModes(new Set());
     }, []);
 
     const addDiscoveredCraftedLetter = useCallback((letter: string) => {
@@ -414,6 +432,8 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             applyBurnMultiplier,
             battleEnergyCarryover,
             setBattleEnergyCarryover,
+            sealedCombinationModes,
+            sealCombinationMode,
             discoveredCraftedLetters,
             addDiscoveredCraftedLetter,
         }),
@@ -450,6 +470,8 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             applyBurnMultiplier,
             battleEnergyCarryover,
             setBattleEnergyCarryover,
+            sealedCombinationModes,
+            sealCombinationMode,
             discoveredCraftedLetters,
             addDiscoveredCraftedLetter,
         ],

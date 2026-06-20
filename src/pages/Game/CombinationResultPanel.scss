@@ -1,0 +1,52 @@
+﻿#Game {
+    .combination-result-panel {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1.5rem 2rem;
+        border: 2px solid #e7ecff;
+        border-radius: 4px;
+        background:
+            radial-gradient(circle at 14% 10%, var(--combination-station-bg-accent, rgba(122, 139, 255, 0.2)), transparent 34%),
+            linear-gradient(180deg, var(--combination-station-bg-top, #3245ce) 0%, var(--combination-station-bg-bottom, #1a2b8d) 100%);
+        box-shadow:
+            inset 0 0 0 1px rgba(168, 186, 255, 0.2),
+            0 8px 0 rgba(0, 0, 0, 0.34);
+        transition: border-color 180ms ease, box-shadow 180ms ease;
+        position: relative;
+
+        &::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            background: repeating-linear-gradient(0deg, rgba(255,255,255,0.04) 0, rgba(255,255,255,0.04) 1px, transparent 1px, transparent 4px);
+            opacity: 0.33;
+            z-index: 0;
+        }
+
+        > * { position: relative; z-index: 1; }
+
+        &.is-lit {
+            border-color: #e7ecff;
+            box-shadow:
+                inset 0 0 0 1px rgba(168, 186, 255, 0.2),
+                0 8px 0 rgba(0, 0, 0, 0.34),
+                0 0 18px var(--combination-station-glow);
+        }
+
+        .drop-zone-area {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .combine-button-dock {
+            position: absolute;
+            top: calc(100% - 0.45rem);
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 20;
+        }
+    }
+}

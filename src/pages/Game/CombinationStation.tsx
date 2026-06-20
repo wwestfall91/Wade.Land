@@ -1,7 +1,10 @@
 import type { RefObject } from "react";
 import type { SpellEffectConfig } from "../../combat/spellEffects";
-import ElementIcon from "../../components/ElementIcon";
+import CombinationModePanel, { type ModeTabElementKey } from "./CombinationModePanel";
+import CombinationResultPanel from "./CombinationResultPanel";
 import "./CombinationStation.scss";
+
+export type { ModeTabElementKey } from "./CombinationModePanel";
 
 export type CombinationStationState = {
     key: "idle" | "cleanse" | "polish" | "purify" | "refine" | "enhance";
@@ -45,187 +48,11 @@ const IDLE_COMBINATION_STATION_STATE: CombinationStationState = {
 export const getCombinationStationState = (firstSlotElementKey: string): CombinationStationState =>
     COMBINATION_STATION_STATE_BY_FIRST_ELEMENT[firstSlotElementKey] ?? IDLE_COMBINATION_STATION_STATE;
 
-type CombineStationTooltipProps = {
-    message: string;
-    className?: string;
-};
-
-const CombineStationTooltip = ({ message, className = "" }: CombineStationTooltipProps) => (
-    <div className={`combine-station-tooltip ${className}`.trim()} role="tooltip">
-        {message}
-    </div>
-);
-
-type CombinationModePanelProps = {
-    className: string;
-    dropZoneClassName: string;
-    dropZoneRefA: RefObject<HTMLDivElement>;
-    onHoverInsertSlot: (slot: 1 | 2 | null) => void;
-    shouldShowSlotOneInsertPrompt: boolean;
-    isInsertEnabled: boolean;
-    isModeInserted: boolean;
-    modeInsertedElementLetter?: string;
-    modeInsertedElementCategory?: string;
-    showModeInsertedElementOverlay: boolean;
-    onInsertMode: () => void;
-};
-
-const CombinationModePanel = ({
-    className,
-    dropZoneClassName,
-    dropZoneRefA,
-    onHoverInsertSlot,
-    shouldShowSlotOneInsertPrompt,
-    isInsertEnabled,
-    isModeInserted,
-    modeInsertedElementLetter,
-    modeInsertedElementCategory,
-    showModeInsertedElementOverlay,
-    onInsertMode,
-}: CombinationModePanelProps) => (
-    <div className={className}>
-        <div className="drop-zone-area">
-            <div className={`mode-drop-zone-shell ${isModeInserted ? "is-closed" : ""}`.trim()}>
-                <div
-                    className={dropZoneClassName}
-                    ref={dropZoneRefA}
-                    onMouseEnter={() => {
-                        onHoverInsertSlot(1);
-                    }}
-                    onMouseLeave={() => {
-                        onHoverInsertSlot(null);
-                    }}
-                >
-                    Mode
-                    {shouldShowSlotOneInsertPrompt ? (
-                        <CombineStationTooltip
-                            className="combine-station-tooltip--slot-one"
-                            message="Please insert element"
-                        />
-                    ) : null}
-                </div>
-                {showModeInsertedElementOverlay && modeInsertedElementLetter ? (
-                    <span
-                        className={`mode-drop-zone-inserted-element ${modeInsertedElementCategory === "soul" ? "is-soul" : ""}`.trim()}
-                        aria-hidden="true"
-                    >
-                        <ElementIcon name={modeInsertedElementLetter} />
-                    </span>
-                ) : null}
-                <span className="mode-drop-zone-shutter" aria-hidden="true" />
-            </div>
-        </div>
-        <div className="insert-mode-button-wrap">
-            <button
-                type="button"
-                className="insert-mode-button"
-                onClick={onInsertMode}
-                disabled={!isInsertEnabled}
-            >
-                {isModeInserted ? "Inserted" : "Insert"}
-            </button>
-        </div>
-    </div>
-);
-
-type CombinationResultPanelProps = {
-    className: string;
-    secondaryDropZoneClassName: string;
-    secondSlotConnectorClassName: string;
-    combineButtonElementClass: string;
-    isCombineButtonDisabled: boolean;
-    combineActionLabel: string;
-    zoneOccupants: Array<number | null>;
-    dropZoneRefB: RefObject<HTMLDivElement>;
-    dropZoneRefC: RefObject<HTMLDivElement>;
-    outputRef: RefObject<HTMLDivElement>;
-    onHoverInsertSlot: (slot: 1 | 2 | null) => void;
-    onCombineButtonHoverChange: (isHovered: boolean) => void;
-    onCombine: () => void;
-    shouldShowSlotTwoInsertPrompt: boolean;
-    onOutputHover: (hovered: boolean) => void;
-};
-
-const CombinationResultPanel = ({
-    className,
-    secondaryDropZoneClassName,
-    secondSlotConnectorClassName,
-    combineButtonElementClass,
-    isCombineButtonDisabled,
-    combineActionLabel,
-    zoneOccupants,
-    dropZoneRefB,
-    dropZoneRefC,
-    outputRef,
-    onHoverInsertSlot,
-    onCombineButtonHoverChange,
-    onCombine,
-    shouldShowSlotTwoInsertPrompt,
-    onOutputHover,
-}: CombinationResultPanelProps) => (
-    <div className={className}>
-        <div className="drop-zone-area">
-            <div
-                className={secondaryDropZoneClassName}
-                ref={dropZoneRefB}
-                onMouseEnter={() => {
-                    onHoverInsertSlot(2);
-                }}
-                onMouseLeave={() => {
-                    onHoverInsertSlot(null);
-                }}
-            >
-                Element
-                {shouldShowSlotTwoInsertPrompt ? (
-                    <CombineStationTooltip
-                        className="combine-station-tooltip--slot-two"
-                        message="Please insert element"
-                    />
-                ) : null}
-            </div>
-            {zoneOccupants.length === 3 ? (
-                <div className="drop-zone" ref={dropZoneRefC}>3</div>
-            ) : null}
-            <div className={secondSlotConnectorClassName} aria-hidden="true" />
-            <div
-                className="output"
-                ref={outputRef}
-                onMouseEnter={() => onOutputHover(true)}
-                onMouseLeave={() => onOutputHover(false)}
-            />
-        </div>
-        <div className="combine-button-dock">
-            <div
-                className={`combine-button-wrap ${isCombineButtonDisabled ? "is-disabled" : ""}`}
-                onMouseEnter={() => {
-                    onCombineButtonHoverChange(true);
-                }}
-                onMouseLeave={() => {
-                    onCombineButtonHoverChange(false);
-                }}
-                onFocusCapture={() => {
-                    onCombineButtonHoverChange(true);
-                }}
-                onBlurCapture={() => {
-                    onCombineButtonHoverChange(false);
-                }}
-            >
-                <button
-                    className={`combine-button ${combineButtonElementClass}`.trim()}
-                    disabled={isCombineButtonDisabled}
-                    onClick={onCombine}
-                >
-                    {combineActionLabel}
-                </button>
-            </div>
-        </div>
-    </div>
-);
-
 type CombinationStationProps = {
     zoneOccupants: Array<number | null>;
     hasStartedDraggingElement: boolean;
     hasSeenDropZoneOneTutorial: boolean;
+    isInsertEnabled: boolean;
     isEnhanceCombinationReady: boolean;
     isNonEnhanceCombinationReady: boolean;
     firstSlotConnectorKey: string;
@@ -243,9 +70,12 @@ type CombinationStationProps = {
     onCombineButtonHoverChange: (isHovered: boolean) => void;
     onOutputHover: (hovered: boolean) => void;
     isModeInserted: boolean;
+    shouldAnimateModeShutter: boolean;
     modeInsertedElementLetter?: string;
     modeInsertedElementCategory?: string;
     showModeInsertedElementOverlay: boolean;
+    activeModeTabElementKey?: string;
+    onModeTabSelect: (elementKey: ModeTabElementKey) => void;
     onInsertMode: () => void;
 };
 
@@ -253,6 +83,7 @@ function CombinationStation({
     zoneOccupants,
     hasStartedDraggingElement,
     hasSeenDropZoneOneTutorial,
+    isInsertEnabled,
     isEnhanceCombinationReady,
     isNonEnhanceCombinationReady,
     firstSlotConnectorKey,
@@ -270,9 +101,12 @@ function CombinationStation({
     onCombineButtonHoverChange,
     onOutputHover,
     isModeInserted,
+    shouldAnimateModeShutter,
     modeInsertedElementLetter,
     modeInsertedElementCategory,
     showModeInsertedElementOverlay,
+    activeModeTabElementKey,
+    onModeTabSelect,
     onInsertMode,
 }: CombinationStationProps) {
     const combineButtonElementClass = hasActiveCombinationState && combinationStationState.elementKey
@@ -302,11 +136,7 @@ function CombinationStation({
         zoneOccupants[0] !== null ? "is-lit" : "",
         zoneOccupants[0] !== null ? `combination-station--${firstSlotConnectorKey || "default"}` : "",
     ].filter((name) => name.length > 0).join(" ");
-    const combinationEquationPanelClassName = [
-        "combination-equation-panel",
-        zoneOccupants[0] !== null ? "is-lit" : "",
-        zoneOccupants[0] !== null ? `combination-equation-panel--${firstSlotConnectorKey || "default"}` : "",
-    ].filter((name) => name.length > 0).join(" ");
+    const panelModifierClass = zoneOccupants[0] !== null ? "is-lit" : "";
     const modeDropZoneClassName = `drop-zone ${hasStartedDraggingElement && !hasSeenDropZoneOneTutorial ? "is-discoverable" : ""} ${isEnhanceCombinationReady ? "is-enhance-ready-primary" : ""} ${isNonEnhanceCombinationReady ? "is-combination-ready-primary" : ""}`;
     const secondaryDropZoneClassName = `drop-zone ${isEnhanceCombinationReady ? "is-enhance-ready-secondary" : ""} ${isNonEnhanceCombinationReady ? "is-combination-ready-secondary" : ""}`;
     const isCombineButtonDisabled = !canCombine || !hasActiveCombinationState;
@@ -319,22 +149,25 @@ function CombinationStation({
         <div className={combinationStationClassName}>
             <div className="combination-equation">
                 <CombinationModePanel
-                    className={`${combinationEquationPanelClassName} combination-equation-panel--mode`}
+                    className={panelModifierClass}
                     dropZoneClassName={modeDropZoneClassName}
                     dropZoneRefA={dropZoneRefA}
                     onHoverInsertSlot={onHoverInsertSlot}
                     shouldShowSlotOneInsertPrompt={shouldShowSlotOneInsertPrompt}
-                    isInsertEnabled={zoneOccupants[0] !== null && !isModeInserted}
+                    isInsertEnabled={isInsertEnabled}
                     isModeInserted={isModeInserted}
+                    shouldAnimateModeShutter={shouldAnimateModeShutter}
                     modeInsertedElementLetter={modeInsertedElementLetter}
                     modeInsertedElementCategory={modeInsertedElementCategory}
                     showModeInsertedElementOverlay={showModeInsertedElementOverlay}
+                    activeModeTabElementKey={combinationStationState.elementKey}
+                    onModeTabSelect={onModeTabSelect}
                     onInsertMode={onInsertMode}
                 />
                 <div className={interPanelConnectorClassName} aria-hidden="true" />
 
                 <CombinationResultPanel
-                    className={`${combinationEquationPanelClassName} combination-equation-panel--result`}
+                    className={panelModifierClass}
                     secondaryDropZoneClassName={secondaryDropZoneClassName}
                     secondSlotConnectorClassName={secondSlotConnectorClassName}
                     combineButtonElementClass={combineButtonElementClass}
