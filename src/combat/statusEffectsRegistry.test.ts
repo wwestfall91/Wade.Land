@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { getEffectSummaryLines } from "./effectSummary";
 import { parseSpellEffectsFromRow } from "./spellEffects";
+import { statusEffectsRegistry } from "./statusEffectsRegistry";
 
 describe("statusEffectsRegistry", () => {
     it("parses and summarizes newly added status effect kinds", () => {
@@ -22,5 +23,18 @@ describe("statusEffectsRegistry", () => {
             "Energy Combo: next Fire attack costs -1 energy",
             "Rage: +2",
         ]);
+    });
+
+    it("prefers long description and interpolates X with amount", () => {
+        const effects = parseSpellEffectsFromRow({
+            "Effect 1 Kind": "Charge",
+            "Effect 1 Amount": 50,
+            "Effect 1 Target": "self",
+            "Effect 1 Short Description": "Short copy should not be used.",
+            "Effect 1 Long Description": "Increase damage by X% based on energy cost.",
+        });
+
+        expect(effects).toHaveLength(1);
+        expect(statusEffectsRegistry.getEffectDetail(effects[0])).toBe("Increase damage by 50% based on energy cost.");
     });
 });

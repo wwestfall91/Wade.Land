@@ -78,7 +78,7 @@
             inset 0 0 0 2px #1a276f;
         transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
         touch-action: none;
-        z-index: 2;
+        z-index: 1;
 
         &.is-discoverable:not(.drag-preview)::after {
             content: "";

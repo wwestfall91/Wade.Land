@@ -178,6 +178,7 @@ const INTRO_SCENE_FADEOUT_MS = 1600;
 const REWARD_CUE_MS = 260;
 const ELEMENT_FLIGHT_TRAVEL_MS = 520;
 const STARTER_LABEL_ANIM_MS = 520;
+const MODE_SHUTTER_CLOSE_MS = 180;
 const ENABLE_FIRST_BATTLE_OLD_ONE_SCENE = false;
 const COMBUST_DAMAGE_MULTIPLIER = 2.5;
 const PREVIEW_DRAG_START_THRESHOLD_PX = 6;
@@ -256,6 +257,7 @@ function Game() {
         playerName,
         setPlayerName,
         combineElements,
+        consumeElements,
         addSouls,
         spendSouls,
         addElement,
@@ -347,6 +349,9 @@ function Game() {
     const [isSoulCounterPopping] = useState(false);
     const [isSoulPanelErrorFeedback, setIsSoulPanelErrorFeedback] = useState(false);
     const [hoveredInsertSlot, setHoveredInsertSlot] = useState<1 | 2 | null>(null);
+    const [insertedModeElementId, setInsertedModeElementId] = useState<number | null>(null);
+    const [hiddenInsertedModeElementId, setHiddenInsertedModeElementId] = useState<number | null>(null);
+    const [isModeInsertAnimating, setIsModeInsertAnimating] = useState(false);
     const [isCombineButtonHovered, setIsCombineButtonHovered] = useState(false);
     const [isOutputHovered, setIsOutputHovered] = useState(false);
     const [isPostBattleSoulSequenceActive, setIsPostBattleSoulSequenceActive] = useState(false);
@@ -386,6 +391,7 @@ function Game() {
     const soulAnimationTimeoutsRef = useRef<number[]>([]);
     const soulCounterPopTimeoutRef = useRef<number | null>(null);
     const soulPanelErrorTimeoutRef = useRef<number | null>(null);
+    const modeInsertConsumeTimeoutRef = useRef<number | null>(null);
     const enhanceSoulFlightIdRef = useRef(1);
     const enhanceSoulFlightTimeoutsRef = useRef<number[]>([]);
     const elementFlightIdRef = useRef(1);
@@ -1078,7 +1084,7 @@ function Game() {
         setDraggables((previous) => {
             const previousById = new Map(previous.map((item) => [item.id, item]));
 
-            return playerProgress.elements.map((element, index) => {
+            const next = playerProgress.elements.map((element, index) => {
                 const existing = previousById.get(element.id);
                 if (existing) {
                     return {
@@ -1101,13 +1107,26 @@ function Game() {
                     initialPosition: element.initialPosition ?? pendingDropSpawnByIdRef.current.get(element.id) ?? getSpawnPosition(index),
                 };
             });
+
+            if (
+                insertedModeElementId !== null
+                && !playerProgress.elements.some((element) => element.id === insertedModeElementId)
+            ) {
+                const insertedModeDraggable = previousById.get(insertedModeElementId);
+                if (insertedModeDraggable) {
+                    next.push(insertedModeDraggable);
+                }
+            }
+
+            return next;
         });
 
         pendingDropSpawnByIdRef.current.clear();
 
         setZoneOccupants((previous) =>
-            previous.map((occupantId) =>
+            previous.map((occupantId, index) =>
                 playerProgress.elements.some((element) => element.id === occupantId)
+                    || (index === 0 && insertedModeElementId !== null && occupantId === insertedModeElementId)
                     ? occupantId
                     : null,
             ),
@@ -1130,7 +1149,7 @@ function Game() {
             0,
         );
         nextId.current = maxId + 1;
-    }, [playerProgress.elements]);
+    }, [insertedModeElementId, playerProgress.elements]);
 
     useEffect(() => {
         setZoneOccupants((previous) => {
@@ -1210,7 +1229,83 @@ function Game() {
         }
     };
 
+    useEffect(() => {
+        const slotZeroOccupantId = zoneOccupants[0] ?? null;
+
+        if (slotZeroOccupantId === null) {
+            if (modeInsertConsumeTimeoutRef.current !== null) {
+                window.clearTimeout(modeInsertConsumeTimeoutRef.current);
+                modeInsertConsumeTimeoutRef.current = null;
+            }
+            setIsModeInsertAnimating(false);
+            setInsertedModeElementId(null);
+            setHiddenInsertedModeElementId(null);
+            return;
+        }
+
+        if (insertedModeElementId !== null && insertedModeElementId !== slotZeroOccupantId) {
+            if (modeInsertConsumeTimeoutRef.current !== null) {
+                window.clearTimeout(modeInsertConsumeTimeoutRef.current);
+                modeInsertConsumeTimeoutRef.current = null;
+            }
+            setIsModeInsertAnimating(false);
+            setInsertedModeElementId(null);
+            setHiddenInsertedModeElementId(null);
+        }
+    }, [insertedModeElementId, zoneOccupants]);
+
+    const handleInsertMode = useCallback(() => {
+        const slotZeroOccupantId = zoneOccupants[0] ?? null;
+        if (slotZeroOccupantId === null) {
+            return;
+        }
+
+        if (modeInsertConsumeTimeoutRef.current !== null) {
+            window.clearTimeout(modeInsertConsumeTimeoutRef.current);
+            modeInsertConsumeTimeoutRef.current = null;
+        }
+
+        setInsertedModeElementId(slotZeroOccupantId);
+        setHiddenInsertedModeElementId(slotZeroOccupantId);
+        setIsModeInsertAnimating(true);
+        modeInsertConsumeTimeoutRef.current = window.setTimeout(() => {
+            consumeElements([slotZeroOccupantId]);
+            setIsModeInsertAnimating(false);
+            modeInsertConsumeTimeoutRef.current = null;
+        }, MODE_SHUTTER_CLOSE_MS);
+    }, [consumeElements, zoneOccupants]);
+
+    useEffect(() => {
+        if (hiddenInsertedModeElementId === null) {
+            return;
+        }
+
+        if (!playerProgress.elements.some((element) => element.id === hiddenInsertedModeElementId)) {
+            return;
+        }
+
+        consumeElements([hiddenInsertedModeElementId]);
+    }, [consumeElements, hiddenInsertedModeElementId, playerProgress.elements]);
+
+    useEffect(() => () => {
+        if (modeInsertConsumeTimeoutRef.current !== null) {
+            window.clearTimeout(modeInsertConsumeTimeoutRef.current);
+            modeInsertConsumeTimeoutRef.current = null;
+        }
+    }, []);
+
+    const insertedModeDraggable = getDraggableById(insertedModeElementId);
+    const insertedModeElementKey = normalizeElementName(insertedModeDraggable?.letter);
+    const insertedModeState = insertedModeElementId !== null
+        ? getCombinationStationState(insertedModeElementKey)
+        : getCombinationStationState("");
+    const insertedModeStateKey = insertedModeState.key;
+
     const previewCombination = useMemo<PreviewCombination | null>(() => {
+        if (insertedModeStateKey === "idle") {
+            return null;
+        }
+
         if (!zoneOccupants.every((occupantId) => occupantId !== null)) {
             return null;
         }
@@ -1261,10 +1356,7 @@ function Game() {
             return null;
         }
 
-        const firstItem = occupantItems[0];
-        const currentStationStateKey = firstItem
-            ? getCombinationStationState(normalizeElementName(firstItem.letter)).key
-            : "idle";
+        const currentStationStateKey = insertedModeStateKey;
         const currentEnhancementStateKey: CombinationStationActionStateKey | undefined =
             currentStationStateKey === "cleanse" ||
             currentStationStateKey === "polish" ||
@@ -1389,12 +1481,7 @@ function Game() {
             return null;
         }
 
-        const state = getCombinationStationState(normalizeElementName(leftItem.letter));
-        if (state.key === "idle") {
-            return null;
-        }
-
-        if (state.key === "enhance") {
+        if (currentStationStateKey === "enhance") {
             const enhancedDamage = Math.round(rightItem.damage * 1.5);
             const allEnhanceInputEffects = [
                 ...(leftItem.effects ?? []),
@@ -1423,7 +1510,7 @@ function Game() {
             });
         }
 
-        const stateEffects = combinationStateEffectsLookup[state.key];
+        const stateEffects = combinationStateEffectsLookup[currentStationStateKey as CombinationStationActionStateKey];
         const rightElementKey = normalizeElementName(rightItem.letter);
         const mappedEffects = stateEffects?.get(rightElementKey);
         if (!mappedEffects) {
@@ -1458,13 +1545,11 @@ function Game() {
             effects: resolvedPreview.effects,
             category: rightItem.category,
         });
-    }, [combinationStateEffectsLookup, draggables, zoneOccupants]);
+    }, [combinationStateEffectsLookup, draggables, insertedModeStateKey, zoneOccupants]);
 
     const canCombine = previewCombination !== null;
-    const firstSlottedDraggable = getDraggableById(zoneOccupants[0] ?? null);
-    const firstSlotElementKey = normalizeElementName(firstSlottedDraggable?.letter);
-    const firstSlotConnectorKey = normalizeType(firstSlottedDraggable?.type1) || firstSlotElementKey;
-    const combinationStationState = getCombinationStationState(firstSlotElementKey);
+    const firstSlotConnectorKey = normalizeType(insertedModeDraggable?.type1) || insertedModeElementKey;
+    const combinationStationState = insertedModeState;
     const hasActiveCombinationState = combinationStationState.key !== "idle";
     const areBothCombinationSlotsFilled = zoneOccupants[0] !== null && zoneOccupants[1] !== null;
     const isEnhanceCombinationReady = combinationStationState.key === "enhance"
@@ -2624,7 +2709,9 @@ function Game() {
                     }}
                 />
             ) : null}
-            {draggables.map((draggable) => (
+            {draggables
+                .filter((draggable) => draggable.id !== hiddenInsertedModeElementId)
+                .map((draggable) => (
                 <Draggable
                     key={draggable.id}
                     id={draggable.id}
@@ -2798,6 +2885,10 @@ function Game() {
                             isCombineButtonHovered={isCombineButtonHovered}
                             onCombineButtonHoverChange={setIsCombineButtonHovered}
                             onOutputHover={setIsOutputHovered}
+                            isModeInserted={insertedModeElementId !== null}
+                            modeInsertedElementLetter={insertedModeDraggable?.letter}
+                            showModeInsertedElementOverlay={insertedModeElementId !== null && isModeInsertAnimating}
+                            onInsertMode={handleInsertMode}
                         />
                     ) : null}
 

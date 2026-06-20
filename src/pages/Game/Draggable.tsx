@@ -33,6 +33,7 @@ type Props = {
 	canSnapToZone: (draggableId: number, zoneIndex: number) => boolean;
 	isNewFromChest?: boolean;
 	forcedSnapZone?: { zone: number; version: number } | null;
+	zIndexOverride?: number;
 };
 
 function Draggable({
@@ -56,6 +57,7 @@ function Draggable({
 	canSnapToZone,
 	isNewFromChest = false,
 	forcedSnapZone = null,
+	zIndexOverride,
 }: Props) {
 	const { typeMultipliers } = usePlayer();
 	const [isDragging, setIsDragging] = useState(false);
@@ -507,7 +509,7 @@ function Draggable({
 				left: position.x,
 				cursor: isDragging ? "grabbing" : "grab",
 				userSelect: "none",
-				zIndex:8999
+				zIndex: zIndexOverride ?? 8999,
 			}}
 		>
 			<FloatingTooltip

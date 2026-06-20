@@ -95,6 +95,7 @@ type PlayerContextValue = {
     spendSouls: (amount: number) => void;
     initializeElements: (elements: PlayerElement[]) => void;
     combineElements: (consumedIds: number[], newElement: PlayerElement) => void;
+    consumeElements: (consumedIds: number[]) => void;
     updateElementEffects: (elementId: number, effects?: SpellEffectConfig[]) => void;
     applyEnemyAttack: (power: number) => void;
     healPlayer: (amount: number) => void;
@@ -276,6 +277,14 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
         ]);
     }, []);
 
+    const consumeElements = useCallback((consumedIds: number[]) => {
+        if (consumedIds.length === 0) {
+            return;
+        }
+
+        setElements((previous) => previous.filter((element) => !consumedIds.includes(element.id)));
+    }, []);
+
     const updateElementEffects = useCallback((elementId: number, effects?: SpellEffectConfig[]) => {
         setElements((previous) =>
             previous.map((element) =>
@@ -380,6 +389,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             spendSouls,
             initializeElements,
             combineElements,
+            consumeElements,
             updateElementEffects,
             applyEnemyAttack,
             healPlayer,
@@ -412,6 +422,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             spendSouls,
             applyEnemyAttack,
             combineElements,
+            consumeElements,
             updateElementEffects,
             initializeElements,
             levels,

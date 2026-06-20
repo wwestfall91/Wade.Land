@@ -52,6 +52,8 @@ export type SpellEffectConfig = {
     growth?: SpellEffectGrowth;
     /** Spreadsheet-provided short tooltip copy for this effect, when available. */
     shortDescription?: string;
+    /** Spreadsheet-provided long tooltip copy for this effect, when available. */
+    longDescription?: string;
 };
 
 export type ActiveBurnStatus = {
@@ -215,6 +217,7 @@ export const parseSpellEffectsFromRow = (
         const duration = safeNumber(readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Duration")));
         const growth = normalizeGrowth(readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Growth")));
         const shortDescription = readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Short Description"));
+        const longDescription = readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Long Description"));
         const defaultTarget: SpellEffectTarget = SELF_TARGET_EFFECT_KINDS.includes(kind) ? "self" : "enemy";
         const rawTarget = readFirstString(row, EFFECT_COLUMN_CANDIDATES(index, "Target"));
         const target = normalizeTarget(rawTarget, defaultTarget);
@@ -239,6 +242,9 @@ export const parseSpellEffectsFromRow = (
         }
         if (shortDescription.length > 0) {
             effect.shortDescription = shortDescription;
+        }
+        if (longDescription.length > 0) {
+            effect.longDescription = longDescription;
         }
 
         effects.push(effect);

@@ -1,5 +1,6 @@
 import type { RefObject } from "react";
 import type { SpellEffectConfig } from "../../combat/spellEffects";
+import ElementIcon from "../../components/ElementIcon";
 import "./CombinationStation.scss";
 
 export type CombinationStationState = {
@@ -61,6 +62,11 @@ type CombinationModePanelProps = {
     dropZoneRefA: RefObject<HTMLDivElement>;
     onHoverInsertSlot: (slot: 1 | 2 | null) => void;
     shouldShowSlotOneInsertPrompt: boolean;
+    isInsertEnabled: boolean;
+    isModeInserted: boolean;
+    modeInsertedElementLetter?: string;
+    showModeInsertedElementOverlay: boolean;
+    onInsertMode: () => void;
 };
 
 const CombinationModePanel = ({
@@ -69,27 +75,48 @@ const CombinationModePanel = ({
     dropZoneRefA,
     onHoverInsertSlot,
     shouldShowSlotOneInsertPrompt,
+    isInsertEnabled,
+    isModeInserted,
+    modeInsertedElementLetter,
+    showModeInsertedElementOverlay,
+    onInsertMode,
 }: CombinationModePanelProps) => (
     <div className={className}>
         <div className="drop-zone-area">
-            <div
-                className={dropZoneClassName}
-                ref={dropZoneRefA}
-                onMouseEnter={() => {
-                    onHoverInsertSlot(1);
-                }}
-                onMouseLeave={() => {
-                    onHoverInsertSlot(null);
-                }}
-            >
-                Mode
-                {shouldShowSlotOneInsertPrompt ? (
-                    <CombineStationTooltip
-                        className="combine-station-tooltip--slot-one"
-                        message="Please insert element"
-                    />
+            <div className={`mode-drop-zone-shell ${isModeInserted ? "is-closed" : ""}`.trim()}>
+                <div
+                    className={dropZoneClassName}
+                    ref={dropZoneRefA}
+                    onMouseEnter={() => {
+                        onHoverInsertSlot(1);
+                    }}
+                    onMouseLeave={() => {
+                        onHoverInsertSlot(null);
+                    }}
+                >
+                    Mode
+                    {shouldShowSlotOneInsertPrompt ? (
+                        <CombineStationTooltip
+                            className="combine-station-tooltip--slot-one"
+                            message="Please insert element"
+                        />
+                    ) : null}
+                </div>
+                {showModeInsertedElementOverlay && modeInsertedElementLetter ? (
+                    <span className="mode-drop-zone-inserted-element" aria-hidden="true">
+                        <ElementIcon name={modeInsertedElementLetter} />
+                    </span>
                 ) : null}
+                <span className="mode-drop-zone-shutter" aria-hidden="true" />
             </div>
+            <button
+                type="button"
+                className="insert-mode-button"
+                onClick={onInsertMode}
+                disabled={!isInsertEnabled}
+            >
+                {isModeInserted ? "Inserted" : "Insert"}
+            </button>
         </div>
     </div>
 );
@@ -173,6 +200,10 @@ type CombinationStationProps = {
     isCombineButtonHovered: boolean;
     onCombineButtonHoverChange: (isHovered: boolean) => void;
     onOutputHover: (hovered: boolean) => void;
+    isModeInserted: boolean;
+    modeInsertedElementLetter?: string;
+    showModeInsertedElementOverlay: boolean;
+    onInsertMode: () => void;
 };
 
 function CombinationStation({
@@ -195,6 +226,10 @@ function CombinationStation({
     isCombineButtonHovered,
     onCombineButtonHoverChange,
     onOutputHover,
+    isModeInserted,
+    modeInsertedElementLetter,
+    showModeInsertedElementOverlay,
+    onInsertMode,
 }: CombinationStationProps) {
     const combineButtonElementClass = hasActiveCombinationState && combinationStationState.elementKey
         ? `combine-button--${combinationStationState.elementKey}`
@@ -245,6 +280,11 @@ function CombinationStation({
                     dropZoneRefA={dropZoneRefA}
                     onHoverInsertSlot={onHoverInsertSlot}
                     shouldShowSlotOneInsertPrompt={shouldShowSlotOneInsertPrompt}
+                    isInsertEnabled={zoneOccupants[0] !== null && !isModeInserted}
+                    isModeInserted={isModeInserted}
+                    modeInsertedElementLetter={modeInsertedElementLetter}
+                    showModeInsertedElementOverlay={showModeInsertedElementOverlay}
+                    onInsertMode={onInsertMode}
                 />
                 <div className={interPanelConnectorClassName} aria-hidden="true" />
 

@@ -321,7 +321,7 @@
     border-radius: 5px;
     color:rgb(22, 22, 22);
     font-weight: 600;
-    text-transform: uppercase;
+    text-transform: none;
     background: linear-gradient(rgba(255, 255, 255, 0.377), rgba(255, 255, 255, 0.568));
     border:1px solid white;
     gap:5px;
@@ -750,6 +750,8 @@
     font-size: 0.65rem;
     line-height: 1.2;
     color: #000000;
+    font-weight: 700;
+    text-transform: none;
     text-shadow: none;
     box-shadow:
         0 2px 0 rgba(0, 0, 0, 0.29),
@@ -782,6 +784,13 @@
     text-transform: none;
     text-align: left;
     white-space: normal;
+}
+
+.floating-tooltip .effect-chip-number,
+.comparison-tooltip .effect-chip-number {
+    font-weight: 900;
+    color: #101010;
+    letter-spacing: 0.01em;
 }
 
 .floating-tooltip .effect-combo,

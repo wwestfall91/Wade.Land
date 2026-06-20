@@ -87,6 +87,22 @@ export type TooltipPanelContentProps = {
 };
 
 export function TooltipPanelContent({ elementDetails, changedKeys, typeMultipliers }: TooltipPanelContentProps) {
+    const highlightNumericTokens = (text: string) => {
+        const parts = text.split(/([+-]?\d+(?:\.\d+)?(?:%|x)?)/g);
+
+        return parts.map((part, index) => {
+            if (/^[+-]?\d+(?:\.\d+)?(?:%|x)?$/.test(part)) {
+                return (
+                    <strong key={`num-${index}`} className="effect-chip-number">
+                        {part}
+                    </strong>
+                );
+            }
+
+            return <span key={`txt-${index}`}>{part}</span>;
+        });
+    };
+
     const effectKinds = (elementDetails.effects ?? []).map((effect, index) => {
         const descriptor = effect.kind === SK.MULTI_HIT ? undefined : statusEffectsRegistry.get(effect.kind);
         const detail = statusEffectsRegistry.getEffectDetail(effect);
@@ -223,7 +239,7 @@ export function TooltipPanelContent({ elementDetails, changedKeys, typeMultiplie
                                 >
                                     <span className="effect-chip-label">{effectKind.label}</span>
                                     {effectKind.detail ? (
-                                        <span className="effect-chip-description">{effectKind.detail}</span>
+                                        <span className="effect-chip-description">{highlightNumericTokens(effectKind.detail)}</span>
                                     ) : null}
                                 </span>
                             ))}

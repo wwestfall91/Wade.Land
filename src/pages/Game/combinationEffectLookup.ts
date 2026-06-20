@@ -7,6 +7,7 @@ export type EffectWorkbookRow = {
     [key: string]: unknown;
     Effect?: string;
     "Short Description"?: string;
+    "Long Description"?: string;
     Amount?: string | number;
     Duration?: string | number;
     Target?: string;
@@ -15,6 +16,7 @@ export type EffectWorkbookRow = {
 
 export type EffectWorkbookValues = {
     shortDescription: string;
+    longDescription: string;
     amount: string | number;
     duration: string | number;
     target: string;
@@ -83,6 +85,7 @@ export const buildEffectValuesByKey = (rows: EffectWorkbookRow[]): Map<string, E
 
         effectValuesByKey.set(effectKey, {
             shortDescription: String(row["Short Description"] ?? "").trim(),
+            longDescription: String(row["Long Description"] ?? "").trim(),
             amount: row.Amount ?? "",
             duration: row.Duration ?? "",
             target: String(row.Target ?? "").trim(),
@@ -102,6 +105,7 @@ export const buildMappedEffectRow = (
     const mappedEffectRow: Record<string, unknown> = {
         "Effect 1 Kind": effectName,
         "Effect 1 Short Description": effectValues?.shortDescription ?? "",
+        "Effect 1 Long Description": effectValues?.longDescription ?? "",
         "Effect 1 Amount": effectValues?.amount ?? "",
         "Effect 1 Duration": effectValues?.duration ?? "",
         "Effect 1 Target": effectValues?.target ?? "",
