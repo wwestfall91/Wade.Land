@@ -1,58 +1,117 @@
 import type { RefObject } from "react";
+import MixLogicContent from "./modes/MixLogicContent";
+import IncubateLogicContent from "./modes/IncubateLogicContent";
+import DivideLogicContent from "./modes/DivideLogicContent";
+import RefineLogicContent from "./modes/RefineLogicContent";
+import DuplicateLogicContent from "./modes/DuplicateLogicContent";
 import "./CombinationLogicPanel.scss";
-
-type CombineStationTooltipProps = {
-    message: string;
-    className?: string;
-};
-
-const CombineStationTooltip = ({ message, className = "" }: CombineStationTooltipProps) => (
-    <div className={`combine-station-tooltip ${className}`.trim()} role="tooltip">
-        {message}
-    </div>
-);
 
 type CombinationLogicPanelProps = {
     className: string;
+    modeKey: string;
+    primaryDropZoneClassName: string;
     secondaryDropZoneClassName: string;
     zoneOccupants: Array<number | null>;
     dropZoneRefB: RefObject<HTMLDivElement>;
     dropZoneRefC: RefObject<HTMLDivElement>;
     onHoverInsertSlot: (slot: 1 | 2 | null) => void;
     shouldShowSlotTwoInsertPrompt: boolean;
+    shouldShowSlotThreeInsertPrompt: boolean;
+    slotConnectorClassName: string;
+    counterValue: number;
+    onCounterChange: (value: number) => void;
+    pendingJobElement: { letter: string; category?: string } | null;
+    isSlotAnimatingClose: boolean;
+    isSlotAnimatingOpen: boolean;
 };
 
 function CombinationLogicPanel({
     className,
+    modeKey,
+    primaryDropZoneClassName,
     secondaryDropZoneClassName,
-    zoneOccupants,
     dropZoneRefB,
     dropZoneRefC,
     onHoverInsertSlot,
     shouldShowSlotTwoInsertPrompt,
+    shouldShowSlotThreeInsertPrompt,
+    slotConnectorClassName,
+    counterValue,
+    onCounterChange,
+    pendingJobElement,
+    isSlotAnimatingClose,
+    isSlotAnimatingOpen,
 }: CombinationLogicPanelProps) {
+    const renderContent = () => {
+        switch (modeKey) {
+            case "mix":
+                return (
+                    <MixLogicContent
+                        primaryDropZoneClassName={primaryDropZoneClassName}
+                        secondaryDropZoneClassName={secondaryDropZoneClassName}
+                        dropZoneRefB={dropZoneRefB}
+                        dropZoneRefC={dropZoneRefC}
+                        onHoverInsertSlot={onHoverInsertSlot}
+                        shouldShowPrimaryInsertPrompt={shouldShowSlotTwoInsertPrompt}
+                        shouldShowSecondaryInsertPrompt={shouldShowSlotThreeInsertPrompt}
+                        slotConnectorClassName={slotConnectorClassName}
+                    />
+                );
+            case "incubate":
+                return (
+                    <IncubateLogicContent
+                        dropZoneClassName={primaryDropZoneClassName}
+                        dropZoneRef={dropZoneRefB}
+                        onHoverInsertSlot={onHoverInsertSlot}
+                        shouldShowInsertPrompt={shouldShowSlotTwoInsertPrompt}
+                        counterValue={counterValue}
+                        onCounterChange={onCounterChange}
+                        pendingJobElement={pendingJobElement}
+                        isSlotAnimatingClose={isSlotAnimatingClose}
+                        isSlotAnimatingOpen={isSlotAnimatingOpen}
+                    />
+                );
+            case "divide":
+                return (
+                    <DivideLogicContent
+                        dropZoneClassName={primaryDropZoneClassName}
+                        dropZoneRef={dropZoneRefB}
+                        onHoverInsertSlot={onHoverInsertSlot}
+                        shouldShowInsertPrompt={shouldShowSlotTwoInsertPrompt}
+                    />
+                );
+            case "refine":
+                return (
+                    <RefineLogicContent
+                        dropZoneClassName={primaryDropZoneClassName}
+                        dropZoneRef={dropZoneRefB}
+                        onHoverInsertSlot={onHoverInsertSlot}
+                        shouldShowInsertPrompt={shouldShowSlotTwoInsertPrompt}
+                        counterValue={counterValue}
+                        onCounterChange={onCounterChange}
+                        pendingJobElement={pendingJobElement}
+                        isSlotAnimatingClose={isSlotAnimatingClose}
+                        isSlotAnimatingOpen={isSlotAnimatingOpen}
+                    />
+                );
+            case "duplicate":
+                return (
+                    <DuplicateLogicContent
+                        dropZoneClassName={primaryDropZoneClassName}
+                        dropZoneRef={dropZoneRefB}
+                        onHoverInsertSlot={onHoverInsertSlot}
+                        shouldShowInsertPrompt={shouldShowSlotTwoInsertPrompt}
+                    />
+                );
+            default:
+                return null;
+        }
+    };
+
     return (
         <div className={`combination-logic-panel ${className}`.trim()}>
             <div className="logic-panel-body">
-                <div className="drop-zone-area">
-                    <div
-                        className={secondaryDropZoneClassName}
-                        ref={dropZoneRefB}
-                        onMouseEnter={() => onHoverInsertSlot(2)}
-                        onMouseLeave={() => onHoverInsertSlot(null)}
-                    >
-                        Element
-                        {shouldShowSlotTwoInsertPrompt ? (
-                            <CombineStationTooltip
-                                className="combine-station-tooltip--slot-two"
-                                message="Please insert element"
-                            />
-                        ) : null}
-                    </div>
-                    {zoneOccupants.length === 3 ? (
-                        <div className="drop-zone" ref={dropZoneRefC}>3</div>
-                    ) : null}
-                </div>
+                {renderContent()}
             </div>
         </div>
     );

@@ -1,0 +1,70 @@
+#Game {
+    .mode-counter {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.35rem;
+
+        .mode-counter-label {
+            font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #ffffff;
+        }
+
+        .mode-counter-controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0;
+        }
+
+        .mode-counter-value {
+            font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: #ffffff;
+            line-height: 1;
+            min-width: 1.5rem;
+            text-align: center;
+            padding: 0.2rem 0;
+        }
+
+        .mode-counter-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.8rem;
+            height: 1.4rem;
+            border: 1px solid rgba(168, 186, 255, 1);
+            border-radius: 3px;
+            background: rgba(50, 69, 206, 1);
+            color: rgba(200, 215, 255, 0.8);
+            font-size: 0.65rem;
+            cursor: pointer;
+            transition: background 100ms ease, border-color 100ms ease, color 100ms ease, transform 80ms ease;
+
+            &:hover:not(:disabled) {
+                background: rgba(80, 100, 230, 0.6);
+                border-color: rgba(168, 186, 255, 0.6);
+                color: #fff;
+                transform: scale(1.05);
+            }
+
+            &:disabled {
+                opacity: 0.3;
+                cursor: not-allowed;
+            }
+        }
+
+        &.is-disabled {
+            pointer-events: none;
+
+            .mode-counter-btn {
+                opacity: 0.25;
+            }
+        }
+    }
+}

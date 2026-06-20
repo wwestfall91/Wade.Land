@@ -383,6 +383,16 @@
         inset 0 0 0 2px #c9b071,
         0 8px 0 rgba(0, 0, 0, 0.29),
         0 12px 24px rgba(11, 16, 48, 0.24);
+
+    .deferred-tooltip-message {
+        margin: 0;
+        padding: 0.6rem 0.75rem;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        font-size: 0.8rem;
+        font-style: italic;
+        color: rgba(210, 225, 255, 0.9);
+        text-align: center;
+    }
 }
 
 .floating-tooltip__panel.tooltip-theme-fire {

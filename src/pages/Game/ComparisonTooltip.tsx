@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { TooltipPanelContent, type ElementDetails } from "./FloatingTooltip";
 import "./ComparisonTooltip.scss";
@@ -8,6 +8,7 @@ type ComparisonTooltipProps = {
     open: boolean;
     beforeElement: ElementDetails;
     afterElement: ElementDetails;
+    afterContent?: ReactNode;
     changedKeys: ReadonlySet<string>;
     typeMultipliers?: Record<string, number>;
 };
@@ -17,6 +18,7 @@ function ComparisonTooltip({
     open,
     beforeElement,
     afterElement,
+    afterContent,
     changedKeys,
     typeMultipliers,
 }: ComparisonTooltipProps) {
@@ -71,11 +73,15 @@ function ComparisonTooltip({
             </div>
             <div className="comparison-tooltip__arrow" aria-hidden="true">→</div>
             <div className="comparison-tooltip__card">
-                <TooltipPanelContent
-                    elementDetails={afterElement}
-                    changedKeys={changedKeys}
-                    typeMultipliers={typeMultipliers}
-                />
+                {afterContent !== undefined
+                    ? afterContent
+                    : (
+                        <TooltipPanelContent
+                            elementDetails={afterElement}
+                            changedKeys={changedKeys}
+                            typeMultipliers={typeMultipliers}
+                        />
+                    )}
             </div>
         </div>,
         document.body,

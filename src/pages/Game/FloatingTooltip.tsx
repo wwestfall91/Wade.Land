@@ -159,9 +159,9 @@ export function TooltipPanelContent({ elementDetails, changedKeys, typeMultiplie
         : 0;
 
     const enhancementItems = [
-        { key: "purified", label: "Purified", active: Boolean(elementDetails.enhancements?.purified) },
-        { key: "polished", label: "Polished", active: Boolean(elementDetails.enhancements?.polished) },
-        { key: "cleansed", label: "Cleansed", active: Boolean(elementDetails.enhancements?.cleansed) },
+        { key: "incubated", label: "Incubated", active: Boolean(elementDetails.enhancements?.incubated) },
+        { key: "divided", label: "Divided", active: Boolean(elementDetails.enhancements?.divided) },
+        { key: "mixed", label: "Mixed", active: Boolean(elementDetails.enhancements?.mixed) },
         { key: "refined", label: "Refined", active: Boolean(elementDetails.enhancements?.refined) },
     ];
 

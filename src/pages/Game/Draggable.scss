@@ -128,6 +128,27 @@
                 0 5px 0 rgba(0, 0, 0, 0.3);
             opacity: 0.5;
         }
+
+        &.drag-preview.is-deferred {
+            border-color: rgba(200, 220, 255, 0.55);
+            background: linear-gradient(180deg, rgba(40, 55, 130, 0.82) 0%, rgba(18, 28, 90, 0.9) 100%);
+            box-shadow:
+                inset 0 0 0 1px rgba(160, 185, 255, 0.3),
+                inset 0 0 0 2px rgba(20, 35, 100, 0.7),
+                0 5px 0 rgba(0, 0, 0, 0.3);
+            opacity: 0.8;
+        }
+
+        .drag-preview__deferred-label {
+            font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+            font-size: 1.4rem;
+            font-weight: 900;
+            font-style: italic;
+            color: rgba(180, 205, 255, 0.7);
+            text-shadow: 0 0 8px rgba(130, 165, 255, 0.5);
+            user-select: none;
+            pointer-events: none;
+        }
     }
 
     .drag.is-invalid-drop {

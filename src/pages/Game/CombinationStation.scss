@@ -365,7 +365,8 @@
         }
     }
 
-    .drop-zone-area > .output {
+    .drop-zone-area > .output,
+    .drop-zone-area > .result-output-shell > .output {
             display: flex;
             width:3.2rem;
             max-width: 3.2rem;

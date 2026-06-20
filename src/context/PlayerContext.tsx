@@ -24,9 +24,9 @@ export type LevelDefinition = {
 };
 
 export type ElementEnhancements = {
-    purified?: boolean;
-    polished?: boolean;
-    cleansed?: boolean;
+    incubated?: boolean;
+    divided?: boolean;
+    mixed?: boolean;
     refined?: boolean;
 };
 
@@ -97,6 +97,7 @@ type PlayerContextValue = {
     spendSouls: (amount: number) => void;
     initializeElements: (elements: PlayerElement[]) => void;
     combineElements: (consumedIds: number[], newElement: PlayerElement) => void;
+    combineElementsMultiple: (consumedIds: number[], newElements: PlayerElement[]) => void;
     consumeElements: (consumedIds: number[]) => void;
     updateElementEffects: (elementId: number, effects?: SpellEffectConfig[]) => void;
     applyEnemyAttack: (power: number) => void;
@@ -282,6 +283,13 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
         ]);
     }, []);
 
+    const combineElementsMultiple = useCallback((consumedIds: number[], newElements: PlayerElement[]) => {
+        setElements((previous) => [
+            ...previous.filter((element) => !consumedIds.includes(element.id)),
+            ...newElements,
+        ]);
+    }, []);
+
     const consumeElements = useCallback((consumedIds: number[]) => {
         if (consumedIds.length === 0) {
             return;
@@ -407,6 +415,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             spendSouls,
             initializeElements,
             combineElements,
+            combineElementsMultiple,
             consumeElements,
             updateElementEffects,
             applyEnemyAttack,
@@ -442,6 +451,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             spendSouls,
             applyEnemyAttack,
             combineElements,
+            combineElementsMultiple,
             consumeElements,
             updateElementEffects,
             initializeElements,

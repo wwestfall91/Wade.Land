@@ -9,12 +9,12 @@ import "./CombinationStation.scss";
 export type { ModeTabElementKey } from "./CombinationModePanel";
 
 export type CombinationStationState = {
-    key: "idle" | "cleanse" | "polish" | "purify" | "refine" | "enhance";
+    key: "idle" | "mix" | "incubate" | "divide" | "refine" | "duplicate";
     actionLabel: string;
     elementKey?: string;
 };
 
-export type CombinationStationActionStateKey = Exclude<CombinationStationState["key"], "idle" | "enhance">;
+export type CombinationStationActionStateKey = Exclude<CombinationStationState["key"], "idle" | "duplicate">;
 
 export type CombinationStateWorkbookRow = {
     Element?: string;
@@ -28,18 +28,18 @@ export type CombinationStateWorkbookRow = {
 export type CombinationStateEffectsLookup = Partial<Record<CombinationStationActionStateKey, Map<string, SpellEffectConfig[]>>>;
 
 export const COMBINATION_STATE_WORKBOOK_PATHS: Record<CombinationStationActionStateKey, string> = {
-    cleanse: "/cleanse.xlsx",
-    polish: "/polish.xlsx",
-    purify: "/purify.xlsx",
+    mix: "/mix.xlsx",
+    incubate: "/incubate.xlsx",
+    divide: "/divide.xlsx",
     refine: "/refine.xlsx",
 };
 
 const COMBINATION_STATION_STATE_BY_FIRST_ELEMENT: Record<string, CombinationStationState> = {
-    fire: { key: "purify", actionLabel: "Purify", elementKey: "fire" },
+    fire: { key: "incubate", actionLabel: "Incubate", elementKey: "fire" },
     earth: { key: "refine", actionLabel: "Refine", elementKey: "earth" },
-    water: { key: "cleanse", actionLabel: "Cleanse", elementKey: "water" },
-    air: { key: "polish", actionLabel: "Polish", elementKey: "air" },
-    soul: { key: "enhance", actionLabel: "Enhance", elementKey: "soul" },
+    water: { key: "mix", actionLabel: "Mix", elementKey: "water" },
+    air: { key: "divide", actionLabel: "Divide", elementKey: "air" },
+    soul: { key: "duplicate", actionLabel: "Duplicate", elementKey: "soul" },
 };
 
 const IDLE_COMBINATION_STATION_STATE: CombinationStationState = {
@@ -55,8 +55,8 @@ type CombinationStationProps = {
     hasStartedDraggingElement: boolean;
     hasSeenDropZoneOneTutorial: boolean;
     isInsertEnabled: boolean;
-    isEnhanceCombinationReady: boolean;
-    isNonEnhanceCombinationReady: boolean;
+    isDuplicateCombinationReady: boolean;
+    isNonDuplicateCombinationReady: boolean;
     firstSlotConnectorKey: string;
     hasActiveCombinationState: boolean;
     combinationStationState: CombinationStationState;
@@ -66,11 +66,13 @@ type CombinationStationProps = {
     dropZoneRefB: RefObject<HTMLDivElement>;
     dropZoneRefC: RefObject<HTMLDivElement>;
     outputRef: RefObject<HTMLDivElement>;
+    outputRef2: RefObject<HTMLDivElement>;
     onHoverInsertSlot: (slot: 1 | 2 | null) => void;
     hoveredInsertSlot: 1 | 2 | null;
     isCombineButtonHovered: boolean;
     onCombineButtonHoverChange: (isHovered: boolean) => void;
     onOutputHover: (hovered: boolean) => void;
+    onOutputHover2: (hovered: boolean) => void;
     isModeInserted: boolean;
     shouldAnimateModeShutter: boolean;
     modeInsertedElementLetter?: string;
@@ -81,6 +83,16 @@ type CombinationStationProps = {
     selectedModeTabElementKey: ModeTabElementKey | null;
     onModeTabSelect: (elementKey: ModeTabElementKey) => void;
     onInsertMode: () => void;
+    incubateCounter: number;
+    refineCounter: number;
+    onIncubateCounterChange: (value: number) => void;
+    onRefineCounterChange: (value: number) => void;
+    pendingJobElement: { letter: string; category?: string } | null;
+    isSlotAnimatingClose: boolean;
+    isSlotAnimatingOpen: boolean;
+    isOutputSlotClosed: boolean;
+    isOutputSlotAnimatingClose: boolean;
+    isOutputSlotAnimatingOpen: boolean;
 };
 
 function CombinationStation({
@@ -88,8 +100,8 @@ function CombinationStation({
     hasStartedDraggingElement,
     hasSeenDropZoneOneTutorial,
     isInsertEnabled,
-    isEnhanceCombinationReady,
-    isNonEnhanceCombinationReady,
+    isDuplicateCombinationReady,
+    isNonDuplicateCombinationReady,
     firstSlotConnectorKey,
     hasActiveCombinationState,
     combinationStationState,
@@ -99,11 +111,13 @@ function CombinationStation({
     dropZoneRefB,
     dropZoneRefC,
     outputRef,
+    outputRef2,
     onHoverInsertSlot,
     hoveredInsertSlot,
     isCombineButtonHovered,
     onCombineButtonHoverChange,
     onOutputHover,
+    onOutputHover2,
     isModeInserted,
     shouldAnimateModeShutter,
     modeInsertedElementLetter,
@@ -114,6 +128,16 @@ function CombinationStation({
     selectedModeTabElementKey,
     onModeTabSelect,
     onInsertMode,
+    incubateCounter,
+    refineCounter,
+    onIncubateCounterChange,
+    onRefineCounterChange,
+    pendingJobElement,
+    isSlotAnimatingClose,
+    isSlotAnimatingOpen,
+    isOutputSlotClosed,
+    isOutputSlotAnimatingClose,
+    isOutputSlotAnimatingOpen,
 }: CombinationStationProps) {
     const combineButtonElementClass = hasActiveCombinationState && combinationStationState.elementKey
         ? `combine-button--${combinationStationState.elementKey}`
@@ -142,14 +166,27 @@ function CombinationStation({
         zoneOccupants[0] !== null ? "is-lit" : "",
         zoneOccupants[0] !== null ? `combination-station--${firstSlotConnectorKey || "default"}` : "",
     ].filter((name) => name.length > 0).join(" ");
+    const modeKey = combinationStationState.key;
     const panelModifierClass = zoneOccupants[0] !== null ? "is-lit" : "";
-    const modeDropZoneClassName = `drop-zone ${hasStartedDraggingElement && !hasSeenDropZoneOneTutorial ? "is-discoverable" : ""} ${isEnhanceCombinationReady ? "is-enhance-ready-primary" : ""} ${isNonEnhanceCombinationReady ? "is-combination-ready-primary" : ""}`;
-    const secondaryDropZoneClassName = `drop-zone ${isEnhanceCombinationReady ? "is-enhance-ready-secondary" : ""} ${isNonEnhanceCombinationReady ? "is-combination-ready-secondary" : ""}`;
+    const modeDropZoneClassName = `drop-zone ${hasStartedDraggingElement && !hasSeenDropZoneOneTutorial ? "is-discoverable" : ""} ${isDuplicateCombinationReady ? "is-enhance-ready-primary" : ""} ${isNonDuplicateCombinationReady ? "is-combination-ready-primary" : ""}`;
+    const secondaryDropZoneClassName = `drop-zone ${isDuplicateCombinationReady ? "is-enhance-ready-secondary" : ""} ${isNonDuplicateCombinationReady ? "is-combination-ready-secondary" : ""}`;
     const isCombineButtonDisabled = !canCombine || !hasActiveCombinationState;
     const shouldShowSlotOneInsertPrompt = (hoveredInsertSlot === 1 && zoneOccupants[0] === null)
         || (isCombineButtonHovered && hoveredInsertSlot === null && zoneOccupants[0] === null);
     const shouldShowSlotTwoInsertPrompt = (hoveredInsertSlot === 2 && zoneOccupants[1] === null)
         || (isCombineButtonHovered && hoveredInsertSlot === null && zoneOccupants[0] !== null && zoneOccupants[1] === null);
+    // Mix secondary slot (C) — shown when combine button is hovered and primary is filled but secondary is not
+    const shouldShowSlotThreeInsertPrompt = modeKey === "mix"
+        && isCombineButtonHovered
+        && (zoneOccupants[1] ?? null) !== null
+        && (zoneOccupants[2] ?? null) === null;
+    // Resolve active counter and handler based on current mode
+    const activeCounter = modeKey === "incubate" ? incubateCounter
+        : modeKey === "refine" ? refineCounter
+        : 1;
+    const handleCounterChange = modeKey === "incubate" ? onIncubateCounterChange
+        : modeKey === "refine" ? onRefineCounterChange
+        : () => {};
 
     return (
         <div className={combinationStationClassName}>
@@ -177,19 +214,34 @@ function CombinationStation({
 
                 <CombinationLogicPanel
                     className={panelModifierClass}
+                    modeKey={modeKey}
+                    primaryDropZoneClassName={modeDropZoneClassName}
                     secondaryDropZoneClassName={secondaryDropZoneClassName}
                     zoneOccupants={zoneOccupants}
                     dropZoneRefB={dropZoneRefB}
                     dropZoneRefC={dropZoneRefC}
                     onHoverInsertSlot={onHoverInsertSlot}
                     shouldShowSlotTwoInsertPrompt={shouldShowSlotTwoInsertPrompt}
+                    shouldShowSlotThreeInsertPrompt={shouldShowSlotThreeInsertPrompt}
+                    slotConnectorClassName={secondSlotConnectorClassName}
+                    counterValue={activeCounter}
+                    onCounterChange={handleCounterChange}
+                    pendingJobElement={pendingJobElement}
+                    isSlotAnimatingClose={isSlotAnimatingClose}
+                    isSlotAnimatingOpen={isSlotAnimatingOpen}
                 />
                 <div className={secondSlotConnectorClassName} aria-hidden="true" />
 
                 <CombinationResultPanel
                     className={panelModifierClass}
+                    modeKey={modeKey}
                     outputRef={outputRef}
+                    outputRef2={outputRef2}
                     onOutputHover={onOutputHover}
+                    onOutputHover2={onOutputHover2}
+                    isPrimaryOutputShutterClosed={isOutputSlotClosed}
+                    isPrimaryOutputShutterAnimatingClose={isOutputSlotAnimatingClose}
+                    isPrimaryOutputShutterAnimatingOpen={isOutputSlotAnimatingOpen}
                 />
                 </div>
             </div>

@@ -153,6 +153,20 @@ type PreviewCombination = {
     type2?: string;
     effects?: SpellEffectConfig[];
     category?: string;
+    /** Set for Incubate/Refine: element consumed now, output delivered after battles. */
+    isDeferred?: boolean;
+    /** Set for Divide/Duplicate: a second element spawns alongside the primary output. */
+    secondOutput?: {
+        letter: string;
+        damage: number;
+        energy?: number;
+        level: number;
+        description: string;
+        type1?: string;
+        type2?: string;
+        effects?: SpellEffectConfig[];
+        category?: string;
+    };
 };
 
 type ChestDefinition = {
@@ -256,18 +270,18 @@ const mergeEnhancements = (
     stateKey?: CombinationStationActionStateKey,
 ): ElementEnhancements | undefined => {
     const merged: ElementEnhancements = {
-        purified: inherited?.purified ?? false,
-        polished: inherited?.polished ?? false,
-        cleansed: inherited?.cleansed ?? false,
+        incubated: inherited?.incubated ?? false,
+        divided: inherited?.divided ?? false,
+        mixed: inherited?.mixed ?? false,
         refined: inherited?.refined ?? false,
     };
 
-    if (stateKey === "purify") merged.purified = true;
-    if (stateKey === "polish") merged.polished = true;
-    if (stateKey === "cleanse") merged.cleansed = true;
+    if (stateKey === "incubate") merged.incubated = true;
+    if (stateKey === "divide") merged.divided = true;
+    if (stateKey === "mix") merged.mixed = true;
     if (stateKey === "refine") merged.refined = true;
 
-    if (!merged.purified && !merged.polished && !merged.cleansed && !merged.refined) {
+    if (!merged.incubated && !merged.divided && !merged.mixed && !merged.refined) {
         return undefined;
     }
 
@@ -284,6 +298,7 @@ function Game() {
         playerName,
         setPlayerName,
         combineElements,
+        combineElementsMultiple,
         consumeElements,
         addSouls,
         spendSouls,
@@ -311,9 +326,11 @@ function Game() {
     const dropZoneRefB = useRef<HTMLDivElement | null>(null);
     const dropZoneRefC = useRef<HTMLDivElement | null>(null);
     const outputRef = useRef<HTMLDivElement | null>(null);
+    const outputRef2 = useRef<HTMLDivElement | null>(null);
     const enhanceSlotRef = useRef<HTMLDivElement | null>(null);
     const machineSlotRef = useRef<HTMLDivElement | null>(null);
     const previewRef = useRef<HTMLDivElement | null>(null);
+    const previewRef2 = useRef<HTMLDivElement | null>(null);
 
     const [draggables, setDraggables] = useState<DraggableItem[]>([]);
     const [combinationStateEffectsLookup, setCombinationStateEffectsLookup] = useState<CombinationStateEffectsLookup>({});
@@ -364,6 +381,7 @@ function Game() {
     const [isPreviewAltHeld, setIsPreviewAltHeld] = useState(false);
     const [isPreviewPointerDown, setIsPreviewPointerDown] = useState(false);
     const [previewHomePosition, setPreviewHomePosition] = useState<Position | null>(null);
+    const [previewHomePosition2, setPreviewHomePosition2] = useState<Position | null>(null);
     const [previewPosition, setPreviewPosition] = useState<Position | null>(null);
     const [previewPointerOffset, setPreviewPointerOffset] = useState<Position>({ x: 0, y: 0 });
     const [introPhase, setIntroPhase] = useState<IntroPhase>(() => (playerName.trim().length > 0 ? "hidden" : "line1"));
@@ -383,7 +401,26 @@ function Game() {
     const [isModeInsertAnimating, setIsModeInsertAnimating] = useState(false);
     const [selectedModeTabElementKey, setSelectedModeTabElementKey] = useState<ModeTabElementKey | null>(null);
     const [isCombineButtonHovered, setIsCombineButtonHovered] = useState(false);
+    const [incubateCounter, setIncubateCounter] = useState(1);
+    const [refineCounter, setRefineCounter] = useState(1);
+
+    type DeferredJob = {
+        jobId: number;
+        modeKey: "incubate" | "refine";
+        inputElement: DraggableItem;
+        counter: number;
+        battlesWon: number;
+    };
+    const [deferredJobs, setDeferredJobs] = useState<DeferredJob[]>([]);
+    const nextJobId = useRef(1);
+    const [isDeferredShutterAnimating, setIsDeferredShutterAnimating] = useState(false);
+    const [isDeferredShutterOpening, setIsDeferredShutterOpening] = useState(false);
+    const [deferredCompletionRevealModes, setDeferredCompletionRevealModes] = useState<Set<"incubate" | "refine">>(new Set());
+    // Ref so early callbacks (normalizeZoneOccupants) can read the current mode key without
+    // creating a forward-reference to the derived `insertedModeStateKey` const.
+    const insertedModeStateKeyRef = useRef<string>("idle");
     const [isOutputHovered, setIsOutputHovered] = useState(false);
+    const [isOutputHovered2, setIsOutputHovered2] = useState(false);
     const [isPostBattleSoulSequenceActive, setIsPostBattleSoulSequenceActive] = useState(false);
     const [postBattleSoulFillDurationMs, setPostBattleSoulFillDurationMs] = useState(0);
     const [isOldOnePreludeActive, setIsOldOnePreludeActive] = useState(false);
@@ -686,6 +723,12 @@ function Game() {
                 window.clearTimeout(rewardCueTimeoutRef.current);
             }
 
+            // Advance battle counters on all pending deferred jobs
+            setDeferredJobs((prev) => prev.map((job) => ({
+                ...job,
+                battlesWon: job.battlesWon + 1,
+            })));
+
             setFightReward(null);
             setIsFightVictoryCueVisible(true);
             rewardCueTimeoutRef.current = window.setTimeout(() => {
@@ -766,6 +809,10 @@ function Game() {
                 // 2-slot case: preserve element positions so either slot can be filled independently
                 return [sanitized[0] ?? null, sanitized[1] ?? null];
             }
+            // In Mix mode, keep the 3-slot layout intact
+            if (insertedModeStateKeyRef.current === "mix") {
+                return [sanitized[0] ?? null, sanitized[1] ?? null, sanitized[2] ?? null];
+            }
             // Collapsing from 3-slot (plasma removed): pack remaining elements into the 2 slots
             const nonPlasma = sanitized.filter((id): id is number => id !== null).slice(0, 2);
             return [nonPlasma[0] ?? null, nonPlasma[1] ?? null];
@@ -829,6 +876,74 @@ function Game() {
             y: startRect.bottom - containerRect.top - padding - step - row * step,
         };
     };
+
+    // Complete any deferred jobs (Incubate/Refine) whose battle count has been met.
+    useEffect(() => {
+        const completedJobs = deferredJobs.filter((job) => job.battlesWon >= job.counter);
+        if (completedJobs.length === 0) return;
+
+        completedJobs.forEach((job) => {
+            // Spawn at the output slot position so the element appears there, falling back to inventory stack.
+            const containerRect = gameRef.current?.getBoundingClientRect();
+            const outputRect = outputRef.current?.getBoundingClientRect();
+            const spawnPos = (containerRect && outputRect)
+                ? {
+                    x: outputRect.left - containerRect.left + (outputRect.width - 32) / 2,
+                    y: outputRect.top - containerRect.top + (outputRect.height - 32) / 2,
+                }
+                : getSpawnPosition(playerProgress.elements.length);
+
+            if (job.modeKey === "incubate") {
+                const multiplier = job.counter * 1.75;
+                addElement({
+                    letter: job.inputElement.letter,
+                    damage: Math.round(job.inputElement.damage * multiplier),
+                    energy: job.inputElement.energy,
+                    enhancements: mergeEnhancements(job.inputElement.enhancements, "incubate"),
+                    level: job.inputElement.level,
+                    description: job.inputElement.description,
+                    type1: job.inputElement.type1,
+                    type2: job.inputElement.type2,
+                    effects: (job.inputElement.effects ?? []).map((effect) => ({
+                        ...effect,
+                        amount: effect.amount !== undefined ? Math.round(effect.amount * multiplier) : undefined,
+                    })),
+                    category: job.inputElement.category,
+                    initialPosition: spawnPos,
+                });
+            } else if (job.modeKey === "refine") {
+                const powerMultiplier = job.counter * 2;
+                addElement({
+                    letter: job.inputElement.letter,
+                    damage: Math.round(job.inputElement.damage * powerMultiplier),
+                    energy: job.inputElement.energy,
+                    enhancements: mergeEnhancements(job.inputElement.enhancements, "refine"),
+                    level: job.inputElement.level,
+                    description: job.inputElement.description,
+                    type1: job.inputElement.type1,
+                    type2: job.inputElement.type2,
+                    effects: job.inputElement.effects,
+                    category: job.inputElement.category,
+                    initialPosition: spawnPos,
+                });
+            }
+
+            setDeferredCompletionRevealModes((prev) => {
+                const next = new Set(prev);
+                next.add(job.modeKey);
+                return next;
+            });
+
+            if (job.modeKey === "incubate") {
+                setIncubateCounter(1);
+            } else {
+                setRefineCounter(1);
+            }
+        });
+
+        setDeferredJobs((prev) => prev.filter((job) => job.battlesWon < job.counter));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [addElement, deferredJobs, playerProgress.elements.length]);
 
     useEffect(() => {
         if (introPhase === "hidden" || introPhase === "input" || introPhase === "fadeout") {
@@ -1422,6 +1537,27 @@ function Game() {
         && slotZeroElementKey === selectedModeTabElementKey;
     const insertedModeState = getCombinationStationState(activeModeElementKeyForState);
     const insertedModeStateKey = insertedModeState.key;
+    const activeDeferredJob = deferredJobs.find((j) => j.modeKey === insertedModeStateKey) ?? null;
+    const isDeferredModeActive = insertedModeStateKey === "incubate" || insertedModeStateKey === "refine";
+    const isDeferredSlotClosed = isDeferredModeActive && activeDeferredJob !== null;
+
+    // Keep ref in sync so normalizeZoneOccupants can read the key without a forward-reference.
+    insertedModeStateKeyRef.current = insertedModeStateKey;
+
+    // Expand zoneOccupants to 3 slots when Mix mode is active; collapse back to 2 otherwise.
+    useEffect(() => {
+        if (insertedModeStateKey === "mix") {
+            setZoneOccupants((prev) => {
+                if (prev.length >= 3) return prev;
+                return [prev[0] ?? null, prev[1] ?? null, null];
+            });
+        } else if (insertedModeStateKey !== "idle") {
+            setZoneOccupants((prev) => {
+                if (prev.length <= 2) return prev;
+                return [prev[0] ?? null, prev[1] ?? null];
+            });
+        }
+    }, [insertedModeStateKey]);
 
     const previewCombination = useMemo<PreviewCombination | null>(() => {
         if (insertedModeStateKey === "idle") {
@@ -1476,9 +1612,9 @@ function Game() {
 
         const currentStationStateKey = insertedModeStateKey;
         const currentEnhancementStateKey: CombinationStationActionStateKey | undefined =
-            currentStationStateKey === "cleanse" ||
-            currentStationStateKey === "polish" ||
-            currentStationStateKey === "purify" ||
+            currentStationStateKey === "mix" ||
+            currentStationStateKey === "incubate" ||
+            currentStationStateKey === "divide" ||
             currentStationStateKey === "refine"
                 ? currentStationStateKey
                 : undefined;
@@ -1520,6 +1656,25 @@ function Game() {
                 effects: unstableResolved.effects,
             });
         };
+
+        // ── Mix (3-slot): primary + secondary → output of primary type + combined effects ──
+        if (currentStationStateKey === "mix" && zoneOccupants.length === 3) {
+            const [, primaryItem, secondaryItem] = occupantItems;
+            if (!primaryItem || !secondaryItem) return null;
+            return {
+                consumedIds,
+                letter: primaryItem.letter,
+                damage: primaryItem.damage,
+                energy: primaryItem.energy,
+                enhancements: mergeEnhancements(primaryItem.enhancements, "mix"),
+                level: primaryItem.level,
+                description: primaryItem.description,
+                type1: primaryItem.type1,
+                type2: primaryItem.type2,
+                effects: [...(primaryItem.effects ?? []), ...(secondaryItem.effects ?? [])],
+                category: primaryItem.category,
+            };
+        }
 
         if (zoneOccupants.length === 3) {
             const [leftItem, middleItem, rightItem] = occupantItems;
@@ -1599,87 +1754,139 @@ function Game() {
             return null;
         }
 
-        if (currentStationStateKey === "enhance") {
-            const enhancedDamage = Math.round(rightItem.damage * 1.5);
-            const allEnhanceInputEffects = [
-                ...(leftItem.effects ?? []),
-                ...(rightItem.effects ?? []),
-            ];
-            const enhanceResolved = resolveCombinationPreviewFromEffects(
-                { damage: enhancedDamage, energy: rightItem.energy, effects: rightItem.effects },
-                allEnhanceInputEffects,
-            );
+        // ── Incubate: element consumed now, output delivered after N battles ──
+        if (currentStationStateKey === "incubate") {
+            return {
+                consumedIds: withBrittleFormulaConsumedIds([rightItem.id], [leftItem, rightItem]),
+                letter: "?",
+                damage: 0,
+                level: rightItem.level,
+                description: "Time has mysterious effects on all things",
+                isDeferred: true,
+            };
+        }
 
-            const enhanceConsumedIds = isModeSentinelId(leftItem.id) ? [] : [leftItem.id];
-            return applyCombustPreview({
-                consumedIds: withBrittleFormulaConsumedIds(enhanceConsumedIds, [leftItem, rightItem]),
+        // ── Divide: split power + split effects across two outputs ──
+        if (currentStationStateKey === "divide") {
+            const halfPower = Math.ceil(rightItem.damage / 2);
+            const effects = rightItem.effects ?? [];
+            const topCount = Math.ceil(effects.length / 2);
+            const topEffects = effects.slice(0, topCount);
+            const bottomEffects = effects.slice(topCount);
+            const topEnergy = rightItem.energy !== undefined ? Math.ceil(rightItem.energy / 2) : undefined;
+            const bottomEnergy = rightItem.energy !== undefined ? Math.floor(rightItem.energy / 2) : undefined;
+            return {
+                consumedIds: withBrittleFormulaConsumedIds([rightItem.id], [leftItem, rightItem]),
                 letter: rightItem.letter,
-                damage: enhanceResolved.damage,
-                isDamageEnhanced: true,
-                baseDamageBeforeEnhance: rightItem.damage,
-                energy: enhanceResolved.energy,
-                baseEnergyBeforeCreation: enhanceResolved.baseEnergyBeforeCreation,
-                enhancements: mergeEnhancements(rightItem.enhancements),
+                damage: halfPower,
+                energy: topEnergy,
+                enhancements: mergeEnhancements(rightItem.enhancements, "divide"),
                 level: rightItem.level,
                 description: rightItem.description,
                 type1: rightItem.type1,
                 type2: rightItem.type2,
-                effects: enhanceResolved.effects,
+                effects: topEffects,
                 category: rightItem.category,
-            });
+                secondOutput: {
+                    letter: rightItem.letter,
+                    damage: halfPower,
+                    energy: bottomEnergy,
+                    level: rightItem.level,
+                    description: rightItem.description,
+                    type1: rightItem.type1,
+                    type2: rightItem.type2,
+                    effects: bottomEffects,
+                    category: rightItem.category,
+                },
+            };
         }
 
-        const stateEffects = combinationStateEffectsLookup[currentStationStateKey as CombinationStationActionStateKey];
-        const rightElementKey = normalizeElementName(rightItem.letter);
-        const mappedEffects = stateEffects?.get(rightElementKey);
-        if (!mappedEffects) {
-            return null;
+        // ── Refine: element consumed now, output delivered with power × (counter × 2) ──
+        if (currentStationStateKey === "refine") {
+            return {
+                consumedIds: withBrittleFormulaConsumedIds([rightItem.id], [leftItem, rightItem]),
+                letter: rightItem.letter,
+                damage: 0,
+                level: rightItem.level,
+                description: "Time has mysterious effects on all things",
+                isDeferred: true,
+            };
         }
 
-        const resolvedPreview = resolveCombinationPreviewFromEffects(
-            {
+        // ── Duplicate: exact copy + fresh catalog spawn ──
+        if (currentStationStateKey === "duplicate") {
+            const catalogEntry = elementCatalogRef.current.get(normalizeElementName(rightItem.letter));
+            const freshElement = catalogEntry ?? {
+                letter: "Soul",
+                damage: 0,
+                energy: 0,
+                level: 0,
+                description: "A soul element",
+                category: "element",
+            };
+            const duplicateConsumedIds = isModeSentinelId(leftItem.id) ? [] : [leftItem.id];
+            return {
+                consumedIds: withBrittleFormulaConsumedIds([...duplicateConsumedIds, rightItem.id], [leftItem, rightItem]),
+                letter: rightItem.letter,
                 damage: rightItem.damage,
                 energy: rightItem.energy,
-                effects: mappedEffects,
-            },
-            [
-                ...(leftItem.effects ?? []),
-                ...(rightItem.effects ?? []),
-            ],
-        );
+                enhancements: rightItem.enhancements,
+                level: rightItem.level,
+                description: rightItem.description,
+                type1: rightItem.type1,
+                type2: rightItem.type2,
+                effects: rightItem.effects,
+                category: rightItem.category,
+                secondOutput: {
+                    letter: freshElement.letter,
+                    damage: freshElement.damage,
+                    energy: freshElement.energy,
+                    level: freshElement.level,
+                    description: freshElement.description,
+                    type1: (freshElement as DraggableItem).type1,
+                    type2: (freshElement as DraggableItem).type2,
+                    effects: freshElement.effects,
+                    category: freshElement.category,
+                },
+            };
+        }
 
-        return applyCombustPreview({
-            consumedIds: withBrittleFormulaConsumedIds([rightItem.id], [leftItem, rightItem]),
-            letter: rightItem.letter,
-            damage: resolvedPreview.damage,
-            isDamageEnhanced: resolvedPreview.isDamageEnhanced,
-            baseDamageBeforeEnhance: resolvedPreview.baseDamageBeforeEnhance,
-            energy: resolvedPreview.energy,
-            baseEnergyBeforeCreation: resolvedPreview.baseEnergyBeforeCreation,
-            enhancements: mergeEnhancements(rightItem.enhancements, currentEnhancementStateKey),
-            level: rightItem.level,
-            description: rightItem.description,
-            type1: rightItem.type1,
-            type2: rightItem.type2,
-            effects: resolvedPreview.effects,
-            category: rightItem.category,
-        });
+        return null;
     }, [combinationStateEffectsLookup, getDraggableById, insertedModeStateKey, zoneOccupants]);
 
     const canCombine = previewCombination !== null;
     const firstSlotConnectorKey: string = activeModeElementKeyForState;
     const combinationStationState = insertedModeState;
     const hasActiveCombinationState = combinationStationState.key !== "idle";
-    const areBothCombinationSlotsFilled = zoneOccupants[0] !== null && zoneOccupants[1] !== null;
-    const isEnhanceCombinationReady = combinationStationState.key === "enhance"
+    const areBothCombinationSlotsFilled = insertedModeStateKey === "mix"
+        ? (zoneOccupants[1] ?? null) !== null && (zoneOccupants[2] ?? null) !== null
+        : zoneOccupants[0] !== null && zoneOccupants[1] !== null;
+    const isDuplicateCombinationReady = combinationStationState.key === "duplicate"
         && areBothCombinationSlotsFilled;
-    const isNonEnhanceCombinationReady = hasActiveCombinationState
-        && combinationStationState.key !== "enhance"
+    const isNonDuplicateCombinationReady = hasActiveCombinationState
+        && combinationStationState.key !== "duplicate"
         && areBothCombinationSlotsFilled;
 
     const getOutputCenterPosition = useCallback((): Position | null => {
         const containerRect = gameRef.current?.getBoundingClientRect();
         const outputRect = outputRef.current?.getBoundingClientRect();
+        if (!containerRect || !outputRect) {
+            return null;
+        }
+
+        const previewRect = previewRef.current?.getBoundingClientRect();
+        const dragWidth = previewRect?.width ?? 32;
+        const dragHeight = previewRect?.height ?? 32;
+
+        return {
+            x: outputRect.left - containerRect.left + (outputRect.width - dragWidth) / 2,
+            y: outputRect.top - containerRect.top + (outputRect.height - dragHeight) / 2,
+        };
+    }, []);
+
+    const getOutputCenterPosition2 = useCallback((): Position | null => {
+        const containerRect = gameRef.current?.getBoundingClientRect();
+        const outputRect = outputRef2.current?.getBoundingClientRect();
         if (!containerRect || !outputRect) {
             return null;
         }
@@ -1754,12 +1961,97 @@ function Game() {
             new Set([...previewCombination.consumedIds, ...extraConsumedIds]),
         );
 
+        // ── Deferred modes (Incubate / Refine): consume input, queue a pending job ──
+        if (previewCombination.isDeferred) {
+            const activeCounter = insertedModeStateKey === "incubate" ? incubateCounter : refineCounter;
+            const inputId = effectiveConsumedIds[0];
+            const inputDraggable = getDraggableById(inputId);
+            if (!inputDraggable) return;
+
+            const newJob: DeferredJob = {
+                jobId: nextJobId.current++,
+                modeKey: insertedModeStateKey as "incubate" | "refine",
+                inputElement: inputDraggable,
+                counter: activeCounter,
+                battlesWon: 0,
+            };
+
+            setDeferredJobs((prev) => [
+                ...prev.filter((j) => j.modeKey !== newJob.modeKey),
+                newJob,
+            ]);
+            consumeElements(effectiveConsumedIds);
+            setDraggables((prev) => prev.filter((d) => !effectiveConsumedIds.includes(d.id)));
+            setZoneOccupants((prev) => prev.map((id) => (id !== null && effectiveConsumedIds.includes(id) ? null : id)));
+            setIsDeferredShutterOpening(false);
+            setIsDeferredShutterAnimating(true);
+            window.setTimeout(() => setIsDeferredShutterAnimating(false), MODE_SHUTTER_CLOSE_MS);
+            setIsPreviewDragging(false);
+            setPreviewPosition(null);
+            previewPositionRef.current = null;
+            return;
+        }
+
         const outputPosition = getOutputCenterPosition();
         const targetPosition = spawnPosition ?? outputPosition;
         if (!targetPosition) {
             return;
         }
 
+        // ── Dual-output modes (Divide / Duplicate): spawn two elements ──
+        if (previewCombination.secondOutput) {
+            const targetPosition2 = getOutputCenterPosition2() ?? targetPosition;
+
+            const firstDraggable = {
+                id: nextId.current++,
+                letter: previewCombination.letter,
+                damage: previewCombination.damage,
+                energy: previewCombination.energy,
+                enhancements: previewCombination.enhancements,
+                level: previewCombination.level,
+                description: previewCombination.description,
+                type1: previewCombination.type1,
+                type2: previewCombination.type2,
+                effects: previewCombination.effects,
+                category: previewCombination.category,
+                initialPosition: targetPosition,
+            };
+
+            const secondDraggable = {
+                id: nextId.current++,
+                ...previewCombination.secondOutput,
+                initialPosition: targetPosition2,
+            };
+
+            brittleUpdatesById.forEach((nextEffects, elementId) => {
+                updateElementEffects(elementId, nextEffects);
+            });
+
+            combineElementsMultiple(effectiveConsumedIds, [firstDraggable, secondDraggable]);
+
+            setDraggables((previous) => {
+                const preserved = previous
+                    .filter((draggable) => !effectiveConsumedIds.includes(draggable.id))
+                    .map((draggable) => {
+                        const nextEffects = brittleUpdatesById.get(draggable.id);
+                        return nextEffects ? { ...draggable, effects: nextEffects } : draggable;
+                    });
+
+                return [...preserved, firstDraggable, secondDraggable];
+            });
+
+            setZoneOccupants((previous) =>
+                previous.map((occupantId) =>
+                    occupantId !== null && effectiveConsumedIds.includes(occupantId) ? null : occupantId,
+                ),
+            );
+            setIsPreviewDragging(false);
+            setPreviewPosition(null);
+            previewPositionRef.current = null;
+            return;
+        }
+
+        // ── Single-output (default) ──
         const newDraggable = {
             id: nextId.current,
             letter: previewCombination.letter,
@@ -1847,9 +2139,16 @@ function Game() {
     }, [
         addDiscoveredCraftedLetter,
         combineElements,
+        combineElementsMultiple,
+        consumeElements,
         draggables,
+        getDraggableById,
         getOutputCenterPosition,
+        getOutputCenterPosition2,
+        incubateCounter,
+        insertedModeStateKey,
         previewCombination,
+        refineCounter,
         updateElementEffects,
         zoneOccupants,
     ]);
@@ -1886,6 +2185,46 @@ function Game() {
             setPreviewHomePosition(centered);
         }
     }, [getOutputCenterPosition, isPreviewDragging, previewCombination]);
+
+    useLayoutEffect(() => {
+        if (!previewCombination?.secondOutput || isPreviewDragging) {
+            return;
+        }
+
+        const centered2 = getOutputCenterPosition2();
+        if (centered2) {
+            setPreviewHomePosition2(centered2);
+        }
+    }, [getOutputCenterPosition2, isPreviewDragging, previewCombination]);
+
+    useEffect(() => {
+        if (!isDeferredModeActive) {
+            return;
+        }
+
+        if (activeDeferredJob !== null) {
+            return;
+        }
+
+        const modeKey = insertedModeStateKey as "incubate" | "refine";
+        if (!deferredCompletionRevealModes.has(modeKey)) {
+            return;
+        }
+
+        setIsDeferredShutterOpening(true);
+        const timeoutId = window.setTimeout(() => {
+            setIsDeferredShutterOpening(false);
+            setDeferredCompletionRevealModes((prev) => {
+                const next = new Set(prev);
+                next.delete(modeKey);
+                return next;
+            });
+        }, MODE_SHUTTER_CLOSE_MS);
+
+        return () => {
+            window.clearTimeout(timeoutId);
+        };
+    }, [activeDeferredJob, deferredCompletionRevealModes, insertedModeStateKey, isDeferredModeActive]);
 
     useEffect(() => {
         if (!isPreviewPointerDown) {
@@ -2221,6 +2560,11 @@ function Game() {
     const canSnapToZone = (draggableId: number, zoneIndex: number) => {
         const draggable = draggables.find((item) => item.id === draggableId);
         if (!draggable) {
+            return false;
+        }
+
+        // Block the logic panel slot while a deferred job is processing for this mode.
+        if (zoneIndex === 1 && activeDeferredJob !== null) {
             return false;
         }
 
@@ -2573,12 +2917,11 @@ function Game() {
         if ((slotTwoPreviewDraggable.energy ?? 0) !== (previewCombination.energy ?? 0)) changed.add("energy");
         if (slotTwoPreviewDraggable.type1 !== previewCombination.type1) changed.add("type1");
         if (slotTwoPreviewDraggable.type2 !== previewCombination.type2) changed.add("type2");
-        if (slotTwoPreviewDraggable.description !== previewCombination.description) changed.add("description");
         if (slotTwoPreviewDraggable.level !== previewCombination.level) changed.add("level");
         if (effectSignature(slotTwoPreviewDraggable.effects) !== effectSignature(previewCombination.effects)) changed.add("effects");
-        if (Boolean(slotTwoPreviewDraggable.enhancements?.purified) !== Boolean(previewCombination.enhancements?.purified)) changed.add("enhancement-purified");
-        if (Boolean(slotTwoPreviewDraggable.enhancements?.polished) !== Boolean(previewCombination.enhancements?.polished)) changed.add("enhancement-polished");
-        if (Boolean(slotTwoPreviewDraggable.enhancements?.cleansed) !== Boolean(previewCombination.enhancements?.cleansed)) changed.add("enhancement-cleansed");
+        if (Boolean(slotTwoPreviewDraggable.enhancements?.incubated) !== Boolean(previewCombination.enhancements?.incubated)) changed.add("enhancement-incubated");
+        if (Boolean(slotTwoPreviewDraggable.enhancements?.divided) !== Boolean(previewCombination.enhancements?.divided)) changed.add("enhancement-divided");
+        if (Boolean(slotTwoPreviewDraggable.enhancements?.mixed) !== Boolean(previewCombination.enhancements?.mixed)) changed.add("enhancement-mixed");
         if (Boolean(slotTwoPreviewDraggable.enhancements?.refined) !== Boolean(previewCombination.enhancements?.refined)) changed.add("enhancement-refined");
         return changed;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2874,6 +3217,7 @@ function Game() {
                         className={[
                             "drag",
                             "drag-preview",
+                            previewCombination.isDeferred ? "is-deferred" : "",
                             isPreviewDragging ? "is-dragging" : "",
                             isPreviewTooltipPinned ? "is-tooltip-pinned" : "",
                             previewCombination.category === "spell" ? "is-spell" : "",
@@ -2894,7 +3238,9 @@ function Game() {
                             userSelect: "none",
                         }}
                     >
-                        <ElementIcon name={previewCombination.letter} />
+                        {previewCombination.isDeferred
+                            ? <span className="drag-preview__deferred-label">?</span>
+                            : <ElementIcon name={previewCombination.letter} />}
                     </div>
                     <FloatingTooltip
                         anchorElement={previewRef.current}
@@ -2906,22 +3252,27 @@ function Game() {
                         onTooltipMouseLeave={handlePreviewTooltipMouseLeave}
                         clampHorizontal={false}
                         typeMultipliers={typeMultipliers}
-                        elementDetails={{
-                            letter: previewCombination.letter,
-                            damage: previewCombination.damage,
-                            energy: previewCombination.energy,
-                            baseEnergyBeforeCreation: previewCombination.baseEnergyBeforeCreation,
-                            enhancements: previewCombination.enhancements,
-                            isDamageEnhanced: previewCombination.isDamageEnhanced,
-                            baseDamageBeforeEnhance: previewCombination.baseDamageBeforeEnhance,
-                            isCombusted: previewCombination.isCombusted,
-                            baseDamageBeforeCombust: previewCombination.baseDamageBeforeCombust,
-                            description: previewCombination.description,
-                            type1: previewCombination.type1,
-                            type2: previewCombination.type2,
-                            effects: previewCombination.effects,
-                            category: previewCombination.category,
-                        }}
+                        {...(previewCombination.isDeferred
+                            ? { children: <p className="deferred-tooltip-message">{previewCombination.description}</p> }
+                            : {
+                                elementDetails: {
+                                    letter: previewCombination.letter,
+                                    damage: previewCombination.damage,
+                                    energy: previewCombination.energy,
+                                    baseEnergyBeforeCreation: previewCombination.baseEnergyBeforeCreation,
+                                    enhancements: previewCombination.enhancements,
+                                    isDamageEnhanced: previewCombination.isDamageEnhanced,
+                                    baseDamageBeforeEnhance: previewCombination.baseDamageBeforeEnhance,
+                                    isCombusted: previewCombination.isCombusted,
+                                    baseDamageBeforeCombust: previewCombination.baseDamageBeforeCombust,
+                                    description: previewCombination.description,
+                                    type1: previewCombination.type1,
+                                    type2: previewCombination.type2,
+                                    effects: previewCombination.effects,
+                                    category: previewCombination.category,
+                                },
+                            }
+                        )}
                     />
                     {slotTwoPreviewDraggable && (isOutputHovered || isPreviewHovered || isCombineButtonHovered) ? (
                         <ComparisonTooltip
@@ -2953,8 +3304,66 @@ function Game() {
                             }}
                             changedKeys={changedKeys}
                             typeMultipliers={typeMultipliers}
+                            {... (previewCombination.isDeferred
+                                ? {
+                                    afterContent: (
+                                        <div className={`floating-tooltip__panel tooltip-theme-${(slotTwoPreviewDraggable.type1 ?? slotTwoPreviewDraggable.type2 ?? "none").toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}>
+                                            <div className="tooltip-container">
+                                                <div className="element-title">
+                                                    <div>?</div>
+                                                    <div className="description">{previewCombination.description}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ),
+                                }
+                                : {}
+                            )}
                         />
                     ) : null}
+                </>
+            ) : null}
+            {previewCombination?.secondOutput ? (
+                <>
+                    <div
+                        ref={previewRef2}
+                        className={[
+                            "drag",
+                            "drag-preview",
+                            previewCombination.secondOutput.category === "spell" ? "is-spell" : "",
+                            previewCombination.secondOutput.category === "spell" ? `is-spell--${previewCombination.secondOutput.type1 || previewCombination.secondOutput.type2 || "none"}` : "",
+                            previewCombination.secondOutput.category === "weapon" ? "is-weapon" : "",
+                        ].filter(Boolean).join(" ")}
+                        style={{
+                            position: "absolute",
+                            top: previewHomePosition2?.y ?? 0,
+                            left: previewHomePosition2?.x ?? 0,
+                            display: "flex",
+                            justifyContent: "center",
+                            alignItems: "center",
+                            pointerEvents: "none",
+                            userSelect: "none",
+                        }}
+                    >
+                        <ElementIcon name={previewCombination.secondOutput.letter} />
+                    </div>
+                    <FloatingTooltip
+                        anchorElement={previewRef2.current}
+                        open={isOutputHovered2}
+                        className="drag-description-popup"
+                        clampHorizontal={false}
+                        typeMultipliers={typeMultipliers}
+                        elementDetails={{
+                            letter: previewCombination.secondOutput.letter,
+                            damage: previewCombination.secondOutput.damage,
+                            energy: previewCombination.secondOutput.energy,
+                            description: previewCombination.secondOutput.description,
+                            type1: previewCombination.secondOutput.type1,
+                            type2: previewCombination.secondOutput.type2,
+                            effects: previewCombination.secondOutput.effects,
+                            category: previewCombination.secondOutput.category,
+                        }}
+                    />
                 </>
             ) : null}
             <div className="element-start" ref={elementStartRef}></div>
@@ -3000,8 +3409,8 @@ function Game() {
                             hasStartedDraggingElement={hasStartedDraggingElement}
                             hasSeenDropZoneOneTutorial={hasSeenDropZoneOneTutorial}
                             isInsertEnabled={isInsertEnabled}
-                            isEnhanceCombinationReady={isEnhanceCombinationReady}
-                            isNonEnhanceCombinationReady={isNonEnhanceCombinationReady}
+                            isDuplicateCombinationReady={isDuplicateCombinationReady}
+                            isNonDuplicateCombinationReady={isNonDuplicateCombinationReady}
                             firstSlotConnectorKey={firstSlotConnectorKey}
                             hasActiveCombinationState={hasActiveCombinationState}
                             combinationStationState={combinationStationState}
@@ -3011,11 +3420,13 @@ function Game() {
                             dropZoneRefB={dropZoneRefB}
                             dropZoneRefC={dropZoneRefC}
                             outputRef={outputRef}
+                            outputRef2={outputRef2}
                             hoveredInsertSlot={hoveredInsertSlot}
                             onHoverInsertSlot={setHoveredInsertSlot}
                             isCombineButtonHovered={isCombineButtonHovered}
                             onCombineButtonHoverChange={setIsCombineButtonHovered}
                             onOutputHover={setIsOutputHovered}
+                            onOutputHover2={setIsOutputHovered2}
                             isModeInserted={insertedModeElementId !== null || isActiveModeSealed}
                             sealedModeElementKeys={sealedModeTabElementKeys}
                             shouldAnimateModeShutter={insertedModeElementId !== null && isModeInsertAnimating}
@@ -3025,6 +3436,18 @@ function Game() {
                             selectedModeTabElementKey={selectedModeTabElementKey}
                             onModeTabSelect={handleModeTabSelect}
                             onInsertMode={handleInsertMode}
+                            incubateCounter={incubateCounter}
+                            refineCounter={refineCounter}
+                            onIncubateCounterChange={setIncubateCounter}
+                            onRefineCounterChange={setRefineCounter}
+                            pendingJobElement={activeDeferredJob
+                                ? { letter: activeDeferredJob.inputElement.letter, category: activeDeferredJob.inputElement.category }
+                                : null}
+                            isSlotAnimatingClose={isDeferredShutterAnimating && isDeferredSlotClosed}
+                            isSlotAnimatingOpen={isDeferredShutterOpening && isDeferredModeActive && !isDeferredSlotClosed}
+                            isOutputSlotClosed={isDeferredSlotClosed}
+                            isOutputSlotAnimatingClose={isDeferredShutterAnimating && isDeferredSlotClosed}
+                            isOutputSlotAnimatingOpen={isDeferredShutterOpening && isDeferredModeActive && !isDeferredSlotClosed}
                         />
                     ) : null}
 
