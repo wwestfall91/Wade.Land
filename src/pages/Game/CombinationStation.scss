@@ -153,6 +153,12 @@
             display: flex;
             align-items: stretch;
             gap: .5rem;
+
+            &.is-hidden {
+                opacity: 0;
+                visibility: hidden;
+                pointer-events: none;
+            }
         }
 
         .combination-result-group {

@@ -2,14 +2,20 @@
     .combination-mode-panel-outer {
         display: flex;
         position: relative;
+        align-items: stretch;
+        padding-left: 4.75rem;
 
         .mode-component-anchor{
             display: flex;
             justify-content: start;
             align-items: stretch;
+            flex: 1 1 auto;
         }
 
         .mode-tabs-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
             box-sizing: border-box;
             display: flex;
             flex-wrap: wrap;
@@ -27,6 +33,8 @@
                 0 8px 0 rgba(0, 0, 0, 0.34);
             z-index: 20;
             flex-direction: column;
+            flex: 0 0 auto;
+            width: 3.4rem;
         }
 
         .mode-tab {

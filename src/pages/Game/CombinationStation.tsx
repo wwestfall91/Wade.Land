@@ -1,4 +1,4 @@
-import type { RefObject } from "react";
+import { useEffect, useState, type RefObject } from "react";
 import type { SpellEffectConfig } from "../../combat/spellEffects";
 import CombinationModePanel, { type ModeTabElementKey } from "./CombinationModePanel";
 import CombinationLogicPanel from "./CombinationLogicPanel";
@@ -72,6 +72,7 @@ type CombinationStationProps = {
     onCombineButtonHoverChange: (isHovered: boolean) => void;
     onOutputHover: (hovered: boolean) => void;
     onOutputHover2: (hovered: boolean) => void;
+    hasOutputElementInSlot: boolean;
     isModeInserted: boolean;
     shouldAnimateModeShutter: boolean;
     modeInsertedElementLetter?: string;
@@ -117,6 +118,7 @@ function CombinationStation({
     onCombineButtonHoverChange,
     onOutputHover,
     onOutputHover2,
+    hasOutputElementInSlot,
     isModeInserted,
     shouldAnimateModeShutter,
     modeInsertedElementLetter,
@@ -169,7 +171,34 @@ function CombinationStation({
     const modeDropZoneClassName = `drop-zone ${hasStartedDraggingElement && !hasSeenDropZoneOneTutorial ? "is-discoverable" : ""} ${isDuplicateCombinationReady ? "is-enhance-ready-primary" : ""} ${isNonDuplicateCombinationReady ? "is-combination-ready-primary" : ""}`;
     const secondaryDropZoneClassName = `drop-zone ${isDuplicateCombinationReady ? "is-enhance-ready-secondary" : ""} ${isNonDuplicateCombinationReady ? "is-combination-ready-secondary" : ""}`;
     const isCombineButtonDisabled = !canCombine || !hasActiveCombinationState;
-    const shouldShowResultGroup = !isCombineButtonDisabled;
+    const hasDeferredProcessActive = Boolean(pendingJobElement) || isOutputSlotClosed || isOutputSlotAnimatingClose || isOutputSlotAnimatingOpen;
+    const [isResultGroupLatchedVisible, setIsResultGroupLatchedVisible] = useState(false);
+
+    useEffect(() => {
+        if (!isModeInserted) {
+            setIsResultGroupLatchedVisible(false);
+            return;
+        }
+
+        if (!isCombineButtonDisabled) {
+            setIsResultGroupLatchedVisible(true);
+            return;
+        }
+
+        if (hasDeferredProcessActive || hasOutputElementInSlot) {
+            setIsResultGroupLatchedVisible(true);
+            return;
+        }
+
+        setIsResultGroupLatchedVisible(false);
+    }, [
+        hasDeferredProcessActive,
+        hasOutputElementInSlot,
+        isCombineButtonDisabled,
+        isModeInserted,
+    ]);
+
+    const shouldShowResultGroup = isResultGroupLatchedVisible;
     const shouldShowSlotOneInsertPrompt = (hoveredInsertSlot === 1 && zoneOccupants[0] === null)
         || (isCombineButtonHovered && hoveredInsertSlot === null && zoneOccupants[0] === null);
     const shouldShowSlotTwoInsertPrompt = (hoveredInsertSlot === 2 && zoneOccupants[1] === null)
@@ -186,6 +215,13 @@ function CombinationStation({
     const handleCounterChange = modeKey === "incubate" ? onIncubateCounterChange
         : modeKey === "refine" ? onRefineCounterChange
         : () => {};
+    const combineActionLabel = pendingJobElement
+        ? modeKey === "incubate"
+            ? "Incubating"
+            : modeKey === "refine"
+                ? "Refining"
+                : combinationStationState.actionLabel
+        : combinationStationState.actionLabel;
     const activeModeLabel = modeKey === "mix"
         ? "Mixing"
         : modeKey === "incubate"
@@ -195,7 +231,7 @@ function CombinationStation({
                 : modeKey === "divide"
                     ? "Dividing"
                     : modeKey === "duplicate"
-                        ? "Creating"
+                        ? "Duplicating"
                         : "";
 
     return (
@@ -223,7 +259,7 @@ function CombinationStation({
                         onModeTabSelect={onModeTabSelect}
                         onInsertMode={onInsertMode}
                     />
-                    <div className="combination-logic-result-group">
+                    <div className={`combination-logic-result-group ${isModeInserted ? "" : "is-hidden"}`.trim()}>
                         <div className={interPanelConnectorClassName} aria-hidden="true" />
 
                         <CombinationLogicPanel
@@ -245,7 +281,7 @@ function CombinationStation({
                             isSlotAnimatingOpen={isSlotAnimatingOpen}
                             combineButtonElementClass={combineButtonElementClass}
                             isCombineButtonDisabled={isCombineButtonDisabled}
-                            combineActionLabel={combinationStationState.actionLabel}
+                            combineActionLabel={combineActionLabel}
                             onCombineButtonHoverChange={onCombineButtonHoverChange}
                             onCombine={onCombine}
                         />

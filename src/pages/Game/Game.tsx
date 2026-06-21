@@ -30,6 +30,7 @@ import {
     type EffectWorkbookRow,
     type EffectWorkbookValues,
 } from "./combinationEffectLookup";
+import { applyIncubate, applyRefine, mergeEnhancements } from "./combinationCalculations";
 import {
     STARTER_BUTTON_THEME_BY_TYPE,
     STARTER_BUTTON_THEME_DEFAULT,
@@ -191,6 +192,8 @@ const SPREAD_X = 200;
 const SPREAD_Y = 150;
 const DRAG_TUTORIAL_SEEN_KEY = "game.dragTutorialSeen";
 const DROP_ZONE_ONE_TUTORIAL_SEEN_KEY = "game.dropZoneOneTutorialSeen";
+const DEFERRED_JOBS_STORAGE_KEY = "game.deferredJobs";
+const MODE_OUTPUT_STORAGE_KEY = "game.modeOutputElementIds";
 const INTRO_TEXT_VISIBLE_MS = 1850;
 const INTRO_TEXT_FADE_GAP_MS = 850;
 const INTRO_INPUT_FADE_MS = 640;
@@ -265,28 +268,13 @@ const wait = (ms: number) => new Promise<void>((resolve) => {
     window.setTimeout(resolve, ms);
 });
 
-const mergeEnhancements = (
-    inherited?: ElementEnhancements,
-    stateKey?: CombinationStationActionStateKey,
-): ElementEnhancements | undefined => {
-    const merged: ElementEnhancements = {
-        incubated: inherited?.incubated ?? false,
-        divided: inherited?.divided ?? false,
-        mixed: inherited?.mixed ?? false,
-        refined: inherited?.refined ?? false,
-    };
-
-    if (stateKey === "incubate") merged.incubated = true;
-    if (stateKey === "divide") merged.divided = true;
-    if (stateKey === "mix") merged.mixed = true;
-    if (stateKey === "refine") merged.refined = true;
-
-    if (!merged.incubated && !merged.divided && !merged.mixed && !merged.refined) {
-        return undefined;
-    }
-
-    return merged;
+const resolvePublicAssetUrl = (assetPath: string): string => {
+    const normalized = assetPath.replace(/^\/+/, "");
+    return `${import.meta.env.BASE_URL}${normalized}`;
 };
+
+const isSuccessfulResponse = (response: Response): boolean =>
+    typeof response.ok === "boolean" ? response.ok : true;
 
 type IntroPhase = "hidden" | "line1" | "line2" | "input" | "line3" | "line4" | "fadeout";
 
@@ -411,7 +399,40 @@ function Game() {
         counter: number;
         battlesWon: number;
     };
-    const [deferredJobs, setDeferredJobs] = useState<DeferredJob[]>([]);
+    const [deferredJobs, setDeferredJobs] = useState<DeferredJob[]>(() => {
+        if (typeof window === "undefined") {
+            return [];
+        }
+
+        try {
+            const raw = window.sessionStorage.getItem(DEFERRED_JOBS_STORAGE_KEY);
+            if (!raw) {
+                return [];
+            }
+
+            const parsed = JSON.parse(raw) as unknown;
+            if (!Array.isArray(parsed)) {
+                return [];
+            }
+
+            return parsed.filter((job): job is DeferredJob => {
+                if (!job || typeof job !== "object") {
+                    return false;
+                }
+
+                const candidate = job as Partial<DeferredJob>;
+                return (
+                    typeof candidate.jobId === "number"
+                    && (candidate.modeKey === "incubate" || candidate.modeKey === "refine")
+                    && typeof candidate.counter === "number"
+                    && typeof candidate.battlesWon === "number"
+                    && Boolean(candidate.inputElement)
+                );
+            });
+        } catch {
+            return [];
+        }
+    });
     const nextJobId = useRef(1);
     const [isDeferredShutterAnimating, setIsDeferredShutterAnimating] = useState(false);
     const [isDeferredShutterOpening, setIsDeferredShutterOpening] = useState(false);
@@ -421,6 +442,27 @@ function Game() {
     const insertedModeStateKeyRef = useRef<string>("idle");
     const [isOutputHovered, setIsOutputHovered] = useState(false);
     const [isOutputHovered2, setIsOutputHovered2] = useState(false);
+    const [modeOutputElementIds, setModeOutputElementIds] = useState<Partial<Record<string, number[]>>>(() => {
+        if (typeof window === "undefined") {
+            return {};
+        }
+
+        try {
+            const raw = window.sessionStorage.getItem(MODE_OUTPUT_STORAGE_KEY);
+            if (!raw) {
+                return {};
+            }
+
+            const parsed = JSON.parse(raw) as unknown;
+            if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+                return {};
+            }
+
+            return parsed as Partial<Record<string, number[]>>;
+        } catch {
+            return {};
+        }
+    });
     const [isPostBattleSoulSequenceActive, setIsPostBattleSoulSequenceActive] = useState(false);
     const [postBattleSoulFillDurationMs, setPostBattleSoulFillDurationMs] = useState(0);
     const [isOldOnePreludeActive, setIsOldOnePreludeActive] = useState(false);
@@ -713,6 +755,26 @@ function Game() {
     }, [navigate]);
 
     useEffect(() => {
+        if (typeof window === "undefined") {
+            return;
+        }
+
+        if (deferredJobs.length === 0) {
+            window.sessionStorage.removeItem(DEFERRED_JOBS_STORAGE_KEY);
+            return;
+        }
+
+        window.sessionStorage.setItem(DEFERRED_JOBS_STORAGE_KEY, JSON.stringify(deferredJobs));
+    }, [deferredJobs]);
+
+    useEffect(() => {
+        const maxPersistedJobId = deferredJobs.reduce((maxId, job) => Math.max(maxId, job.jobId), 0);
+        if (maxPersistedJobId >= nextJobId.current) {
+            nextJobId.current = maxPersistedJobId + 1;
+        }
+    }, [deferredJobs]);
+
+    useEffect(() => {
         const state = location.state as GameLocationState | null;
         if (state?.battleEnded || state?.fightReward) {
             setIsCombinationStationUnlocked(true);
@@ -882,6 +944,8 @@ function Game() {
         const completedJobs = deferredJobs.filter((job) => job.battlesWon >= job.counter);
         if (completedJobs.length === 0) return;
 
+        const completedOutputsByMode: Array<{ id: number; modeKey: "incubate" | "refine" }> = [];
+
         completedJobs.forEach((job) => {
             // Spawn at the output slot position so the element appears there, falling back to inventory stack.
             const containerRect = gameRef.current?.getBoundingClientRect();
@@ -894,38 +958,23 @@ function Game() {
                 : getSpawnPosition(playerProgress.elements.length);
 
             if (job.modeKey === "incubate") {
-                const multiplier = job.counter * 1.75;
-                addElement({
-                    letter: job.inputElement.letter,
-                    damage: Math.round(job.inputElement.damage * multiplier),
-                    energy: job.inputElement.energy,
-                    enhancements: mergeEnhancements(job.inputElement.enhancements, "incubate"),
-                    level: job.inputElement.level,
-                    description: job.inputElement.description,
-                    type1: job.inputElement.type1,
-                    type2: job.inputElement.type2,
-                    effects: (job.inputElement.effects ?? []).map((effect) => ({
-                        ...effect,
-                        amount: effect.amount !== undefined ? Math.round(effect.amount * multiplier) : undefined,
-                    })),
-                    category: job.inputElement.category,
+                const deferredOutput = {
+                    id: nextId.current++,
+                    ...applyIncubate(job.inputElement, job.counter),
                     initialPosition: spawnPos,
-                });
+                };
+
+                completedOutputsByMode.push({ id: deferredOutput.id, modeKey: "incubate" });
+                combineElements([], deferredOutput);
             } else if (job.modeKey === "refine") {
-                const powerMultiplier = job.counter * 2;
-                addElement({
-                    letter: job.inputElement.letter,
-                    damage: Math.round(job.inputElement.damage * powerMultiplier),
-                    energy: job.inputElement.energy,
-                    enhancements: mergeEnhancements(job.inputElement.enhancements, "refine"),
-                    level: job.inputElement.level,
-                    description: job.inputElement.description,
-                    type1: job.inputElement.type1,
-                    type2: job.inputElement.type2,
-                    effects: job.inputElement.effects,
-                    category: job.inputElement.category,
+                const deferredOutput = {
+                    id: nextId.current++,
+                    ...applyRefine(job.inputElement, job.counter),
                     initialPosition: spawnPos,
-                });
+                };
+
+                completedOutputsByMode.push({ id: deferredOutput.id, modeKey: "refine" });
+                combineElements([], deferredOutput);
             }
 
             setDeferredCompletionRevealModes((prev) => {
@@ -941,9 +990,54 @@ function Game() {
             }
         });
 
+        if (completedOutputsByMode.length > 0) {
+            setModeOutputElementIds((previous) => {
+                const next = { ...previous };
+                completedOutputsByMode.forEach(({ id, modeKey }) => {
+                    next[modeKey] = [...(next[modeKey] ?? []), id];
+                });
+                return next;
+            });
+        }
+
         setDeferredJobs((prev) => prev.filter((job) => job.battlesWon < job.counter));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [addElement, deferredJobs, playerProgress.elements.length]);
+    }, [combineElements, deferredJobs, playerProgress.elements.length]);
+
+    useEffect(() => {
+        setModeOutputElementIds((previous) => {
+            const liveIds = new Set(playerProgress.elements.map((element) => element.id));
+            const next: Partial<Record<string, number[]>> = {};
+            let changed = false;
+            for (const [modeKey, ids] of Object.entries(previous)) {
+                const filtered = (ids ?? []).filter((id) => liveIds.has(id));
+                if (filtered.length > 0) {
+                    next[modeKey] = filtered;
+                }
+                if (filtered.length !== (ids ?? []).length) {
+                    changed = true;
+                }
+            }
+            if (!changed && Object.keys(next).length === Object.keys(previous).length) {
+                return previous;
+            }
+            return next;
+        });
+    }, [playerProgress.elements]);
+
+    useEffect(() => {
+        if (typeof window === "undefined") {
+            return;
+        }
+
+        const hasAny = Object.values(modeOutputElementIds).some((ids) => (ids?.length ?? 0) > 0);
+        if (!hasAny) {
+            window.sessionStorage.removeItem(MODE_OUTPUT_STORAGE_KEY);
+            return;
+        }
+
+        window.sessionStorage.setItem(MODE_OUTPUT_STORAGE_KEY, JSON.stringify(modeOutputElementIds));
+    }, [modeOutputElementIds]);
 
     useEffect(() => {
         if (introPhase === "hidden" || introPhase === "input" || introPhase === "fadeout") {
@@ -1080,107 +1174,146 @@ function Game() {
         };
 
         const loadGameData = async () => {
-            const elementsBuffer = await fetch("/elements.xlsx").then((res) => res.arrayBuffer());
-            if (isCancelled) {
-                return;
-            }
-
-            loadElements(elementsBuffer);
-
-            const effectsWorkbookBuffer = await fetch("/effects.xlsx")
-                .then((res) => (res.ok ? res.arrayBuffer() : null))
-                .catch(() => null);
-            if (isCancelled) {
-                return;
-            }
-
-            let effectValuesByKey = new Map<string, EffectWorkbookValues>();
-            if (effectsWorkbookBuffer) {
-                const effectsWorkbook = XLSX.read(effectsWorkbookBuffer, { type: "array" });
-                const effectsWorksheet = effectsWorkbook.Sheets[effectsWorkbook.SheetNames[0]];
-                const effectRows = XLSX.utils.sheet_to_json<EffectWorkbookRow>(effectsWorksheet);
-                effectValuesByKey = buildEffectValuesByKey(effectRows);
-            }
-
-            const stateLookup: CombinationStateEffectsLookup = {};
-            for (const [stateKey, workbookPath] of Object.entries(COMBINATION_STATE_WORKBOOK_PATHS) as Array<[CombinationStationActionStateKey, string]>) {
-                const workbookBuffer = await fetch(workbookPath).then((res) => (res.ok ? res.arrayBuffer() : null));
+            try {
+                const elementsResponse = await fetch(resolvePublicAssetUrl("elements.xlsx"));
+                if (!isSuccessfulResponse(elementsResponse)) {
+                    throw new Error(`Failed to load elements workbook (${elementsResponse.status})`);
+                }
+                const elementsBuffer = await elementsResponse.arrayBuffer();
                 if (isCancelled) {
                     return;
                 }
 
-                if (!workbookBuffer) {
-                    continue;
+                loadElements(elementsBuffer);
+
+                const effectsWorkbookBuffer = await fetch(resolvePublicAssetUrl("effects.xlsx"))
+                    .then((res) => (res.ok ? res.arrayBuffer() : null))
+                    .catch(() => null);
+                if (isCancelled) {
+                    return;
                 }
 
-                const workbook = XLSX.read(workbookBuffer, { type: "array" });
-                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                const workbookRows = XLSX.utils.sheet_to_json<CombinationStateWorkbookRow>(worksheet);
+                let effectValuesByKey = new Map<string, EffectWorkbookValues>();
+                if (effectsWorkbookBuffer) {
+                    const effectsWorkbook = XLSX.read(effectsWorkbookBuffer, { type: "array" });
+                    const effectsWorksheet = effectsWorkbook.Sheets[effectsWorkbook.SheetNames[0]];
+                    const effectRows = XLSX.utils.sheet_to_json<EffectWorkbookRow>(effectsWorksheet);
+                    effectValuesByKey = buildEffectValuesByKey(effectRows);
+                }
 
-                const effectsMap = new Map<string, SpellEffectConfig[]>();
-                workbookRows.forEach((row) => {
-                    const elementName = String(row.Element ?? "").trim();
-                    if (elementName.length === 0) {
+                const stateLookup: CombinationStateEffectsLookup = {};
+                for (const [stateKey, workbookPath] of Object.entries(COMBINATION_STATE_WORKBOOK_PATHS) as Array<[CombinationStationActionStateKey, string]>) {
+                    const workbookBuffer = await fetch(resolvePublicAssetUrl(workbookPath))
+                        .then((res) => (res.ok ? res.arrayBuffer() : null))
+                        .catch(() => null);
+                    if (isCancelled) {
                         return;
                     }
 
-                    const effectName = String(row.Effect ?? "").trim();
-                    const mappedEffectRow = buildMappedEffectRow(effectName, effectValuesByKey);
+                    if (!workbookBuffer) {
+                        continue;
+                    }
 
-                    const parsedEffects = parseSpellEffectsFromRow(mappedEffectRow, 1);
-                    effectsMap.set(normalizeElementName(elementName), parsedEffects);
-                });
+                    const workbook = XLSX.read(workbookBuffer, { type: "array" });
+                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const workbookRows = XLSX.utils.sheet_to_json<CombinationStateWorkbookRow>(worksheet);
 
-                stateLookup[stateKey] = effectsMap;
+                    const effectsMap = new Map<string, SpellEffectConfig[]>();
+                    workbookRows.forEach((row) => {
+                        const elementName = String(row.Element ?? "").trim();
+                        if (elementName.length === 0) {
+                            return;
+                        }
+
+                        const effectName = String(row.Effect ?? "").trim();
+                        const mappedEffectRow = buildMappedEffectRow(effectName, effectValuesByKey);
+
+                        const parsedEffects = parseSpellEffectsFromRow(mappedEffectRow, 1);
+                        effectsMap.set(normalizeElementName(elementName), parsedEffects);
+                    });
+
+                    stateLookup[stateKey] = effectsMap;
+                }
+                setCombinationStateEffectsLookup(stateLookup);
+
+                const monsterRewardsBuffer = await fetch(resolvePublicAssetUrl("monster_rewards.xlsx"))
+                    .then((res) => (res.ok ? res.arrayBuffer() : null))
+                    .catch(() => null);
+                if (isCancelled) return;
+
+                if (monsterRewardsBuffer) {
+                    const monsterWb = XLSX.read(monsterRewardsBuffer, { type: "array" });
+                    const monsterWs = monsterWb.Sheets[monsterWb.SheetNames[0]];
+                    const monsterRows = XLSX.utils.sheet_to_json<MonsterRewardRow>(monsterWs);
+                    const parsed: MonsterRewardThreshold[] = monsterRows
+                        .map((row) => ({
+                            level: Number(row.Level ?? row.level ?? 0) || 0,
+                            souls: Number(row.Souls ?? row.souls ?? row.Experience ?? row.experience ?? 0) || 0,
+                        }))
+                        .filter((row) => row.level > 0 && row.souls > 0)
+                        .sort((a, b) => a.souls - b.souls);
+                    setMonsterThresholds(parsed);
+                }
+            } catch (error) {
+                if (isCancelled) {
+                    return;
+                }
+
+                console.error("Failed to load non-enemy game data.", error);
             }
-            setCombinationStateEffectsLookup(stateLookup);
 
-            const enemiesBuffer = await fetch("/enemies.xlsx").then((res) => res.arrayBuffer());
-            if (isCancelled) {
-                return;
-            }
+            try {
+                const enemyUrls = [resolvePublicAssetUrl("enemies.xlsx"), "/enemies.xlsx"];
+                let enemiesBuffer: ArrayBuffer | null = null;
 
-            const wb = XLSX.read(enemiesBuffer, { type: "array" });
-            const ws = wb.Sheets[wb.SheetNames[0]];
-            const rows = XLSX.utils.sheet_to_json<EnemyRow>(ws);
-            const parsed: Enemy[] = rows
-                .map((row) => ({
-                    name: ((row.Name ?? row.name ?? "") as string).trim(),
-                    hp: Number(row.HP ?? row.hp ?? 0) || 0,
-                    power: Number(row.Power ?? row.power ?? 0) || 0,
-                    souls: Number(row.Souls ?? row.souls ?? 0) || 0,
-                    description: ((row.Description ?? row.description ?? "") as string).trim(),
-                    sprite: ((row.Sprite ?? row.sprite ?? "") as string).trim(),
-                    weaknesses: [row.Weak1, row["Weak 1"], row.Weak2, row["Weak 2"]]
-                        .flatMap((value) => String(value ?? "").split(/[;,/]/g))
-                        .map((value) => normalizeType(value))
-                        .filter(Boolean),
-                    elements: [row.Element1 ?? row.element1, row.Element2 ?? row.element2, row.Element3 ?? row.element3]
-                        .map((value) => String(value ?? "").trim())
-                        .filter((value) => value.length > 0)
-                        .map((value) => elementCatalogRef.current.get(normalizeElementName(value)))
-                        .filter((value): value is RewardElement => Boolean(value)),
-                }))
-                .filter((e) => e.name.length > 0);
-            setEnemies(parsed);
+                for (const url of enemyUrls) {
+                    const response = await fetch(url).catch(() => null);
+                    if (!response || !isSuccessfulResponse(response)) {
+                        continue;
+                    }
 
-            const monsterRewardsBuffer = await fetch("/monster_rewards.xlsx")
-                .then((res) => (res.ok ? res.arrayBuffer() : null))
-                .catch(() => null);
-            if (isCancelled) return;
+                    enemiesBuffer = await response.arrayBuffer();
+                    break;
+                }
 
-            if (monsterRewardsBuffer) {
-                const monsterWb = XLSX.read(monsterRewardsBuffer, { type: "array" });
-                const monsterWs = monsterWb.Sheets[monsterWb.SheetNames[0]];
-                const monsterRows = XLSX.utils.sheet_to_json<MonsterRewardRow>(monsterWs);
-                const parsed: MonsterRewardThreshold[] = monsterRows
+                if (!enemiesBuffer) {
+                    throw new Error("Failed to load enemies workbook from all known paths.");
+                }
+
+                if (isCancelled) {
+                    return;
+                }
+
+                const wb = XLSX.read(enemiesBuffer, { type: "array" });
+                const ws = wb.Sheets[wb.SheetNames[0]];
+                const rows = XLSX.utils.sheet_to_json<EnemyRow>(ws);
+                const parsed: Enemy[] = rows
                     .map((row) => ({
-                        level: Number(row.Level ?? row.level ?? 0) || 0,
-                        souls: Number(row.Souls ?? row.souls ?? row.Experience ?? row.experience ?? 0) || 0,
+                        name: String(row.Name ?? row.name ?? "").trim(),
+                        hp: Number(row.HP ?? row.hp ?? 0) || 0,
+                        power: Number(row.Power ?? row.power ?? 0) || 0,
+                        souls: Number(row.Souls ?? row.souls ?? 0) || 0,
+                        description: String(row.Description ?? row.description ?? "").trim(),
+                        sprite: String(row.Sprite ?? row.sprite ?? "").trim(),
+                        weaknesses: [row.Weak1, row["Weak 1"], row.Weak2, row["Weak 2"]]
+                            .flatMap((value) => String(value ?? "").split(/[;,/]/g))
+                            .map((value) => normalizeType(value))
+                            .filter(Boolean),
+                        elements: [row.Element1 ?? row.element1, row.Element2 ?? row.element2, row.Element3 ?? row.element3]
+                            .map((value) => String(value ?? "").trim())
+                            .filter((value) => value.length > 0)
+                            .map((value) => elementCatalogRef.current.get(normalizeElementName(value)))
+                            .filter((value): value is RewardElement => Boolean(value)),
                     }))
-                    .filter((row) => row.level > 0 && row.souls > 0)
-                    .sort((a, b) => a.souls - b.souls);
-                setMonsterThresholds(parsed);
+                    .filter((e) => e.name.length > 0);
+
+                setEnemies(parsed);
+            } catch (error) {
+                if (isCancelled) {
+                    return;
+                }
+
+                console.error("Failed to load enemies workbook.", error);
             }
         };
 
@@ -1541,6 +1674,45 @@ function Game() {
 
     // Keep ref in sync so normalizeZoneOccupants can read the key without a forward-reference.
     insertedModeStateKeyRef.current = insertedModeStateKey;
+
+    // When a deferred mode (incubate/refine) becomes active and already has output elements,
+    // correct their positions using offsetLeft/offsetTop traversal — which is NOT affected by
+    // CSS transforms. getBoundingClientRect() includes the translateX(-1rem) from .is-hidden,
+    // so it returns wrong coordinates while the result panel is hidden. offsetLeft/offsetTop
+    // always reflect the natural layout position regardless of transforms on ancestors.
+    useLayoutEffect(() => {
+        if (!isDeferredModeActive) return;
+        const outputIds = modeOutputElementIds[insertedModeStateKey] ?? [];
+        if (outputIds.length === 0) return;
+
+        const container = gameRef.current;
+        const outputSlot = outputRef.current;
+        if (!container || !outputSlot) return;
+
+        // Walk the offsetParent chain to get container-relative coords without transforms.
+        let x = 0;
+        let y = 0;
+        let el: HTMLElement | null = outputSlot;
+        while (el && el !== container) {
+            x += el.offsetLeft;
+            y += el.offsetTop;
+            el = el.offsetParent as HTMLElement | null;
+        }
+        if (el !== container) return; // offsetParent chain didn't reach the game container
+
+        const correctedPos = {
+            x: x + (outputSlot.offsetWidth - 32) / 2,
+            y: y + (outputSlot.offsetHeight - 32) / 2,
+        };
+
+        const idsToCorrect = [...outputIds];
+        setDraggables((prev) =>
+            prev.map((d) =>
+                idsToCorrect.includes(d.id) ? { ...d, initialPosition: correctedPos } : d
+            )
+        );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isDeferredModeActive, insertedModeStateKey, modeOutputElementIds]);
 
     // Expand zoneOccupants to 3 slots when Mix mode is active; collapse back to 2 otherwise.
     useEffect(() => {
@@ -1999,6 +2171,7 @@ function Game() {
         // ── Dual-output modes (Divide / Duplicate): spawn two elements ──
         if (previewCombination.secondOutput) {
             const targetPosition2 = getOutputCenterPosition2() ?? targetPosition;
+            const didSpawnFromOutputSlot = !spawnPosition;
 
             const firstDraggable = {
                 id: nextId.current++,
@@ -2020,6 +2193,17 @@ function Game() {
                 ...previewCombination.secondOutput,
                 initialPosition: targetPosition2,
             };
+
+            if (didSpawnFromOutputSlot) {
+                setModeOutputElementIds((previous) => ({
+                    ...previous,
+                    [insertedModeStateKey]: [
+                        ...(previous[insertedModeStateKey] ?? []),
+                        firstDraggable.id,
+                        secondDraggable.id,
+                    ],
+                }));
+            }
 
             brittleUpdatesById.forEach((nextEffects, elementId) => {
                 updateElementEffects(elementId, nextEffects);
@@ -2064,6 +2248,16 @@ function Game() {
             category: previewCombination.category,
             initialPosition: targetPosition,
         };
+
+        if (!spawnPosition) {
+            setModeOutputElementIds((previous) => ({
+                ...previous,
+                [insertedModeStateKey]: [
+                    ...(previous[insertedModeStateKey] ?? []),
+                    newDraggable.id,
+                ],
+            }));
+        }
 
         nextId.current += 1;
 
@@ -2178,10 +2372,27 @@ function Game() {
             return;
         }
 
-        const centered = getOutputCenterPosition();
-        if (centered) {
-            setPreviewHomePosition(centered);
-        }
+        const syncPreviewHomePosition = () => {
+            const centered = getOutputCenterPosition();
+            if (centered) {
+                setPreviewHomePosition(centered);
+            }
+        };
+
+        syncPreviewHomePosition();
+
+        const frameId = window.requestAnimationFrame(() => {
+            syncPreviewHomePosition();
+        });
+
+        const timeoutId = window.setTimeout(() => {
+            syncPreviewHomePosition();
+        }, 240);
+
+        return () => {
+            window.cancelAnimationFrame(frameId);
+            window.clearTimeout(timeoutId);
+        };
     }, [getOutputCenterPosition, isPreviewDragging, previewCombination]);
 
     useLayoutEffect(() => {
@@ -2189,10 +2400,27 @@ function Game() {
             return;
         }
 
-        const centered2 = getOutputCenterPosition2();
-        if (centered2) {
-            setPreviewHomePosition2(centered2);
-        }
+        const syncSecondPreviewHomePosition = () => {
+            const centered2 = getOutputCenterPosition2();
+            if (centered2) {
+                setPreviewHomePosition2(centered2);
+            }
+        };
+
+        syncSecondPreviewHomePosition();
+
+        const frameId = window.requestAnimationFrame(() => {
+            syncSecondPreviewHomePosition();
+        });
+
+        const timeoutId = window.setTimeout(() => {
+            syncSecondPreviewHomePosition();
+        }, 240);
+
+        return () => {
+            window.cancelAnimationFrame(frameId);
+            window.clearTimeout(timeoutId);
+        };
     }, [getOutputCenterPosition2, isPreviewDragging, previewCombination]);
 
     useEffect(() => {
@@ -2487,6 +2715,23 @@ function Game() {
     );
 
     const handleSnapChange = (draggableId: number, zoneIndex: number | null) => {
+        if (Object.values(modeOutputElementIds).some((ids) => ids?.includes(draggableId))) {
+            setModeOutputElementIds((previous) => {
+                const next: Partial<Record<string, number[]>> = {};
+                let changed = false;
+                for (const [modeKey, ids] of Object.entries(previous)) {
+                    const filtered = (ids ?? []).filter((id) => id !== draggableId);
+                    if (filtered.length > 0) {
+                        next[modeKey] = filtered;
+                    }
+                    if (filtered.length !== (ids ?? []).length) {
+                        changed = true;
+                    }
+                }
+                return changed ? next : previous;
+            });
+        }
+
         const enhanceZoneIndex = zoneOccupants.length;
         const machineZoneIndex = zoneOccupants.length + (isEnhanceStationUnlocked ? 1 : 0);
         if (newChestElementIds.has(draggableId)) {
@@ -2897,6 +3142,18 @@ function Game() {
             ? (starterChoiceElements[hoveredStarterChoiceIndex] ?? null)
             : null;
     const slotTwoPreviewDraggable = getDraggableById(zoneOccupants[1] ?? null);
+    const currentModeOutputIds = new Set(modeOutputElementIds[insertedModeStateKey] ?? []);
+    const hiddenModeOutputElementIds = useMemo(() => {
+        const hidden = new Set<number>();
+        for (const [modeKey, ids] of Object.entries(modeOutputElementIds)) {
+            if (modeKey !== insertedModeStateKey) {
+                (ids ?? []).forEach((id) => hidden.add(id));
+            }
+        }
+        return hidden;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [modeOutputElementIds, insertedModeStateKey]);
+    const hasOutputElementInSlot = currentModeOutputIds.size > 0 || previewCombination !== null;
 
     const effectSignature = (effects?: SpellEffectConfig[]) =>
         JSON.stringify((effects ?? []).map((effect) => ({
@@ -3181,7 +3438,7 @@ function Game() {
                 />
             ) : null}
             {draggables
-                .filter((draggable) => draggable.id !== hiddenInsertedModeElementId)
+                .filter((draggable) => draggable.id !== hiddenInsertedModeElementId && !hiddenModeOutputElementIds.has(draggable.id))
                 .map((draggable) => (
                 <Draggable
                     key={draggable.id}
@@ -3427,6 +3684,7 @@ function Game() {
                             onCombineButtonHoverChange={setIsCombineButtonHovered}
                             onOutputHover={setIsOutputHovered}
                             onOutputHover2={setIsOutputHovered2}
+                            hasOutputElementInSlot={hasOutputElementInSlot}
                             isModeInserted={insertedModeElementId !== null || isActiveModeSealed}
                             sealedModeElementKeys={sealedModeTabElementKeys}
                             shouldAnimateModeShutter={insertedModeElementId !== null && isModeInsertAnimating}
@@ -3502,7 +3760,7 @@ function Game() {
                         <div className="game-enemy-card-footer">Hover for details</div>
                     </div>
                     <div className="game-enemy-actions">
-                        <button className="fight-button" onClick={handleFight}>
+                        <button className="fight-button" onClick={handleFight} disabled={!nextEnemy}>
                             FIGHT!
                         </button>
                     </div>

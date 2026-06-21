@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import { getCombinationStationState } from "./CombinationStation";
 
 describe("combination station state machine", () => {
-    it("resolves the five actionable states from slot one element", () => {
-        expect(getCombinationStationState("water")).toMatchObject({ key: "cleanse", actionLabel: "Cleanse", elementKey: "water" });
-        expect(getCombinationStationState("air")).toMatchObject({ key: "polish", actionLabel: "Polish", elementKey: "air" });
-        expect(getCombinationStationState("fire")).toMatchObject({ key: "purify", actionLabel: "Purify", elementKey: "fire" });
+    it("resolves the correct mode for each element slot key", () => {
+        expect(getCombinationStationState("fire")).toMatchObject({ key: "incubate", actionLabel: "Incubate", elementKey: "fire" });
         expect(getCombinationStationState("earth")).toMatchObject({ key: "refine", actionLabel: "Refine", elementKey: "earth" });
-        expect(getCombinationStationState("soul")).toMatchObject({ key: "enhance", actionLabel: "Enhance", elementKey: "soul" });
+        expect(getCombinationStationState("water")).toMatchObject({ key: "mix", actionLabel: "Mix", elementKey: "water" });
+        expect(getCombinationStationState("air")).toMatchObject({ key: "divide", actionLabel: "Divide", elementKey: "air" });
+        expect(getCombinationStationState("soul")).toMatchObject({ key: "duplicate", actionLabel: "Duplicate", elementKey: "soul" });
     });
 
     it("falls back to idle for unknown or empty elements", () => {
