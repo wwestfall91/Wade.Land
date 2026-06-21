@@ -35,13 +35,13 @@ function MixLogicContent({
     return (
         <div className="mix-logic-content">
             <div className="mix-slot-group">
-                <span className="mix-slot-label">Primary</span>
                 <div
-                    className={primaryDropZoneClassName}
+                    className={`${primaryDropZoneClassName} mix-slot mix-slot--primary`.trim()}
                     ref={dropZoneRefB}
                     onMouseEnter={() => onHoverInsertSlot(2)}
                     onMouseLeave={() => onHoverInsertSlot(null)}
                 >
+                    <span className="mix-slot-label mix-slot-label--inside">Primary</span>
                     {shouldShowPrimaryInsertPrompt ? (
                         <CombineStationTooltip
                             className="combine-station-tooltip--slot-two"
@@ -54,13 +54,13 @@ function MixLogicContent({
             <div className={slotConnectorClassName} aria-hidden="true" />
 
             <div className="mix-slot-group">
-                <span className="mix-slot-label">Secondary</span>
                 <div
-                    className={secondaryDropZoneClassName}
+                    className={`${secondaryDropZoneClassName} mix-slot mix-slot--secondary`.trim()}
                     ref={dropZoneRefC}
                     onMouseEnter={() => onHoverInsertSlot(null)}
                     onMouseLeave={() => onHoverInsertSlot(null)}
                 >
+                    <span className="mix-slot-label mix-slot-label--inside">Secondary</span>
                     {shouldShowSecondaryInsertPrompt ? (
                         <CombineStationTooltip
                             className="combine-station-tooltip--slot-three"

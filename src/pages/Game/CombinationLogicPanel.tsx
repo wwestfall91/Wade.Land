@@ -4,6 +4,7 @@ import IncubateLogicContent from "./modes/IncubateLogicContent";
 import DivideLogicContent from "./modes/DivideLogicContent";
 import RefineLogicContent from "./modes/RefineLogicContent";
 import DuplicateLogicContent from "./modes/DuplicateLogicContent";
+import CombinationCombineButton from "./CombinationCombineButton";
 import "./CombinationLogicPanel.scss";
 
 type CombinationLogicPanelProps = {
@@ -23,6 +24,11 @@ type CombinationLogicPanelProps = {
     pendingJobElement: { letter: string; category?: string } | null;
     isSlotAnimatingClose: boolean;
     isSlotAnimatingOpen: boolean;
+    combineButtonElementClass: string;
+    isCombineButtonDisabled: boolean;
+    combineActionLabel: string;
+    onCombineButtonHoverChange: (isHovered: boolean) => void;
+    onCombine: () => void;
 };
 
 function CombinationLogicPanel({
@@ -41,6 +47,11 @@ function CombinationLogicPanel({
     pendingJobElement,
     isSlotAnimatingClose,
     isSlotAnimatingOpen,
+    combineButtonElementClass,
+    isCombineButtonDisabled,
+    combineActionLabel,
+    onCombineButtonHoverChange,
+    onCombine,
 }: CombinationLogicPanelProps) {
     const renderContent = () => {
         switch (modeKey) {
@@ -109,9 +120,18 @@ function CombinationLogicPanel({
     };
 
     return (
-        <div className={`combination-logic-panel ${className}`.trim()}>
+        <div className={`combination-logic-panel mode-${modeKey} ${className}`.trim()}>
             <div className="logic-panel-body">
                 {renderContent()}
+            </div>
+            <div className="logic-panel-actions">
+                <CombinationCombineButton
+                    combineButtonElementClass={combineButtonElementClass}
+                    isCombineButtonDisabled={isCombineButtonDisabled}
+                    combineActionLabel={combineActionLabel}
+                    onCombineButtonHoverChange={onCombineButtonHoverChange}
+                    onCombine={onCombine}
+                />
             </div>
         </div>
     );

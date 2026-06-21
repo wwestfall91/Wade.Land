@@ -1,8 +1,11 @@
 #Game {
     .combination-logic-panel {
+        box-sizing: border-box;
         display: flex;
         flex-direction: column;
         align-items: stretch;
+        height: var(--combination-station-panel-height, 9.6rem);
+        min-width: 14.25rem;
         border: 2px solid #e7ecff;
         border-radius: 4px;
         background:
@@ -39,7 +42,30 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 1.5rem 2rem;
+        }
+
+        .logic-panel-actions {
+            display: flex;
+            justify-content: center;
+            padding: 0 0 0.95rem;
+
+            .combine-button-wrap {
+                width: 100%;
+                padding: 0 0.75rem;
+                box-sizing: border-box;
+            }
+
+            .combine-button {
+                width: 100%;
+                min-width: 0;
+            }
+        }
+
+        &.mode-incubate,
+        &.mode-refine {
+            .logic-panel-actions {
+                padding-bottom: 1.2rem;
+            }
         }
 
         // Drop zone slots inside the logic panel
@@ -205,9 +231,7 @@
 
         .mix-slot-group {
             display: flex;
-            flex-direction: column;
             align-items: center;
-            gap: 0.4rem;
         }
 
         .mix-slot-label {
@@ -217,6 +241,24 @@
             letter-spacing: 0.07em;
             text-transform: uppercase;
             color: rgba(200, 215, 255, 0.6);
+
+            &.mix-slot-label--inside {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                z-index: 2;
+                font-size: calc(0.56rem - 2px);
+                letter-spacing: 0.08em;
+                color: rgba(205, 220, 255, 0.8);
+                text-shadow: 0 1px 0 rgba(0, 0, 0, 0.65);
+                pointer-events: none;
+                user-select: none;
+            }
+        }
+
+        .mix-slot {
+            position: relative;
         }
 
         // Counter modes: drop zone + counter side by side

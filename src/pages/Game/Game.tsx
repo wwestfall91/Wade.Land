@@ -1225,15 +1225,13 @@ function Game() {
         hasShownInitialRewardModalRef.current = true;
         setIsFightVictoryCueVisible(false);
 
-        setStarterChoiceElements(starterElements);
-        setHoveredStarterChoiceIndex(null);
-        setSelectedStarterChoiceIndex(null);
-        setIsStarterChoiceConfirming(false);
-        setStarterChoiceNameCurrent("");
-        setStarterChoiceNameOutgoing(null);
-        setStarterChoiceNameRevision((current) => current + 1);
-        setIsStarterChoiceOpen(true);
-    }, [allElementOptions, introPhase, location.state, playerProgress.elements.length]);
+        starterElements.forEach((element, index) => {
+            addElement({
+                ...element,
+                initialPosition: getSpawnPosition(index),
+            });
+        });
+    }, [addElement, allElementOptions, introPhase, location.state, playerProgress.elements.length]);
 
     useEffect(() => {
         levelZeroElementsRef.current = allElementOptions.filter((e) => e.level === 0);
@@ -2601,7 +2599,7 @@ function Game() {
         const isPlasma = isPlasmaName(draggable.letter);
         const hasThreeSlots = zoneOccupants.length === 3;
 
-        if (hasThreeSlots) {
+        if (hasThreeSlots && insertedModeStateKey !== "mix") {
             if (isPlasma && zoneIndex !== 1) {
                 return false;
             }
@@ -3231,6 +3229,7 @@ function Game() {
                             position: "absolute",
                             top: (isPreviewDragging ? previewPosition : previewHomePosition)?.y ?? 0,
                             left: (isPreviewDragging ? previewPosition : previewHomePosition)?.x ?? 0,
+                            zIndex: 9350,
                             display: "flex",
                             justifyContent: "center",
                             alignItems: "center",
@@ -3338,6 +3337,7 @@ function Game() {
                             position: "absolute",
                             top: previewHomePosition2?.y ?? 0,
                             left: previewHomePosition2?.x ?? 0,
+                            zIndex: 9350,
                             display: "flex",
                             justifyContent: "center",
                             alignItems: "center",

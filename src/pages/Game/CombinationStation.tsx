@@ -3,7 +3,6 @@ import type { SpellEffectConfig } from "../../combat/spellEffects";
 import CombinationModePanel, { type ModeTabElementKey } from "./CombinationModePanel";
 import CombinationLogicPanel from "./CombinationLogicPanel";
 import CombinationResultPanel from "./CombinationResultPanel";
-import CombinationCombineButton from "./CombinationCombineButton";
 import "./CombinationStation.scss";
 
 export type { ModeTabElementKey } from "./CombinationModePanel";
@@ -124,7 +123,6 @@ function CombinationStation({
     modeInsertedElementCategory,
     showModeInsertedElementOverlay,
     sealedModeElementKeys,
-    activeModeTabElementKey,
     selectedModeTabElementKey,
     onModeTabSelect,
     onInsertMode,
@@ -171,6 +169,7 @@ function CombinationStation({
     const modeDropZoneClassName = `drop-zone ${hasStartedDraggingElement && !hasSeenDropZoneOneTutorial ? "is-discoverable" : ""} ${isDuplicateCombinationReady ? "is-enhance-ready-primary" : ""} ${isNonDuplicateCombinationReady ? "is-combination-ready-primary" : ""}`;
     const secondaryDropZoneClassName = `drop-zone ${isDuplicateCombinationReady ? "is-enhance-ready-secondary" : ""} ${isNonDuplicateCombinationReady ? "is-combination-ready-secondary" : ""}`;
     const isCombineButtonDisabled = !canCombine || !hasActiveCombinationState;
+    const shouldShowResultGroup = !isCombineButtonDisabled;
     const shouldShowSlotOneInsertPrompt = (hoveredInsertSlot === 1 && zoneOccupants[0] === null)
         || (isCombineButtonHovered && hoveredInsertSlot === null && zoneOccupants[0] === null);
     const shouldShowSlotTwoInsertPrompt = (hoveredInsertSlot === 2 && zoneOccupants[1] === null)
@@ -187,71 +186,87 @@ function CombinationStation({
     const handleCounterChange = modeKey === "incubate" ? onIncubateCounterChange
         : modeKey === "refine" ? onRefineCounterChange
         : () => {};
+    const activeModeLabel = modeKey === "mix"
+        ? "Mixing"
+        : modeKey === "incubate"
+            ? "Incubating"
+            : modeKey === "refine"
+                ? "Refining"
+                : modeKey === "divide"
+                    ? "Dividing"
+                    : modeKey === "duplicate"
+                        ? "Creating"
+                        : "";
 
     return (
         <div className={combinationStationClassName}>
-            <div className="combination-equation">
-                <CombinationModePanel
-                    className={panelModifierClass}
-                    dropZoneClassName={modeDropZoneClassName}
-                    dropZoneRefA={dropZoneRefA}
-                    onHoverInsertSlot={onHoverInsertSlot}
-                    shouldShowSlotOneInsertPrompt={shouldShowSlotOneInsertPrompt}
-                    isInsertEnabled={isInsertEnabled}
-                    isModeInserted={isModeInserted}
-                    shouldAnimateModeShutter={shouldAnimateModeShutter}
-                    modeInsertedElementLetter={modeInsertedElementLetter}
-                    modeInsertedElementCategory={modeInsertedElementCategory}
-                    showModeInsertedElementOverlay={showModeInsertedElementOverlay}
-                    sealedModeElementKeys={sealedModeElementKeys}
-                    hasSelectedModeTab={selectedModeTabElementKey !== null}
-                    activeModeTabElementKey={combinationStationState.elementKey}
-                    onModeTabSelect={onModeTabSelect}
-                    onInsertMode={onInsertMode}
-                />
-                <div className={`combination-result-group ${isModeInserted ? "" : "is-hidden"}`.trim()}>
-                <div className={interPanelConnectorClassName} aria-hidden="true" />
+            <div className="combination-equation-shell">
+                <div className="combination-equation-mode-label" aria-live="polite">
+                    {activeModeLabel}
+                </div>
+                <div className="combination-equation">
+                    <CombinationModePanel
+                        className={panelModifierClass}
+                        dropZoneClassName={modeDropZoneClassName}
+                        dropZoneRefA={dropZoneRefA}
+                        onHoverInsertSlot={onHoverInsertSlot}
+                        shouldShowSlotOneInsertPrompt={shouldShowSlotOneInsertPrompt}
+                        isInsertEnabled={isInsertEnabled}
+                        isModeInserted={isModeInserted}
+                        shouldAnimateModeShutter={shouldAnimateModeShutter}
+                        modeInsertedElementLetter={modeInsertedElementLetter}
+                        modeInsertedElementCategory={modeInsertedElementCategory}
+                        showModeInsertedElementOverlay={showModeInsertedElementOverlay}
+                        sealedModeElementKeys={sealedModeElementKeys}
+                        hasSelectedModeTab={selectedModeTabElementKey !== null}
+                        activeModeTabElementKey={combinationStationState.elementKey}
+                        onModeTabSelect={onModeTabSelect}
+                        onInsertMode={onInsertMode}
+                    />
+                    <div className="combination-logic-result-group">
+                        <div className={interPanelConnectorClassName} aria-hidden="true" />
 
-                <CombinationLogicPanel
-                    className={panelModifierClass}
-                    modeKey={modeKey}
-                    primaryDropZoneClassName={modeDropZoneClassName}
-                    secondaryDropZoneClassName={secondaryDropZoneClassName}
-                    zoneOccupants={zoneOccupants}
-                    dropZoneRefB={dropZoneRefB}
-                    dropZoneRefC={dropZoneRefC}
-                    onHoverInsertSlot={onHoverInsertSlot}
-                    shouldShowSlotTwoInsertPrompt={shouldShowSlotTwoInsertPrompt}
-                    shouldShowSlotThreeInsertPrompt={shouldShowSlotThreeInsertPrompt}
-                    slotConnectorClassName={secondSlotConnectorClassName}
-                    counterValue={activeCounter}
-                    onCounterChange={handleCounterChange}
-                    pendingJobElement={pendingJobElement}
-                    isSlotAnimatingClose={isSlotAnimatingClose}
-                    isSlotAnimatingOpen={isSlotAnimatingOpen}
-                />
-                <div className={secondSlotConnectorClassName} aria-hidden="true" />
+                        <CombinationLogicPanel
+                            className={panelModifierClass}
+                            modeKey={modeKey}
+                            primaryDropZoneClassName={modeDropZoneClassName}
+                            secondaryDropZoneClassName={secondaryDropZoneClassName}
+                            zoneOccupants={zoneOccupants}
+                            dropZoneRefB={dropZoneRefB}
+                            dropZoneRefC={dropZoneRefC}
+                            onHoverInsertSlot={onHoverInsertSlot}
+                            shouldShowSlotTwoInsertPrompt={shouldShowSlotTwoInsertPrompt}
+                            shouldShowSlotThreeInsertPrompt={shouldShowSlotThreeInsertPrompt}
+                            slotConnectorClassName={secondSlotConnectorClassName}
+                            counterValue={activeCounter}
+                            onCounterChange={handleCounterChange}
+                            pendingJobElement={pendingJobElement}
+                            isSlotAnimatingClose={isSlotAnimatingClose}
+                            isSlotAnimatingOpen={isSlotAnimatingOpen}
+                            combineButtonElementClass={combineButtonElementClass}
+                            isCombineButtonDisabled={isCombineButtonDisabled}
+                            combineActionLabel={combinationStationState.actionLabel}
+                            onCombineButtonHoverChange={onCombineButtonHoverChange}
+                            onCombine={onCombine}
+                        />
+                        <div className={secondSlotConnectorClassName} aria-hidden="true" />
 
-                <CombinationResultPanel
-                    className={panelModifierClass}
-                    modeKey={modeKey}
-                    outputRef={outputRef}
-                    outputRef2={outputRef2}
-                    onOutputHover={onOutputHover}
-                    onOutputHover2={onOutputHover2}
-                    isPrimaryOutputShutterClosed={isOutputSlotClosed}
-                    isPrimaryOutputShutterAnimatingClose={isOutputSlotAnimatingClose}
-                    isPrimaryOutputShutterAnimatingOpen={isOutputSlotAnimatingOpen}
-                />
+                        <div className={`combination-result-group ${shouldShowResultGroup ? "" : "is-hidden"}`.trim()}>
+                            <CombinationResultPanel
+                                className={panelModifierClass}
+                                modeKey={modeKey}
+                                outputRef={outputRef}
+                                outputRef2={outputRef2}
+                                onOutputHover={onOutputHover}
+                                onOutputHover2={onOutputHover2}
+                                isPrimaryOutputShutterClosed={isOutputSlotClosed}
+                                isPrimaryOutputShutterAnimatingClose={isOutputSlotAnimatingClose}
+                                isPrimaryOutputShutterAnimatingOpen={isOutputSlotAnimatingOpen}
+                            />
+                        </div>
+                    </div>
                 </div>
             </div>
-            <CombinationCombineButton
-                combineButtonElementClass={combineButtonElementClass}
-                isCombineButtonDisabled={isCombineButtonDisabled}
-                combineActionLabel={combinationStationState.actionLabel}
-                onCombineButtonHoverChange={onCombineButtonHoverChange}
-                onCombine={onCombine}
-            />
         </div>
     );
 }
