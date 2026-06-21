@@ -41,6 +41,7 @@ import ElementIcon from "../../components/ElementIcon";
 import shieldIcon from "../../assets/icons/Shield.png";
 import soulIcon from "../../assets/icons/Soul.png";
 import energizeIcon from "../../assets/icons/Energize.png";
+import { ExpResultsModal, type ExpEntry, type ExpSegment } from "./ExpResultsModal";
 
 type EventLogEntry = {
     id: number;
@@ -174,6 +175,8 @@ function Fight() {
     const [eventLogEntries, setEventLogEntries] = useState<EventLogEntry[]>([]);
     const [isBattleLogExpanded, setIsBattleLogExpanded] = useState(false);
     const [isGameOver, setIsGameOver] = useState(false);
+    const [expResultsEntries, setExpResultsEntries] = useState<ExpEntry[] | null>(null);
+    const pendingNavStateRef = useRef<GameLocationState | null>(null);
     const [isPlayerHit, setIsPlayerHit] = useState(false);
     const [isScreenFlashing, setIsScreenFlashing] = useState(false);
     const [isSpellCastFlashing, setIsSpellCastFlashing] = useState(false);
@@ -348,7 +351,7 @@ function Fight() {
     const [enemyHealth, setEnemyHealth] = useState(() => enemy.hp);
     const enemyMaxHp = Math.max(1, enemy.hp);
     const enemyHpFillPercent = Math.max(0, Math.min(100, (enemyHealth / enemyMaxHp) * 100));
-    const playerMaxHp = Math.max(1, Math.round((levels.find((levelDef) => levelDef.level === player.level)?.hp ?? Math.max(player.hp, 1)) * effectiveMaxHpMultiplier) - (permanentMaxHpReduction ?? 0));
+    const playerMaxHp = Math.max(1, Math.round(100 * effectiveMaxHpMultiplier) - (permanentMaxHpReduction ?? 0));
     const displayedPlayerHp = player.hp + Math.max(0, playerShield);
     const playerHpFillPercent = Math.max(0, Math.min(100, (player.hp / playerMaxHp) * 100));
     const playerShieldFillPercent = Math.max(0, Math.min(100, (Math.max(0, playerShield) / playerMaxHp) * 100));
@@ -658,6 +661,12 @@ function Fight() {
         previousPlayerShieldRef.current = playerShield;
     }, [playerShield]);
 
+    const handleExpResultsContinue = () => {
+        const state = pendingNavStateRef.current;
+        if (!state) return;
+        navigate("/game", { replace: true, state });
+    };
+
     useEffect(() => {
         if (enemyHealth <= 0 && !hasResolvedVictory.current) {
             hasResolvedVictory.current = true;
@@ -673,19 +682,76 @@ function Fight() {
                 float: playerFloatStatus,
                 shield: 0,
             });
-            navigate("/game", {
-                replace: true,
-                state: {
-                    battleEnded: true,
-                    fightReward: {
-                        soulsGained: enemy.souls,
-                        rewardElements: chosen,
-                    },
-                    elementUseCounts: { ...elementUsesRef.current },
-                } as GameLocationState,
-            });
+
+            // Build exp entries for the results modal
+            const useCounts = elementUsesRef.current;
+            const entries: ExpEntry[] = [];
+            for (const [idStr, usesGained] of Object.entries(useCounts)) {
+                if (usesGained <= 0) continue;
+                const elementId = Number(idStr);
+                const element = player.elements.find((e) => e.id === elementId);
+                if (!element) continue;
+
+                const oldUses = element.uses ?? 0;
+                const newUses = oldUses + usesGained;
+                const oldLevel = Math.max(1, element.level ?? 1);
+
+                // Build one segment per level traversed
+                const segments: ExpSegment[] = [];
+                let levelIter = oldLevel;
+
+                while (true) {
+                    const levelDef = levels.find((l) => l.level === levelIter);
+                    if (!levelDef || levelDef.usesRequired <= 0) {
+                        // Max level or no threshold — show a single partial bar
+                        if (segments.length === 0) {
+                            segments.push({ startPct: 0, endPct: Math.min(100, usesGained * 20), didLevelUp: false, toLevel: levelIter });
+                        }
+                        break;
+                    }
+                    const prevLevelDef = levels.find((l) => l.level === levelIter - 1);
+                    const levelStart = prevLevelDef?.usesRequired ?? 0;
+                    const levelEnd = levelDef.usesRequired;
+                    const levelRange = levelEnd - levelStart;
+                    if (levelRange <= 0) break;
+
+                    // First segment: start from actual old progress. Subsequent: always 0 (just reset).
+                    const startPct = segments.length === 0
+                        ? Math.max(0, Math.min(100, ((oldUses - levelStart) / levelRange) * 100))
+                        : 0;
+                    const reachesThreshold = newUses >= levelEnd;
+                    const endPct = reachesThreshold
+                        ? 100
+                        : Math.min(100, Math.max(startPct, ((newUses - levelStart) / levelRange) * 100));
+
+                    segments.push({ startPct, endPct, didLevelUp: reachesThreshold, toLevel: levelIter + (reachesThreshold ? 1 : 0) });
+
+                    if (!reachesThreshold) break;
+                    levelIter++;
+                }
+
+                // Walk levels to determine the final new level
+                let newLevel = oldLevel;
+                let checking = oldLevel;
+                while (true) {
+                    const levelDef = levels.find((l) => l.level === checking);
+                    if (!levelDef || levelDef.usesRequired <= 0 || newUses < levelDef.usesRequired) break;
+                    checking++;
+                    newLevel = checking;
+                }
+
+                entries.push({ elementId, letter: element.letter, type1: element.type1, type2: element.type2, usesGained, oldLevel, newLevel, segments });
+            }
+
+            // Store nav state for when player clicks Continue
+            pendingNavStateRef.current = {
+                battleEnded: true,
+                fightReward: { soulsGained: enemy.souls, rewardElements: chosen },
+                elementUseCounts: { ...useCounts },
+            };
+            setExpResultsEntries(entries);
         }
-    }, [elementPool, enemy.souls, enemyHealth, navigate, playerBurnStatus, playerSoakStatus, playerFreezeStatus, playerEnergizeStatus, setBattleEnergyCarryover, setPlayerStatuses]);
+    }, [elementPool, enemy.souls, enemyHealth, levels, navigate, player.elements, playerBurnStatus, playerSoakStatus, playerFreezeStatus, playerEnergizeStatus, playerThornsStatus, playerFloatStatus, setBattleEnergyCarryover, setPlayerStatuses]);
 
     useEffect(() => {
         if (levels.length === 0 || enemyHealth <= 0 || player.hp > 0) {
@@ -2106,6 +2172,9 @@ function Fight() {
                         <button type="button" onClick={handlePlayAgain}>Play again</button>
                     </div>
                 </div>
+            ) : null}
+            {expResultsEntries !== null ? (
+                <ExpResultsModal entries={expResultsEntries} onContinue={handleExpResultsContinue} />
             ) : null}
             {projectiles.length > 0
                 ? createPortal(

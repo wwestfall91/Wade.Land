@@ -19,12 +19,33 @@ type LevelUpModalProps = {
 const formatEffectKind = (kind: string): string =>
     kind.split("_").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
 
-const formatEffectStats = (effect: SpellEffectConfig): string => {
-    const parts: string[] = [];
-    if (effect.amount != null) parts.push(`${effect.amount}`);
-    if (effect.duration != null) parts.push(`${effect.duration} turns`);
-    return parts.join(" / ");
-};
+/** Replaces X / X% placeholders with bold-gold value spans. */
+function renderDescription(description: string, effect: SpellEffectConfig): React.ReactNode {
+    const values: (string | number)[] = [];
+    if (effect.amount != null) values.push(effect.amount);
+    if (effect.duration != null) values.push(effect.duration);
+
+    const parts: React.ReactNode[] = [];
+    const regex = /\bX(%?)/g;
+    let match: RegExpExecArray | null;
+    let lastIndex = 0;
+    let valueIndex = 0;
+
+    while ((match = regex.exec(description)) !== null) {
+        if (match.index > lastIndex) parts.push(description.slice(lastIndex, match.index));
+        const val = values[valueIndex++];
+        const suffix = match[1]; // "%" or ""
+        parts.push(
+            val !== undefined
+                ? <strong key={match.index} className="levelup-desc-value">{val}{suffix}</strong>
+                : `X${suffix}`,
+        );
+        lastIndex = match.index + match[0].length;
+    }
+
+    if (lastIndex < description.length) parts.push(description.slice(lastIndex));
+    return parts.length > 1 ? parts : description;
+}
 
 export function LevelUpModal({ elementLetter, elementType1, elementType2, elementPreview, choices, onConfirm }: LevelUpModalProps) {
     const [selected, setSelected] = useState<SpellEffectConfig | null>(
@@ -86,7 +107,7 @@ export function LevelUpModal({ elementLetter, elementType1, elementType2, elemen
                                 ref={(button) => {
                                     choiceButtonRefs.current[index] = button;
                                 }}
-                                className={`levelup-choice${selected === effect ? " is-selected" : ""}`}
+                                className={`levelup-choice${selected === effect ? " is-selected" : ""}${selected !== null && selected !== effect ? " is-unchosen" : ""}`}
                                 onClick={() => setSelected(effect)}
                                 onMouseEnter={() => setHoveredChoiceIndex(index)}
                                 onMouseLeave={() => setHoveredChoiceIndex((current) => (current === index ? null : current))}
@@ -94,10 +115,14 @@ export function LevelUpModal({ elementLetter, elementType1, elementType2, elemen
                                 onBlur={() => setHoveredChoiceIndex((current) => (current === index ? null : current))}
                             >
                                 <span className="levelup-choice-kind">{formatEffectKind(effect.kind)}</span>
-                                {(effect.shortDescription) ? (
-                                    <span className="levelup-choice-desc">{effect.shortDescription}</span>
+                                {(effect.longDescription ?? effect.shortDescription) ? (
+                                    <>
+                                        <div className="levelup-choice-divider" />
+                                        <span className="levelup-choice-desc">
+                                            {renderDescription(effect.longDescription ?? effect.shortDescription ?? "", effect)}
+                                        </span>
+                                    </>
                                 ) : null}
-                                <span className="levelup-choice-stats">{formatEffectStats(effect)}</span>
                             </button>
                         ))}
                     </div>
