@@ -39,6 +39,11 @@ const EFFECT_TYPE_BY_KIND: Record<SpellEffectKind, RuntimeEffectType> = {
     [EFFECTS.ENERGETIC]:    "create",
     [EFFECTS.EFFICIENT]:    "create",
     [EFFECTS.BRITTLE]:      "element",
+    [EFFECTS.GUST]:         "active",
+    [EFFECTS.ROOT]:         "active",
+    [EFFECTS.STATIC]:       "active",
+    [EFFECTS.FLAME]:        "active",
+    [EFFECTS.DRIZZLE]:      "active",
 };
 
 export class EffectTypeFactory {

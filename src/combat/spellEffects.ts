@@ -31,6 +31,11 @@ export const EFFECTS = {
     ENERGETIC:    "energetic",
     EFFICIENT:    "efficient",
     BRITTLE:      "brittle",
+    GUST:         "gust",
+    ROOT:         "root",
+    STATIC:       "static",
+    FLAME:        "flame",
+    DRIZZLE:      "drizzle",
 } as const;
 
 
@@ -117,6 +122,7 @@ const SELF_TARGET_EFFECT_KINDS: ReadonlyArray<SpellEffectKind> = [
     EFFECTS.HEAL, EFFECTS.SHIELD, EFFECTS.LIFESTEAL, EFFECTS.ENERGIZE, EFFECTS.THORNS, EFFECTS.FLOAT,
     EFFECTS.COMBO, EFFECTS.ENERGY_COMBO, EFFECTS.POWER_COMBO, EFFECTS.FOLLOW_UP, EFFECTS.CHARGE,
     EFFECTS.CONSUME, EFFECTS.HARDENED, EFFECTS.RAGE, EFFECTS.POWERFUL, EFFECTS.ENERGETIC, EFFECTS.EFFICIENT, EFFECTS.BRITTLE,
+    EFFECTS.GUST, EFFECTS.ROOT, EFFECTS.STATIC, EFFECTS.FLAME, EFFECTS.DRIZZLE,
 ];
 
 /**
@@ -163,6 +169,12 @@ export const EFFECT_KIND_ALIASES: Readonly<Record<string, SpellEffectKind>> = {
     powercombo:   EFFECTS.POWER_COMBO,
     followup:     EFFECTS.FOLLOW_UP,
     soaker:       EFFECTS.SOAK,         // renamed in sheet
+    // ── starter type-amplifier effects ───────────────────────────────────
+    gust:         EFFECTS.GUST,
+    root:         EFFECTS.ROOT,
+    static:       EFFECTS.STATIC,
+    flame:        EFFECTS.FLAME,
+    drizzle:      EFFECTS.DRIZZLE,
 };
 
 const normalizeEffectKind = (value: string): SpellEffectKind | null => {

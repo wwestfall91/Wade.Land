@@ -102,6 +102,7 @@ type FightRewardState = {
 type GameLocationState = {
     fightReward?: FightRewardState;
     battleEnded?: boolean;
+    elementUseCounts?: Record<number, number>;
 };
 
 type CastableSpell = {
@@ -124,6 +125,7 @@ type ComboStatus = {
 function Fight() {
     const location = useLocation();
     const navigate = useNavigate();
+    const elementUsesRef = useRef<Record<number, number>>({});
     const {
         player,
         playerName,
@@ -679,6 +681,7 @@ function Fight() {
                         soulsGained: enemy.souls,
                         rewardElements: chosen,
                     },
+                    elementUseCounts: { ...elementUsesRef.current },
                 } as GameLocationState,
             });
         }
@@ -1308,6 +1311,14 @@ function Fight() {
         const followUpEffect = spell.effects?.find(e => e.kind === "follow_up");
         const powerComboEffect = spell.effects?.find(e => e.kind === "power_combo");
         const combustSpellEffect = spell.effects?.find(e => e.kind === "explode");
+        const TYPE_AMP_TARGETS: Partial<Record<string, string>> = {
+            [EFFECTS.GUST]:    "fire",
+            [EFFECTS.ROOT]:    "water",
+            [EFFECTS.STATIC]:  "earth",
+            [EFFECTS.FLAME]:   "air",
+            [EFFECTS.DRIZZLE]: "lightning",
+        };
+        const typeAmpEffect = spell.effects?.find(e => e.kind in TYPE_AMP_TARGETS);
 
         const spellDamageForCast = getSpellDamageForCastPreview(spell, spellEnergyCost, spellTypes);
         const isWeapon = spell.category?.toLowerCase() === "weapon";
@@ -1322,6 +1333,7 @@ function Fight() {
         }
 
         setIsResolvingTurn(true);
+        elementUsesRef.current[spell.id] = (elementUsesRef.current[spell.id] ?? 0) + 1;
         if (isWeapon) {
             setUsedWeaponThisTurn(true);
         }
@@ -1671,6 +1683,12 @@ function Fight() {
         if (powerComboEffect?.targetType) {
             setPlayerPowerComboStatus({ requiredType: powerComboEffect.targetType, bonusPercent: powerComboEffect.amount ?? 50 });
             effectMessages.push(`Power combo primed: ${formatTypeLabel(powerComboEffect.targetType)} +${powerComboEffect.amount ?? 50}%`);
+        } else if (typeAmpEffect) {
+            const ampTargetType = TYPE_AMP_TARGETS[typeAmpEffect.kind];
+            if (ampTargetType) {
+                setPlayerPowerComboStatus({ requiredType: ampTargetType, bonusPercent: typeAmpEffect.amount ?? 50 });
+                effectMessages.push(`${typeAmpEffect.kind.charAt(0).toUpperCase() + typeAmpEffect.kind.slice(1)} primed: ${formatTypeLabel(ampTargetType)} +${typeAmpEffect.amount ?? 50}%`);
+            }
         }
 
         if (effectMessages.length > 0) {
@@ -1699,6 +1717,7 @@ function Fight() {
             replace: true,
             state: {
                 battleEnded: true,
+                elementUseCounts: { ...elementUsesRef.current },
             } as GameLocationState,
         });
     };

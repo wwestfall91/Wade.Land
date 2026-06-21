@@ -86,6 +86,7 @@ export const applyDivide = (input: ElementStats): DivideOutput => {
     const base = {
         letter: input.letter,
         damage: halfPower,
+        rank: input.rank,
         level: input.level,
         description: input.description,
         type1: input.type1,

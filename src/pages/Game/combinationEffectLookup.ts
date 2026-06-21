@@ -12,6 +12,7 @@ export type EffectWorkbookRow = {
     Duration?: string | number;
     Target?: string;
     Growth?: string;
+    Type?: string;
 };
 
 export type EffectWorkbookValues = {

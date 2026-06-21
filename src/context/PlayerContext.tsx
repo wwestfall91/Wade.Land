@@ -16,11 +16,14 @@ type LevelRow = {
     level?: number | string;
     HP?: number | string;
     hp?: number | string;
+    Uses?: number | string;
+    uses?: number | string;
 };
 
 export type LevelDefinition = {
     level: number;
     hp: number;
+    usesRequired: number;
 };
 
 export type ElementEnhancements = {
@@ -37,7 +40,9 @@ export type PlayerElement = {
     damage: number;
     energy?: number;
     enhancements?: ElementEnhancements;
+    rank: number;
     level: number;
+    uses?: number;
     description: string;
     type1?: string;
     type2?: string;
@@ -128,6 +133,8 @@ type PlayerContextValue = {
     setBattleEnergyCarryover: (amount: number) => void;
     sealedCombinationModes: Set<CombinationModeKey>;
     sealCombinationMode: (mode: CombinationModeKey) => void;
+    recordElementUses: (counts: Record<number, number>) => void;
+    upgradeElement: (elementId: number, newLevel: number, effect: SpellEffectConfig) => void;
 };
 
 const DEFAULT_PLAYER_PROGRESS: PlayerProgress = {
@@ -136,6 +143,8 @@ const DEFAULT_PLAYER_PROGRESS: PlayerProgress = {
     souls: 0,
     elements: [],
 };
+
+const PLAYER_BASE_HP = 100;
 
 const PLAYER_NAME_COOKIE = "wade_player_name";
 
@@ -181,19 +190,11 @@ const resolvePlayerProgress = (
 ): PlayerProgress => {
     const matchedLevel = resolveLevelForPlayer(playerLevel, levels);
 
-    if (!matchedLevel) {
-        return {
-            ...DEFAULT_PLAYER_PROGRESS,
-            souls,
-            elements,
-        };
-    }
-
-    const effectiveMaxHp = Math.max(1, Math.round(matchedLevel.hp * maxHpMultiplier) - permanentMaxHpReduction);
+    const effectiveMaxHp = Math.max(1, Math.round(PLAYER_BASE_HP * maxHpMultiplier) - permanentMaxHpReduction);
     const resolvedHp = Math.max(0, Math.min(currentHp ?? effectiveMaxHp, effectiveMaxHp));
 
     return {
-        level: matchedLevel.level,
+        level: matchedLevel?.level ?? playerLevel,
         hp: resolvedHp,
         souls,
         elements,
@@ -235,6 +236,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
                     .map((row) => ({
                         level: Number(row.Level ?? row.level ?? 0) || 0,
                         hp: Number(row.HP ?? row.hp ?? 0) || 0,
+                        usesRequired: Number(row.Uses ?? row.uses ?? 0) || 0,
                     }))
                     .filter((level) => level.level > 0)
                     .sort((left, right) => left.level - right.level);
@@ -314,22 +316,20 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
     const applyEnemyAttack = useCallback((power: number) => {
         const normalizedPower = Math.max(0, power);
         setCurrentHp((previousHp) => {
-            const matchedLevel = resolveLevelForPlayer(playerLevel, levels);
-            const effectiveMaxHp = Math.max(1, Math.round((matchedLevel?.hp ?? 0) * maxHpMultiplier) - permanentMaxHpReduction);
+            const effectiveMaxHp = Math.max(1, Math.round(PLAYER_BASE_HP * maxHpMultiplier) - permanentMaxHpReduction);
             const startingHp = previousHp ?? effectiveMaxHp;
             return Math.max(0, startingHp - normalizedPower);
         });
-    }, [levels, maxHpMultiplier, permanentMaxHpReduction, playerLevel]);
+    }, [maxHpMultiplier, permanentMaxHpReduction]);
 
     const healPlayer = useCallback((amount: number) => {
         const normalizedAmount = Math.max(0, amount);
         setCurrentHp((previousHp) => {
-            const matchedLevel = resolveLevelForPlayer(playerLevel, levels);
-            const effectiveMaxHp = Math.max(1, Math.round((matchedLevel?.hp ?? 0) * maxHpMultiplier) - permanentMaxHpReduction);
+            const effectiveMaxHp = Math.max(1, Math.round(PLAYER_BASE_HP * maxHpMultiplier) - permanentMaxHpReduction);
             const startingHp = previousHp ?? effectiveMaxHp;
             return Math.min(effectiveMaxHp, startingHp + normalizedAmount);
         });
-    }, [levels, maxHpMultiplier, permanentMaxHpReduction, playerLevel]);
+    }, [maxHpMultiplier, permanentMaxHpReduction]);
 
     const decreaseMaxHp = useCallback((amount: number) => {
         setPermanentMaxHpReduction((previous) => previous + Math.max(0, amount));
@@ -405,6 +405,30 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
         });
     }, []);
 
+    const recordElementUses = useCallback((counts: Record<number, number>) => {
+        setElements((previous) =>
+            previous.map((element) => {
+                const gained = counts[element.id] ?? 0;
+                if (gained <= 0) return element;
+                return { ...element, uses: (element.uses ?? 0) + gained };
+            }),
+        );
+    }, []);
+
+    const upgradeElement = useCallback((elementId: number, newLevel: number, effect: SpellEffectConfig) => {
+        setElements((previous) =>
+            previous.map((element) =>
+                element.id === elementId
+                    ? {
+                        ...element,
+                        level: newLevel,
+                        effects: [...(element.effects ?? []), effect],
+                    }
+                    : element,
+            ),
+        );
+    }, []);
+
     const contextValue = useMemo(
         () => ({
             player,
@@ -445,6 +469,8 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             sealCombinationMode,
             discoveredCraftedLetters,
             addDiscoveredCraftedLetter,
+            recordElementUses,
+            upgradeElement,
         }),
         [
             addSouls,
@@ -484,6 +510,8 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             sealCombinationMode,
             discoveredCraftedLetters,
             addDiscoveredCraftedLetter,
+            recordElementUses,
+            upgradeElement,
         ],
     );
 

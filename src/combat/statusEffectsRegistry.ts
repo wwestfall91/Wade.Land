@@ -269,6 +269,41 @@ const STATUS_EFFECT_DESCRIPTORS: StatusEffectDescriptor[] = [
             return `Consumed after ${uses} uses in a FORMULA.`;
         },
     },
+    {
+        kind: EFFECTS.GUST,
+        label: "Gust",
+        chipClass: "effect-gust",
+        formatLine: (effect) => `Gust: next FIRE attack +${effect.amount ?? 50}%`,
+        formatDetail: (effect) => `Increases FIRE damage by ${effect.amount ?? 50}% on the next attack.`,
+    },
+    {
+        kind: EFFECTS.ROOT,
+        label: "Root",
+        chipClass: "effect-root",
+        formatLine: (effect) => `Root: next WATER attack +${effect.amount ?? 50}%`,
+        formatDetail: (effect) => `Increases WATER damage by ${effect.amount ?? 50}% on the next attack.`,
+    },
+    {
+        kind: EFFECTS.STATIC,
+        label: "Static",
+        chipClass: "effect-static",
+        formatLine: (effect) => `Static: next EARTH attack +${effect.amount ?? 50}%`,
+        formatDetail: (effect) => `Increases EARTH damage by ${effect.amount ?? 50}% on the next attack.`,
+    },
+    {
+        kind: EFFECTS.FLAME,
+        label: "Flame",
+        chipClass: "effect-flame",
+        formatLine: (effect) => `Flame: next AIR attack +${effect.amount ?? 50}%`,
+        formatDetail: (effect) => `Increases AIR damage by ${effect.amount ?? 50}% on the next attack.`,
+    },
+    {
+        kind: EFFECTS.DRIZZLE,
+        label: "Drizzle",
+        chipClass: "effect-drizzle",
+        formatLine: (effect) => `Drizzle: next LIGHTNING attack +${effect.amount ?? 50}%`,
+        formatDetail: (effect) => `Increases LIGHTNING damage by ${effect.amount ?? 50}% on the next attack.`,
+    },
 ];
 
 export class StatusEffectsRegistry {

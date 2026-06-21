@@ -20,6 +20,8 @@ type PlayerStatsProps = {
     className?: string;
 };
 
+const PLAYER_BASE_HP = 100;
+
 function PlayerStats({
     playerName,
     level,
@@ -29,9 +31,9 @@ function PlayerStats({
     statuses,
     className,
 }: PlayerStatsProps) {
-    const { player, levels, maxHpMultiplier } = usePlayer();
-    const baseMaxHp = levels.find((levelDef) => levelDef.level === player.level)?.hp ?? Math.max(player.hp, 1);
-    const playerMaxHp = Math.round(baseMaxHp * maxHpMultiplier);
+    const { maxHpMultiplier, permanentMaxHpReduction } = usePlayer();
+    const computedMaxHp = Math.max(1, Math.round(PLAYER_BASE_HP * maxHpMultiplier) - permanentMaxHpReduction);
+    const playerMaxHp = Math.max(1, maxHp ?? computedMaxHp);
     const hpFillPercent = Math.max(0, Math.min(100, (hp / playerMaxHp) * 100));
     const style = {
         "--hp-fill": `${hpFillPercent}%`,

@@ -6,6 +6,7 @@ type ElementDetailsTooltipProps = {
     anchorElement: HTMLElement | null;
     open: boolean;
     className?: string;
+    highlightedEffectKey?: string;
     clampHorizontal?: boolean;
     interactive?: boolean;
     onTooltipMouseEnter?: () => void;
@@ -17,6 +18,7 @@ function ElementDetailsTooltip({
     anchorElement,
     open,
     className = "reward-element-tooltip-shell",
+    highlightedEffectKey,
     clampHorizontal = true,
     interactive = false,
     onTooltipMouseEnter,
@@ -31,6 +33,7 @@ function ElementDetailsTooltip({
             interactive={interactive}
             onTooltipMouseEnter={onTooltipMouseEnter}
             onTooltipMouseLeave={onTooltipMouseLeave}
+            highlightedEffectKey={highlightedEffectKey}
             elementDetails={{
                 letter: element.letter,
                 damage: element.damage,

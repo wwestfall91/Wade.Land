@@ -5,7 +5,7 @@ import { useLocation, useNavigate } from "react-router";
 import PlayerStats from "../../components/PlayerStats";
 import EnemyStage from "../../components/EnemyStage";
 import ElementIcon from "../../components/ElementIcon";
-import { parseSpellEffectsFromRow, type SpellEffectConfig } from "../../combat/spellEffects";
+import { EFFECTS, parseSpellEffectsFromRow, type SpellEffectConfig } from "../../combat/spellEffects";
 import {
     type CombinationModeKey,
     type ElementEnhancements,
@@ -36,6 +36,7 @@ import {
     STARTER_BUTTON_THEME_DEFAULT,
 } from "../../styles/elementThemes";
 import MonsterUpgradeModal from "./MonsterUpgradeModal";
+import { LevelUpModal } from "../Fight/LevelUpModal";
 import soulIcon from "../../assets/icons/Soul.png";
 import chestIcon from "../../assets/icons/Chest.png";
 import "./Game.scss";
@@ -55,6 +56,7 @@ type DraggableItem = {
     damage: number;
     energy?: number;
     enhancements?: ElementEnhancements;
+    rank: number;
     level: number;
     description: string;
     type1?: string;
@@ -74,6 +76,8 @@ type ElementRow = {
     Damage?: number | string;
     energy?: number | string;
     Energy?: number | string;
+    Rank?: number | string;
+    rank?: number | string;
     Level?: number | string;
     level?: number | string;
     Description?: string;
@@ -148,6 +152,7 @@ type PreviewCombination = {
     energy?: number;
     baseEnergyBeforeCreation?: number;
     enhancements?: ElementEnhancements;
+    rank?: number;
     level: number;
     description: string;
     type1?: string;
@@ -161,6 +166,7 @@ type PreviewCombination = {
         letter: string;
         damage: number;
         energy?: number;
+        rank?: number;
         level: number;
         description: string;
         type1?: string;
@@ -183,9 +189,25 @@ type FightRewardState = {
     chests?: ChestDefinition[];
 };
 
+type LevelUpEffectEntry = {
+    config: SpellEffectConfig;
+    types: string[];
+};
+
+type PendingLevelUp = {
+    elementId: number;
+    elementPreview: RewardElement;
+    elementLetter: string;
+    elementType1?: string;
+    elementType2?: string;
+    newLevel: number;
+    choices: SpellEffectConfig[];
+};
+
 type GameLocationState = {
     fightReward?: FightRewardState;
     battleEnded?: boolean;
+    elementUseCounts?: Record<number, number>;
 };
 
 const SPREAD_X = 200;
@@ -307,6 +329,9 @@ function Game() {
         updateElementEffects,
         sealedCombinationModes,
         sealCombinationMode,
+        levels,
+        recordElementUses,
+        upgradeElement,
     } = usePlayer();
     const gameRef = useRef<HTMLDivElement | null>(null);
     const elementStartRef = useRef<HTMLDivElement | null>(null);
@@ -342,6 +367,9 @@ function Game() {
     const [, setMonsterThresholds] = useState<MonsterRewardThreshold[]>([]);
     const [rewardGlowRevision] = useState(0);
     const [pendingUpgradeRewards, setPendingUpgradeRewards] = useState<MonsterReward[] | null>(null);
+    const [levelUpEffectPool, setLevelUpEffectPool] = useState<LevelUpEffectEntry[]>([]);
+    const [pendingElementUseCounts, setPendingElementUseCounts] = useState<Record<number, number> | null>(null);
+    const [pendingLevelUps, setPendingLevelUps] = useState<PendingLevelUp[]>([]);
     const [newElementToasts, setNewElementToasts] = useState<Array<{ id: number; x: number; y: number; category?: string }>>([]);
     const [hasSeenDragTutorial, setHasSeenDragTutorial] = useState(() => {
         if (typeof window === "undefined") {
@@ -780,6 +808,10 @@ function Game() {
             setIsCombinationStationUnlocked(true);
         }
 
+        if (state?.elementUseCounts) {
+            setPendingElementUseCounts(state.elementUseCounts);
+        }
+
         if (state?.fightReward) {
             if (rewardCueTimeoutRef.current !== null) {
                 window.clearTimeout(rewardCueTimeoutRef.current);
@@ -823,6 +855,81 @@ function Game() {
         }
     }, [isOldOneIntroTriggered, location.state, navigate, startOldOneStoryPrelude]);
 
+    useEffect(() => {
+        if (!pendingElementUseCounts || levelUpEffectPool.length === 0 || levels.length === 0) return;
+
+        const counts = pendingElementUseCounts;
+        setPendingElementUseCounts(null);
+        recordElementUses(counts);
+
+        const newPendingLevelUps: PendingLevelUp[] = [];
+        for (const [idStr, usesGained] of Object.entries(counts)) {
+            const elementId = Number(idStr);
+            const element = playerProgress.elements.find((e) => e.id === elementId);
+            if (!element || usesGained <= 0) continue;
+
+            const oldUses = element.uses ?? 0;
+            const newUses = oldUses + usesGained;
+            let currentLevel = Math.max(1, element.level || 1);
+
+            while (true) {
+                const levelDef = levels.find((l) => l.level === currentLevel);
+                if (!levelDef || levelDef.usesRequired <= 0 || newUses < levelDef.usesRequired) break;
+                currentLevel++;
+
+                const elementTypes = [element.type1, element.type2]
+                    .filter(Boolean)
+                    .map((t) => (t ?? "").trim().toLowerCase());
+
+                const compatible = levelUpEffectPool.filter((entry) =>
+                    entry.types.some((t) => elementTypes.includes(t)),
+                );
+                if (compatible.length === 0) continue;
+
+                const shuffled = [...compatible].sort(() => Math.random() - 0.5);
+                const choices = shuffled.slice(0, 2).map((e) => e.config);
+
+                newPendingLevelUps.push({
+                    elementId,
+                    elementPreview: {
+                        letter: element.letter,
+                        damage: element.damage,
+                        energy: element.energy,
+                        enhancements: element.enhancements,
+                        rank: element.rank,
+                        level: element.level,
+                        uses: element.uses,
+                        description: element.description,
+                        type1: element.type1,
+                        type2: element.type2,
+                        effects: element.effects,
+                        category: element.category,
+                        initialPosition: element.initialPosition,
+                    },
+                    elementLetter: element.letter,
+                    elementType1: element.type1,
+                    elementType2: element.type2,
+                    newLevel: currentLevel,
+                    choices,
+                });
+            }
+        }
+
+        if (newPendingLevelUps.length > 0) {
+            setPendingLevelUps((prev) => [...prev, ...newPendingLevelUps]);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [pendingElementUseCounts, levelUpEffectPool, levels]);
+
+    const handleLevelUpConfirm = useCallback((choice: SpellEffectConfig) => {
+        setPendingLevelUps((prev) => {
+            if (prev.length === 0) return prev;
+            const [current, ...rest] = prev;
+            upgradeElement(current.elementId, current.newLevel, choice);
+            return rest;
+        });
+    }, [upgradeElement]);
+
     const activeDropZoneRefs = zoneOccupants.length === 3
         ? [dropZoneRefA, dropZoneRefB, dropZoneRefC]
         : [dropZoneRefA, dropZoneRefB];
@@ -852,6 +959,7 @@ function Game() {
             letter: sentinelModeKey,
             damage: 0,
             energy: 0,
+            rank: 0,
             level: 0,
             description: "Mode lock",
             category: "element",
@@ -1131,11 +1239,14 @@ function Game() {
                     element2: (row["Element 2"] ?? "").trim(),
                     damage: Number(row.damage ?? row.Damage ?? 0) || 0,
                     energy: Math.max(0, Number(row.energy ?? row.Energy ?? 0) || 0),
-                    level: (() => {
-                            const raw = row.Level ?? row.level;
-                            if (raw !== undefined && raw !== null && String(raw).trim() !== "") return Number(raw);
-                            return (row["Element 1"] ?? "").trim().length === 0 ? 1 : 2;
+                    rank: (() => {
+                            const raw = row.Rank ?? row.rank;
+                            if (raw !== undefined && raw !== null && String(raw).trim() !== "") {
+                                return Number(raw) || 0;
+                            }
+                            return (row["Element 1"] ?? "").trim().length === 0 ? 0 : 2;
                         })(),
+                    level: 1,
                     description: (row.Description ?? row.description ?? "").trim(),
                     type1: normalizeType((row.Type1 || "") as string),
                     type2: normalizeType((row.Type2 || "") as string),
@@ -1145,17 +1256,37 @@ function Game() {
                 .filter((row) => row.name.length > 0);
 
             setAllElementOptions(
-                parsedRows.map((row) => ({
-                    letter: row.name,
-                    damage: row.damage,
-                    energy: row.energy,
-                    level: row.level,
-                    description: row.description,
-                    type1: row.type1,
-                    type2: row.type2,
-                    effects: row.effects,
-                    category: row.category,
-                })),
+                parsedRows.map((row) => {
+                    const baseEffects: SpellEffectConfig[] = row.effects ?? [];
+                    // Inject default starter effects for rank-0 elements by type
+                    const starterEffectByType: Record<string, SpellEffectConfig> = {
+                        air:       { kind: EFFECTS.GUST,    target: "self", amount: 50, growth: "+" },
+                        earth:     { kind: EFFECTS.ROOT,    target: "self", amount: 50, growth: "+" },
+                        lightning: { kind: EFFECTS.STATIC,  target: "self", amount: 50, growth: "+" },
+                        fire:      { kind: EFFECTS.FLAME,   target: "self", amount: 50, growth: "+" },
+                        water:     { kind: EFFECTS.DRIZZLE, target: "self", amount: 50, growth: "+" },
+                    };
+                    let effects = baseEffects;
+                    if (row.rank === 0) {
+                        const primaryType = row.type1 || row.type2;
+                        const starterEffect = primaryType ? starterEffectByType[primaryType] : undefined;
+                        if (starterEffect && !baseEffects.some((e) => e.kind === starterEffect.kind)) {
+                            effects = [...baseEffects, starterEffect];
+                        }
+                    }
+                    return {
+                        letter: row.name,
+                        damage: row.damage,
+                        energy: row.energy,
+                        rank: row.rank,
+                        level: row.level,
+                        description: row.description,
+                        type1: row.type1,
+                        type2: row.type2,
+                        effects,
+                        category: row.category,
+                    };
+                }),
             );
 
             elementCatalogRef.current = new Map(
@@ -1163,6 +1294,7 @@ function Game() {
                     letter: row.name,
                     damage: row.damage,
                     energy: row.energy,
+                    rank: row.rank,
                     level: row.level,
                     description: row.description,
                     type1: row.type1,
@@ -1199,6 +1331,23 @@ function Game() {
                     const effectsWorksheet = effectsWorkbook.Sheets[effectsWorkbook.SheetNames[0]];
                     const effectRows = XLSX.utils.sheet_to_json<EffectWorkbookRow>(effectsWorksheet);
                     effectValuesByKey = buildEffectValuesByKey(effectRows);
+
+                    const parsedLevelUpEffects: LevelUpEffectEntry[] = [];
+                    effectRows.forEach((row) => {
+                        const typeColumn = String(row.Type ?? "").trim();
+                        if (!typeColumn) return;
+                        const effectName = String(row.Effect ?? "").trim();
+                        if (!effectName) return;
+                        const mappedRow = buildMappedEffectRow(effectName, effectValuesByKey);
+                        const parsed = parseSpellEffectsFromRow(mappedRow, 1);
+                        if (parsed.length === 0) return;
+                        const types = typeColumn
+                            .split(",")
+                            .map((t) => t.trim().toLowerCase())
+                            .filter(Boolean);
+                        parsedLevelUpEffects.push({ config: parsed[0], types });
+                    });
+                    setLevelUpEffectPool(parsedLevelUpEffects);
                 }
 
                 const stateLookup: CombinationStateEffectsLookup = {};
@@ -1349,7 +1498,7 @@ function Game() {
         }
 
         const starterElements = allElementOptions
-            .filter((element) => element.level === 0 && element.category?.toLowerCase() === "element")
+            .filter((element) => element.rank === 0 && element.category?.toLowerCase() === "element")
             .slice(0, 4);
         if (starterElements.length === 0) {
             return;
@@ -1367,7 +1516,7 @@ function Game() {
     }, [addElement, allElementOptions, introPhase, location.state, playerProgress.elements.length]);
 
     useEffect(() => {
-        levelZeroElementsRef.current = allElementOptions.filter((e) => e.level === 0);
+        levelZeroElementsRef.current = allElementOptions.filter((e) => e.rank === 0);
         allElementOptionsRef.current = allElementOptions;
     }, [allElementOptions]);
 
@@ -1388,6 +1537,7 @@ function Game() {
                         damage: element.damage,
                         energy: element.energy,
                         enhancements: element.enhancements,
+                        rank: element.rank,
                         level: element.level,
                         description: element.description,
                         type1: element.type1,
@@ -1990,9 +2140,11 @@ function Game() {
                 letter: "Soul",
                 damage: 0,
                 energy: 0,
+                rank: 0,
                 level: 0,
                 description: "A soul element",
                 category: "element",
+                effects: undefined,
             };
             const duplicateConsumedIds = isModeSentinelId(leftItem.id) ? [] : [leftItem.id];
             return {
@@ -2179,6 +2331,7 @@ function Game() {
                 damage: previewCombination.damage,
                 energy: previewCombination.energy,
                 enhancements: previewCombination.enhancements,
+                rank: previewCombination.rank ?? 0,
                 level: previewCombination.level,
                 description: previewCombination.description,
                 type1: previewCombination.type1,
@@ -2191,6 +2344,7 @@ function Game() {
             const secondDraggable = {
                 id: nextId.current++,
                 ...previewCombination.secondOutput,
+                rank: previewCombination.secondOutput.rank ?? 0,
                 initialPosition: targetPosition2,
             };
 
@@ -2240,6 +2394,7 @@ function Game() {
             damage: previewCombination.damage,
             energy: previewCombination.energy,
             enhancements: previewCombination.enhancements,
+            rank: previewCombination.rank ?? 0,
             level: previewCombination.level,
             description: previewCombination.description,
             type1: previewCombination.type1,
@@ -3035,6 +3190,7 @@ function Game() {
                         letter: "Soul",
                         damage: 0,
                         energy: 0,
+                        rank: 0,
                         level: 1,
                         description: "Could be useful as a base...",
                         effects: [{ kind: "brittle", target: "self" }],
@@ -3804,6 +3960,16 @@ function Game() {
                     rewards={pendingUpgradeRewards}
                     applyContext={{ applyTypeMultiplier, applyShieldMultiplier, applySoakMultiplier, applyBurnMultiplier }}
                     onConfirm={() => setPendingUpgradeRewards(null)}
+                />
+            ) : null}
+            {pendingLevelUps.length > 0 ? (
+                <LevelUpModal
+                    elementLetter={pendingLevelUps[0].elementLetter}
+                    elementType1={pendingLevelUps[0].elementType1}
+                    elementType2={pendingLevelUps[0].elementType2}
+                    elementPreview={pendingLevelUps[0].elementPreview}
+                    choices={pendingLevelUps[0].choices}
+                    onConfirm={handleLevelUpConfirm}
                 />
             ) : null}
             {isFeedOverlayOpen ? (

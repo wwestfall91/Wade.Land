@@ -46,6 +46,7 @@ type FloatingTooltipProps = {
     children?: ReactNode;
     elementDetails?: ElementDetails;
     changedKeys?: ReadonlySet<string>;
+    highlightedEffectKey?: string;
     typeMultipliers?: Record<string, number>;
     offset?: number;
     viewportPadding?: number;
@@ -83,10 +84,11 @@ const clamp = (value: number, min: number, max: number) => Math.max(min, Math.mi
 export type TooltipPanelContentProps = {
     elementDetails: ElementDetails;
     changedKeys?: ReadonlySet<string>;
+    highlightedEffectKey?: string;
     typeMultipliers?: Record<string, number>;
 };
 
-export function TooltipPanelContent({ elementDetails, changedKeys, typeMultipliers }: TooltipPanelContentProps) {
+export function TooltipPanelContent({ elementDetails, changedKeys, highlightedEffectKey, typeMultipliers }: TooltipPanelContentProps) {
     const highlightNumericTokens = (text: string) => {
         const parts = text.split(/([+-]?\d+(?:\.\d+)?(?:%|x)?)/g);
 
@@ -235,7 +237,7 @@ export function TooltipPanelContent({ elementDetails, changedKeys, typeMultiplie
                             {effectKinds.map((effectKind) => (
                                 <span
                                     key={effectKind.key}
-                                    className={`effect-chip ${effectKind.chipClass}`}
+                                    className={`effect-chip ${effectKind.chipClass}${effectKind.key === highlightedEffectKey ? " is-highlighted" : ""}`}
                                 >
                                     <span className="effect-chip-label">{effectKind.label}</span>
                                     {effectKind.detail ? (
@@ -276,6 +278,7 @@ function FloatingTooltip({
     children,
     elementDetails,
     changedKeys,
+    highlightedEffectKey,
     typeMultipliers,
     offset = 8,
     viewportPadding = 8,
@@ -433,6 +436,7 @@ function FloatingTooltip({
                 <TooltipPanelContent
                     elementDetails={elementDetails}
                     changedKeys={changedKeys}
+                    highlightedEffectKey={highlightedEffectKey}
                     typeMultipliers={typeMultipliers}
                 />
             ) : (
