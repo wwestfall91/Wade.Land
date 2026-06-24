@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { SpellEffectConfig } from "../../combat/spellEffects";
+import { mergeLevelUpEffect } from "../../combat/effectMerging";
 import type { RewardElement } from "../../context/PlayerContext";
 import ElementIcon from "../../components/ElementIcon";
 import ElementDetailsTooltip from "../../components/ElementDetailsTooltip";
@@ -68,15 +69,16 @@ export function LevelUpModal({ elementLetter, elementType1, elementType2, elemen
     const usesLightPanelText = activeType === "air" || activeType === "light" || activeType === "water" || activeType === "ice";
 
     const hoveredEffect = hoveredChoiceIndex !== null ? choices[hoveredChoiceIndex] : null;
-    const previewEffects = hoveredEffect ? [...(elementPreview.effects ?? []), hoveredEffect] : undefined;
+    const previewMergeResult = hoveredEffect ? mergeLevelUpEffect(elementPreview.effects, hoveredEffect) : null;
+    const previewEffects = previewMergeResult?.effects;
     const previewElement = hoveredEffect
         ? {
             ...elementPreview,
             effects: previewEffects,
         }
         : null;
-    const highlightedEffectKey = hoveredEffect && previewEffects
-        ? `${hoveredEffect.kind}-${previewEffects.length - 1}`
+    const highlightedEffectKey = hoveredEffect && previewMergeResult
+        ? `${previewMergeResult.effects[previewMergeResult.mergedIndex]?.kind ?? hoveredEffect.kind}-${previewMergeResult.mergedIndex}`
         : undefined;
 
     return createPortal(

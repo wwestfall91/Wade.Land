@@ -10,6 +10,7 @@ import React, {
 import * as XLSX from "xlsx";
 import type { SpellEffectConfig } from "../combat/spellEffects";
 import type { ActiveBurnStatus, ActiveSoakStatus, ActiveFreezeStatus, ActiveEnergizeStatus, ActiveThornsStatus, ActiveFloatStatus } from "../combat/spellEffects";
+import { mergeLevelUpEffect } from "../combat/effectMerging";
 
 type LevelRow = {
     Level?: number | string;
@@ -422,7 +423,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
                     ? {
                         ...element,
                         level: newLevel,
-                        effects: [...(element.effects ?? []), effect],
+                        effects: mergeLevelUpEffect(element.effects, effect).effects,
                     }
                     : element,
             ),
