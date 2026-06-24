@@ -74,7 +74,9 @@ type CombinationStationProps = {
     onOutputHover2: (hovered: boolean) => void;
     hasOutputElementInSlot: boolean;
     isModeInserted: boolean;
+    isModeCollapseAnimating: boolean;
     shouldAnimateModeShutter: boolean;
+        modeUsesRemaining: number;
     modeInsertedElementLetter?: string;
     modeInsertedElementCategory?: string;
     showModeInsertedElementOverlay: boolean;
@@ -120,7 +122,9 @@ function CombinationStation({
     onOutputHover2,
     hasOutputElementInSlot,
     isModeInserted,
+    isModeCollapseAnimating,
     shouldAnimateModeShutter,
+        modeUsesRemaining,
     modeInsertedElementLetter,
     modeInsertedElementCategory,
     showModeInsertedElementOverlay,
@@ -237,8 +241,21 @@ function CombinationStation({
     return (
         <div className={combinationStationClassName}>
             <div className="combination-equation-shell">
-                <div className="combination-equation-mode-label" aria-live="polite">
-                    {activeModeLabel}
+                <div className="combination-header-row">
+                    <div className="combination-equation-mode-label" aria-live="polite">
+                        {activeModeLabel}
+                    </div>
+                    {isModeInserted && modeKey !== "idle" && (
+                        <div className="mode-charge-pips" aria-label={`${modeUsesRemaining} uses remaining`}>
+                            {[0, 1, 2].map((i) => (
+                                <span
+                                    key={i}
+                                    className={`mode-charge-pip mode-charge-pip--${combinationStationState.elementKey ?? "default"} ${i < modeUsesRemaining ? "is-lit" : "is-spent"}`}
+                                    aria-hidden="true"
+                                />
+                            ))}
+                        </div>
+                    )}
                 </div>
                 <div className="combination-equation">
                     <CombinationModePanel
@@ -259,7 +276,11 @@ function CombinationStation({
                         onModeTabSelect={onModeTabSelect}
                         onInsertMode={onInsertMode}
                     />
-                    <div className={`combination-logic-result-group ${isModeInserted ? "" : "is-hidden"}`.trim()}>
+                    <div className={[
+                        "combination-logic-result-group",
+                        !isModeInserted ? "is-hidden" : "",
+                        isModeCollapseAnimating ? "is-collapsing" : "",
+                    ].filter(Boolean).join(" ")}>
                         <div className={interPanelConnectorClassName} aria-hidden="true" />
 
                         <CombinationLogicPanel

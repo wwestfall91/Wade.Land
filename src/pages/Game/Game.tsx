@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import Draggable from "./Draggable";
 import { useLocation, useNavigate } from "react-router";
@@ -224,6 +224,7 @@ const REWARD_CUE_MS = 260;
 const ELEMENT_FLIGHT_TRAVEL_MS = 520;
 const STARTER_LABEL_ANIM_MS = 520;
 const MODE_SHUTTER_CLOSE_MS = 180;
+const MODE_COLLAPSE_ANIMATION_MS = 420;
 const ENABLE_FIRST_BATTLE_OLD_ONE_SCENE = false;
 const COMBUST_DAMAGE_MULTIPLIER = 2.5;
 const PREVIEW_DRAG_START_THRESHOLD_PX = 6;
@@ -329,6 +330,7 @@ function Game() {
         updateElementEffects,
         sealedCombinationModes,
         sealCombinationMode,
+        unsealCombinationMode,
         levels,
         recordElementUses,
         upgradeElement,
@@ -468,8 +470,18 @@ function Game() {
     // Ref so early callbacks (normalizeZoneOccupants) can read the current mode key without
     // creating a forward-reference to the derived `insertedModeStateKey` const.
     const insertedModeStateKeyRef = useRef<string>("idle");
+    // Tracks how many combination uses have occurred for each sealed mode element key.
+    // After 3 uses the slot is unsealed and resets to idle.
+    const modeUseCountsRef = useRef<Partial<Record<string, number>>>({});
+    // Always reflects the current activeModeElementKey so finalizeCombination can read it
+    // without adding it to the useCallback dependency array.
+    const activeModeElementKeyRef = useRef<ModeTabElementKey | null>(null);
     const [isOutputHovered, setIsOutputHovered] = useState(false);
     const [isOutputHovered2, setIsOutputHovered2] = useState(false);
+    const [isModeCollapsing, setIsModeCollapsing] = useState(false);
+    const [isModeCollapseAnimating, setIsModeCollapseAnimating] = useState(false);
+    const [modeUsesRemaining, setModeUsesRemaining] = useState(3);
+    const collapseTimerRef = useRef<number | null>(null);
     const [modeOutputElementIds, setModeOutputElementIds] = useState<Partial<Record<string, number[]>>>(() => {
         if (typeof window === "undefined") {
             return {};
@@ -1735,6 +1747,14 @@ function Game() {
             consumeElements([slotZeroOccupantId]);
             if (insertedModeKey) {
                 sealCombinationMode(insertedModeKey);
+                modeUseCountsRef.current = { ...modeUseCountsRef.current, [insertedModeKey]: 0 };
+                setModeUsesRemaining(3);
+                setIsModeCollapsing(false);
+                setIsModeCollapseAnimating(false);
+                if (collapseTimerRef.current !== null) {
+                    window.clearTimeout(collapseTimerRef.current);
+                    collapseTimerRef.current = null;
+                }
                 setZoneOccupants((previous) => {
                     const next = [...previous];
                     next[0] = getModeSentinelId(insertedModeKey);
@@ -1770,6 +1790,31 @@ function Game() {
             modeInsertConsumeTimeoutRef.current = null;
         }
     }, []);
+
+    useEffect(() => () => {
+        if (collapseTimerRef.current !== null) {
+            window.clearTimeout(collapseTimerRef.current);
+            collapseTimerRef.current = null;
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!isModeCollapsing || isModeCollapseAnimating) {
+            return;
+        }
+
+        const currentModeOutputCount = (modeOutputElementIds[insertedModeStateKeyRef.current] ?? []).length;
+        if (currentModeOutputCount > 0) {
+            return;
+        }
+
+        setIsModeCollapseAnimating(true);
+        collapseTimerRef.current = window.setTimeout(() => {
+            setIsModeCollapsing(false);
+            setIsModeCollapseAnimating(false);
+            collapseTimerRef.current = null;
+        }, MODE_COLLAPSE_ANIMATION_MS);
+    }, [isModeCollapsing, isModeCollapseAnimating, modeOutputElementIds]);
 
     useEffect(() => {
         if (selectedModeTabElementKey === null) {
@@ -1824,9 +1869,11 @@ function Game() {
 
     // Keep ref in sync so normalizeZoneOccupants can read the key without a forward-reference.
     insertedModeStateKeyRef.current = insertedModeStateKey;
+    // Keep ref in sync so finalizeCombination can read the current mode element key.
+    activeModeElementKeyRef.current = activeModeElementKey;
 
     // When a deferred mode (incubate/refine) becomes active and already has output elements,
-    // correct their positions using offsetLeft/offsetTop traversal — which is NOT affected by
+    // correct their positions using offsetLeft/offsetTop traversal â€” which is NOT affected by
     // CSS transforms. getBoundingClientRect() includes the translateX(-1rem) from .is-hidden,
     // so it returns wrong coordinates while the result panel is hidden. offsetLeft/offsetTop
     // always reflect the natural layout position regardless of transforms on ancestors.
@@ -1977,7 +2024,7 @@ function Game() {
             });
         };
 
-        // ── Mix (3-slot): primary + secondary → output of primary type + combined effects ──
+        // â”€â”€ Mix (3-slot): primary + secondary â†’ output of primary type + combined effects â”€â”€
         if (currentStationStateKey === "mix" && zoneOccupants.length === 3) {
             const [, primaryItem, secondaryItem] = occupantItems;
             if (!primaryItem || !secondaryItem) return null;
@@ -2074,7 +2121,7 @@ function Game() {
             return null;
         }
 
-        // ── Incubate: element consumed now, output delivered after N battles ──
+        // â”€â”€ Incubate: element consumed now, output delivered after N battles â”€â”€
         if (currentStationStateKey === "incubate") {
             return {
                 consumedIds: withBrittleFormulaConsumedIds([rightItem.id], [leftItem, rightItem]),
@@ -2086,7 +2133,7 @@ function Game() {
             };
         }
 
-        // ── Divide: split power + split effects across two outputs ──
+        // â”€â”€ Divide: split power + split effects across two outputs â”€â”€
         if (currentStationStateKey === "divide") {
             const halfPower = Math.ceil(rightItem.damage / 2);
             const effects = rightItem.effects ?? [];
@@ -2121,7 +2168,7 @@ function Game() {
             };
         }
 
-        // ── Refine: element consumed now, output delivered with power × (counter × 2) ──
+        // â”€â”€ Refine: element consumed now, output delivered with power Ã— (counter Ã— 2) â”€â”€
         if (currentStationStateKey === "refine") {
             return {
                 consumedIds: withBrittleFormulaConsumedIds([rightItem.id], [leftItem, rightItem]),
@@ -2133,7 +2180,7 @@ function Game() {
             };
         }
 
-        // ── Duplicate: exact copy + fresh catalog spawn ──
+        // â”€â”€ Duplicate: exact copy + fresh catalog spawn â”€â”€
         if (currentStationStateKey === "duplicate") {
             const catalogEntry = elementCatalogRef.current.get(normalizeElementName(rightItem.letter));
             const freshElement = catalogEntry ?? {
@@ -2228,6 +2275,20 @@ function Game() {
             return;
         }
 
+        const trackModeUse = () => {
+            const modeKey = activeModeElementKeyRef.current;
+            if (!modeKey) return;
+            const nextCount = (modeUseCountsRef.current[modeKey] ?? 0) + 1;
+            modeUseCountsRef.current = { ...modeUseCountsRef.current, [modeKey]: nextCount };
+            if (nextCount >= 3) {
+                unsealCombinationMode(modeKey);
+                modeUseCountsRef.current = { ...modeUseCountsRef.current, [modeKey]: 0 };
+                setIsModeCollapsing(true);
+                setModeUsesRemaining(0);
+            } else {
+                setModeUsesRemaining(3 - nextCount);
+            }
+        };
         const getBrittleUses = (effect: SpellEffectConfig): number =>
             Math.max(1, Math.floor(effect.amount ?? 1));
 
@@ -2283,7 +2344,7 @@ function Game() {
             new Set([...previewCombination.consumedIds, ...extraConsumedIds]),
         );
 
-        // ── Deferred modes (Incubate / Refine): consume input, queue a pending job ──
+        // â”€â”€ Deferred modes (Incubate / Refine): consume input, queue a pending job â”€â”€
         if (previewCombination.isDeferred) {
             const activeCounter = insertedModeStateKey === "incubate" ? incubateCounter : refineCounter;
             const inputId = effectiveConsumedIds[0];
@@ -2311,6 +2372,7 @@ function Game() {
             setIsPreviewDragging(false);
             setPreviewPosition(null);
             previewPositionRef.current = null;
+            trackModeUse();
             return;
         }
 
@@ -2320,7 +2382,7 @@ function Game() {
             return;
         }
 
-        // ── Dual-output modes (Divide / Duplicate): spawn two elements ──
+        // â”€â”€ Dual-output modes (Divide / Duplicate): spawn two elements â”€â”€
         if (previewCombination.secondOutput) {
             const targetPosition2 = getOutputCenterPosition2() ?? targetPosition;
             const didSpawnFromOutputSlot = !spawnPosition;
@@ -2384,10 +2446,11 @@ function Game() {
             setIsPreviewDragging(false);
             setPreviewPosition(null);
             previewPositionRef.current = null;
+            trackModeUse();
             return;
         }
 
-        // ── Single-output (default) ──
+        // â”€â”€ Single-output (default) â”€â”€
         const newDraggable = {
             id: nextId.current,
             letter: previewCombination.letter,
@@ -2483,6 +2546,8 @@ function Game() {
                 setNewElementToasts((previous) => previous.filter((t) => t.id !== toastId));
             }, 2600);
         }
+
+        trackModeUse();
     }, [
         addDiscoveredCraftedLetter,
         combineElements,
@@ -2496,6 +2561,7 @@ function Game() {
         insertedModeStateKey,
         previewCombination,
         refineCounter,
+        unsealCombinationMode,
         updateElementEffects,
         zoneOccupants,
     ]);
@@ -2991,7 +3057,7 @@ function Game() {
             return machineSlotOccupantId === null || machineSlotOccupantId === draggableId;
         }
 
-        // Spells cannot be combined — block snapping entirely
+        // Spells cannot be combined â€” block snapping entirely
         if (draggable.category === "spell") {
             return false;
         }
@@ -3789,25 +3855,25 @@ function Game() {
                             {Object.entries(typeMultipliers).map(([type, mult]) => (
                                 <li key={type} className={`upgrades-panel-item type-${type}`}>
                                     <span className="upgrades-item-type">{type}</span>
-                                    <span className="upgrades-item-value">×{mult.toFixed(1)}</span>
+                                    <span className="upgrades-item-value">Ã—{mult.toFixed(1)}</span>
                                 </li>
                             ))}
                             {shieldMultiplier > 1 ? (
                                 <li className="upgrades-panel-item type-shield">
                                     <span className="upgrades-item-type">shield gain</span>
-                                    <span className="upgrades-item-value">×{shieldMultiplier.toFixed(1)}</span>
+                                    <span className="upgrades-item-value">Ã—{shieldMultiplier.toFixed(1)}</span>
                                 </li>
                             ) : null}
                             {soakMultiplier > 1 ? (
                                 <li className="upgrades-panel-item type-soak">
                                     <span className="upgrades-item-type">soak stacks</span>
-                                    <span className="upgrades-item-value">×{soakMultiplier.toFixed(1)}</span>
+                                    <span className="upgrades-item-value">Ã—{soakMultiplier.toFixed(1)}</span>
                                 </li>
                             ) : null}
                             {burnMultiplier > 1 ? (
                                 <li className="upgrades-panel-item type-burn">
                                     <span className="upgrades-item-type">burn stacks</span>
-                                    <span className="upgrades-item-value">×{burnMultiplier.toFixed(1)}</span>
+                                    <span className="upgrades-item-value">Ã—{burnMultiplier.toFixed(1)}</span>
                                 </li>
                             ) : null}
                         </ul>
@@ -3841,7 +3907,9 @@ function Game() {
                             onOutputHover={setIsOutputHovered}
                             onOutputHover2={setIsOutputHovered2}
                             hasOutputElementInSlot={hasOutputElementInSlot}
-                            isModeInserted={insertedModeElementId !== null || isActiveModeSealed}
+                            isModeInserted={insertedModeElementId !== null || isActiveModeSealed || isModeCollapsing}
+                            isModeCollapseAnimating={isModeCollapseAnimating}
+                                                        modeUsesRemaining={modeUsesRemaining}
                             sealedModeElementKeys={sealedModeTabElementKeys}
                             shouldAnimateModeShutter={insertedModeElementId !== null && isModeInsertAnimating}
                             modeInsertedElementLetter={insertedModeDraggable?.letter}

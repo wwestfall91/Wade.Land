@@ -134,6 +134,7 @@ type PlayerContextValue = {
     setBattleEnergyCarryover: (amount: number) => void;
     sealedCombinationModes: Set<CombinationModeKey>;
     sealCombinationMode: (mode: CombinationModeKey) => void;
+    unsealCombinationMode: (mode: CombinationModeKey) => void;
     recordElementUses: (counts: Record<number, number>) => void;
     upgradeElement: (elementId: number, newLevel: number, effect: SpellEffectConfig) => void;
 };
@@ -372,6 +373,18 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
         });
     }, []);
 
+    const unsealCombinationMode = useCallback((mode: CombinationModeKey) => {
+        setSealedCombinationModes((previous) => {
+            if (!previous.has(mode)) {
+                return previous;
+            }
+
+            const next = new Set(previous);
+            next.delete(mode);
+            return next;
+        });
+    }, []);
+
     const resetGame = useCallback(() => {
         setSouls(0);
         setElements([]);
@@ -468,6 +481,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             setBattleEnergyCarryover,
             sealedCombinationModes,
             sealCombinationMode,
+            unsealCombinationMode,
             discoveredCraftedLetters,
             addDiscoveredCraftedLetter,
             recordElementUses,
@@ -509,6 +523,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             setBattleEnergyCarryover,
             sealedCombinationModes,
             sealCombinationMode,
+            unsealCombinationMode,
             discoveredCraftedLetters,
             addDiscoveredCraftedLetter,
             recordElementUses,
