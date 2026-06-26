@@ -3,6 +3,7 @@ import type { SpellEffectConfig } from "../../combat/spellEffects";
 import CombinationModePanel, { type ModeTabElementKey } from "./CombinationModePanel";
 import CombinationLogicPanel from "./CombinationLogicPanel";
 import CombinationResultPanel from "./CombinationResultPanel";
+import { combinationStationRulesEngine } from "./CombinationStationRulesEngine";
 import "./CombinationStation.scss";
 
 export type { ModeTabElementKey } from "./CombinationModePanel";
@@ -207,8 +208,8 @@ function CombinationStation({
         || (isCombineButtonHovered && hoveredInsertSlot === null && zoneOccupants[0] === null);
     const shouldShowSlotTwoInsertPrompt = (hoveredInsertSlot === 2 && zoneOccupants[1] === null)
         || (isCombineButtonHovered && hoveredInsertSlot === null && zoneOccupants[0] !== null && zoneOccupants[1] === null);
-    // Mix secondary slot (C) — shown when combine button is hovered and primary is filled but secondary is not
-    const shouldShowSlotThreeInsertPrompt = modeKey === "mix"
+    // Third equation slot (e.g. Mix secondary) — shown when combine button is hovered and primary is filled but secondary is not
+    const shouldShowSlotThreeInsertPrompt = combinationStationRulesEngine.usesThirdSlot(modeKey)
         && isCombineButtonHovered
         && (zoneOccupants[1] ?? null) !== null
         && (zoneOccupants[2] ?? null) === null;
@@ -219,24 +220,10 @@ function CombinationStation({
     const handleCounterChange = modeKey === "incubate" ? onIncubateCounterChange
         : modeKey === "refine" ? onRefineCounterChange
         : () => {};
-    const combineActionLabel = pendingJobElement
-        ? modeKey === "incubate"
-            ? "Incubating"
-            : modeKey === "refine"
-                ? "Refining"
-                : combinationStationState.actionLabel
+    const combineActionLabel = pendingJobElement && combinationStationRulesEngine.isDeferred(modeKey)
+        ? combinationStationRulesEngine.getActiveLabel(modeKey) ?? combinationStationState.actionLabel
         : combinationStationState.actionLabel;
-    const activeModeLabel = modeKey === "mix"
-        ? "Mixing"
-        : modeKey === "incubate"
-            ? "Incubating"
-            : modeKey === "refine"
-                ? "Refining"
-                : modeKey === "divide"
-                    ? "Dividing"
-                    : modeKey === "duplicate"
-                        ? "Duplicating"
-                        : "";
+    const activeModeLabel = combinationStationRulesEngine.getActiveLabel(modeKey) ?? "";
 
     return (
         <div className={combinationStationClassName}>

@@ -30,7 +30,13 @@ import {
     type EffectWorkbookRow,
     type EffectWorkbookValues,
 } from "./combinationEffectLookup";
-import { applyIncubate, applyRefine, mergeEnhancements } from "./combinationCalculations";
+import { mergeEnhancements } from "./combinationCalculations";
+import type { Position, DraggableItem, PreviewCombination } from "./combinationTypes";
+import type { ModePreviewContext } from "./combinationModeRules";
+import {
+    combinationStationRulesEngine,
+    withBrittleFormulaConsumedIds,
+} from "./CombinationStationRulesEngine";
 import {
     STARTER_BUTTON_THEME_BY_TYPE,
     STARTER_BUTTON_THEME_DEFAULT,
@@ -44,27 +50,6 @@ import "./Game.scss";
 // TODO: Add special effects (Healing, burn, multi-hit)
 // TODO: Balance the current state to be fun
 // TODO: Add combos to battles
-
-type Position = {
-    x: number;
-    y: number;
-};
-
-type DraggableItem = {
-    id: number;
-    letter: string;
-    damage: number;
-    energy?: number;
-    enhancements?: ElementEnhancements;
-    rank: number;
-    level: number;
-    description: string;
-    type1?: string;
-    type2?: string;
-    effects?: SpellEffectConfig[];
-    category?: string;
-    initialPosition: Position;
-};
 
 type ElementRow = {
     [key: string]: unknown;
@@ -138,42 +123,6 @@ type Enemy = {
     sprite: string;
     weaknesses: string[];
     elements: RewardElement[];
-};
-
-type PreviewCombination = {
-    consumedIds: number[];
-    letter: string;
-    damage: number;
-    isDamageEnhanced?: boolean;
-    baseDamageBeforeEnhance?: number;
-    isCombusted?: boolean;
-    baseDamageBeforeCombust?: number;
-    isSoulChoiceOutput?: boolean;
-    energy?: number;
-    baseEnergyBeforeCreation?: number;
-    enhancements?: ElementEnhancements;
-    rank?: number;
-    level: number;
-    description: string;
-    type1?: string;
-    type2?: string;
-    effects?: SpellEffectConfig[];
-    category?: string;
-    /** Set for Incubate/Refine: element consumed now, output delivered after battles. */
-    isDeferred?: boolean;
-    /** Set for Divide/Duplicate: a second element spawns alongside the primary output. */
-    secondOutput?: {
-        letter: string;
-        damage: number;
-        energy?: number;
-        rank?: number;
-        level: number;
-        description: string;
-        type1?: string;
-        type2?: string;
-        effects?: SpellEffectConfig[];
-        category?: string;
-    };
 };
 
 type ChestDefinition = {
@@ -991,8 +940,8 @@ function Game() {
                 // 2-slot case: preserve element positions so either slot can be filled independently
                 return [sanitized[0] ?? null, sanitized[1] ?? null];
             }
-            // In Mix mode, keep the 3-slot layout intact
-            if (insertedModeStateKeyRef.current === "mix") {
+            // In a 3-slot mode (e.g. Mix), keep the 3-slot layout intact
+            if (combinationStationRulesEngine.usesThirdSlot(insertedModeStateKeyRef.current)) {
                 return [sanitized[0] ?? null, sanitized[1] ?? null, sanitized[2] ?? null];
             }
             // Collapsing from 3-slot (plasma removed): pack remaining elements into the 2 slots
@@ -1078,23 +1027,29 @@ function Game() {
                 : getSpawnPosition(playerProgress.elements.length);
 
             if (job.modeKey === "incubate") {
-                const deferredOutput = {
-                    id: nextId.current++,
-                    ...applyIncubate(job.inputElement, job.counter),
-                    initialPosition: spawnPos,
-                };
+                const incubateOutput = combinationStationRulesEngine.applyDeferred("incubate", job.inputElement, job.counter);
+                if (incubateOutput) {
+                    const deferredOutput = {
+                        id: nextId.current++,
+                        ...incubateOutput,
+                        initialPosition: spawnPos,
+                    };
 
-                completedOutputsByMode.push({ id: deferredOutput.id, modeKey: "incubate" });
-                combineElements([], deferredOutput);
+                    completedOutputsByMode.push({ id: deferredOutput.id, modeKey: "incubate" });
+                    combineElements([], deferredOutput);
+                }
             } else if (job.modeKey === "refine") {
-                const deferredOutput = {
-                    id: nextId.current++,
-                    ...applyRefine(job.inputElement, job.counter),
-                    initialPosition: spawnPos,
-                };
+                const refineOutput = combinationStationRulesEngine.applyDeferred("refine", job.inputElement, job.counter);
+                if (refineOutput) {
+                    const deferredOutput = {
+                        id: nextId.current++,
+                        ...refineOutput,
+                        initialPosition: spawnPos,
+                    };
 
-                completedOutputsByMode.push({ id: deferredOutput.id, modeKey: "refine" });
-                combineElements([], deferredOutput);
+                    completedOutputsByMode.push({ id: deferredOutput.id, modeKey: "refine" });
+                    combineElements([], deferredOutput);
+                }
             }
 
             setDeferredCompletionRevealModes((prev) => {
@@ -1911,9 +1866,9 @@ function Game() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isDeferredModeActive, insertedModeStateKey, modeOutputElementIds]);
 
-    // Expand zoneOccupants to 3 slots when Mix mode is active; collapse back to 2 otherwise.
+    // Expand zoneOccupants to 3 slots when a 3-slot mode (e.g. Mix) is active; collapse back to 2 otherwise.
     useEffect(() => {
-        if (insertedModeStateKey === "mix") {
+        if (combinationStationRulesEngine.usesThirdSlot(insertedModeStateKey)) {
             setZoneOccupants((prev) => {
                 if (prev.length >= 3) return prev;
                 return [prev[0] ?? null, prev[1] ?? null, null];
@@ -1949,23 +1904,6 @@ function Game() {
             };
         };
 
-        const getBrittleUses = (effect: SpellEffectConfig): number =>
-            Math.max(1, Math.floor(effect.amount ?? 1));
-
-        const isBrittleConsumedOnFormulaUse = (item?: DraggableItem): boolean =>
-            Boolean(item?.effects?.some((effect) => effect.kind === "brittle" && getBrittleUses(effect) <= 1));
-
-        const withBrittleFormulaConsumedIds = (
-            baseConsumedIds: number[],
-            items: Array<DraggableItem | undefined>,
-        ): number[] => {
-            const brittleConsumedIds = items
-                .filter((item): item is DraggableItem => Boolean(item) && isBrittleConsumedOnFormulaUse(item))
-                .map((item) => item.id);
-
-            return Array.from(new Set([...baseConsumedIds, ...brittleConsumedIds]));
-        };
-
         const consumedIds = zoneOccupants.filter(
             (occupantId): occupantId is number => occupantId !== null && !isModeSentinelId(occupantId),
         );
@@ -1976,6 +1914,14 @@ function Game() {
         if (occupantItems.some((item) => !item)) {
             return null;
         }
+
+        const modePreviewContext: ModePreviewContext = {
+            occupantItems,
+            consumedIds,
+            isModeSentinelId,
+            lookupCatalogElement: (letter) =>
+                elementCatalogRef.current.get(normalizeElementName(letter)),
+        };
 
         const currentStationStateKey = insertedModeStateKey;
         const currentEnhancementStateKey: CombinationStationActionStateKey | undefined =
@@ -2024,23 +1970,10 @@ function Game() {
             });
         };
 
-        // â”€â”€ Mix (3-slot): primary + secondary â†’ output of primary type + combined effects â”€â”€
-        if (currentStationStateKey === "mix" && zoneOccupants.length === 3) {
-            const [, primaryItem, secondaryItem] = occupantItems;
-            if (!primaryItem || !secondaryItem) return null;
-            return {
-                consumedIds,
-                letter: primaryItem.letter,
-                damage: primaryItem.damage,
-                energy: primaryItem.energy,
-                enhancements: mergeEnhancements(primaryItem.enhancements, "mix"),
-                level: primaryItem.level,
-                description: primaryItem.description,
-                type1: primaryItem.type1,
-                type2: primaryItem.type2,
-                effects: [...(primaryItem.effects ?? []), ...(secondaryItem.effects ?? [])],
-                category: primaryItem.category,
-            };
+        // ── Mix (3-slot): handled by the rules engine. Must run before the plasma
+        // rule below, which also keys off a 3-slot layout. ──
+        if (combinationStationRulesEngine.usesThirdSlot(currentStationStateKey) && zoneOccupants.length === 3) {
+            return combinationStationRulesEngine.buildPreview(currentStationStateKey, modePreviewContext);
         }
 
         if (zoneOccupants.length === 3) {
@@ -2121,115 +2054,20 @@ function Game() {
             return null;
         }
 
-        // â”€â”€ Incubate: element consumed now, output delivered after N battles â”€â”€
-        if (currentStationStateKey === "incubate") {
-            return {
-                consumedIds: withBrittleFormulaConsumedIds([rightItem.id], [leftItem, rightItem]),
-                letter: "?",
-                damage: 0,
-                level: rightItem.level,
-                description: "Time has mysterious effects on all things",
-                isDeferred: true,
-            };
-        }
-
-        // â”€â”€ Divide: split power + split effects across two outputs â”€â”€
-        if (currentStationStateKey === "divide") {
-            const halfPower = Math.ceil(rightItem.damage / 2);
-            const effects = rightItem.effects ?? [];
-            const topCount = Math.ceil(effects.length / 2);
-            const topEffects = effects.slice(0, topCount);
-            const bottomEffects = effects.slice(topCount);
-            const topEnergy = rightItem.energy !== undefined ? Math.ceil(rightItem.energy / 2) : undefined;
-            const bottomEnergy = rightItem.energy !== undefined ? Math.floor(rightItem.energy / 2) : undefined;
-            return {
-                consumedIds: withBrittleFormulaConsumedIds([rightItem.id], [leftItem, rightItem]),
-                letter: rightItem.letter,
-                damage: halfPower,
-                energy: topEnergy,
-                enhancements: mergeEnhancements(rightItem.enhancements, "divide"),
-                level: rightItem.level,
-                description: rightItem.description,
-                type1: rightItem.type1,
-                type2: rightItem.type2,
-                effects: topEffects,
-                category: rightItem.category,
-                secondOutput: {
-                    letter: rightItem.letter,
-                    damage: halfPower,
-                    energy: bottomEnergy,
-                    level: rightItem.level,
-                    description: rightItem.description,
-                    type1: rightItem.type1,
-                    type2: rightItem.type2,
-                    effects: bottomEffects,
-                    category: rightItem.category,
-                },
-            };
-        }
-
-        // â”€â”€ Refine: element consumed now, output delivered with power Ã— (counter Ã— 2) â”€â”€
-        if (currentStationStateKey === "refine") {
-            return {
-                consumedIds: withBrittleFormulaConsumedIds([rightItem.id], [leftItem, rightItem]),
-                letter: rightItem.letter,
-                damage: 0,
-                level: rightItem.level,
-                description: "Time has mysterious effects on all things",
-                isDeferred: true,
-            };
-        }
-
-        // â”€â”€ Duplicate: exact copy + fresh catalog spawn â”€â”€
-        if (currentStationStateKey === "duplicate") {
-            const catalogEntry = elementCatalogRef.current.get(normalizeElementName(rightItem.letter));
-            const freshElement = catalogEntry ?? {
-                letter: "Soul",
-                damage: 0,
-                energy: 0,
-                rank: 0,
-                level: 0,
-                description: "A soul element",
-                category: "element",
-                effects: undefined,
-            };
-            const duplicateConsumedIds = isModeSentinelId(leftItem.id) ? [] : [leftItem.id];
-            return {
-                consumedIds: withBrittleFormulaConsumedIds([...duplicateConsumedIds, rightItem.id], [leftItem, rightItem]),
-                letter: rightItem.letter,
-                damage: rightItem.damage,
-                energy: rightItem.energy,
-                enhancements: rightItem.enhancements,
-                level: rightItem.level,
-                description: rightItem.description,
-                type1: rightItem.type1,
-                type2: rightItem.type2,
-                effects: rightItem.effects,
-                category: rightItem.category,
-                secondOutput: {
-                    letter: freshElement.letter,
-                    damage: freshElement.damage,
-                    energy: freshElement.energy,
-                    level: freshElement.level,
-                    description: freshElement.description,
-                    type1: (freshElement as DraggableItem).type1,
-                    type2: (freshElement as DraggableItem).type2,
-                    effects: freshElement.effects,
-                    category: freshElement.category,
-                },
-            };
-        }
-
-        return null;
+        // ── Per-mode 2-slot previews (Incubate / Divide / Refine / Duplicate) are
+        // produced by the rules engine. Runs after the global soul+soul and unstable
+        // rules above so those keep priority. ──
+        return combinationStationRulesEngine.buildPreview(currentStationStateKey, modePreviewContext);
     }, [combinationStateEffectsLookup, getDraggableById, insertedModeStateKey, zoneOccupants]);
 
     const canCombine = previewCombination !== null;
     const firstSlotConnectorKey: string = activeModeElementKeyForState;
     const combinationStationState = insertedModeState;
     const hasActiveCombinationState = combinationStationState.key !== "idle";
-    const areBothCombinationSlotsFilled = insertedModeStateKey === "mix"
-        ? (zoneOccupants[1] ?? null) !== null && (zoneOccupants[2] ?? null) !== null
-        : zoneOccupants[0] !== null && zoneOccupants[1] !== null;
+    const areBothCombinationSlotsFilled = combinationStationRulesEngine.areInputSlotsFilled(
+        insertedModeStateKey,
+        zoneOccupants,
+    );
     const isDuplicateCombinationReady = combinationStationState.key === "duplicate"
         && areBothCombinationSlotsFilled;
     const isNonDuplicateCombinationReady = hasActiveCombinationState
