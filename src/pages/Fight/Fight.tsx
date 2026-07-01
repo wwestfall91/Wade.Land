@@ -34,7 +34,7 @@ import {
 } from "../../combat/statusMath";
 import EnemyStage, { type EnemyDamagePopup } from "../../components/EnemyStage";
 import ElementDetailsTooltip from "../../components/ElementDetailsTooltip";
-import { usePlayer, type RewardElement } from "../../context/PlayerContext";
+import { usePlayer, type ElementalResistanceKey, type RewardElement } from "../../context/PlayerContext";
 import FloatingTooltip from "../Game/FloatingTooltip";
 import { ELEMENT_SPELL_COLORS, type ElementSpellColor } from "../../styles/elementThemes";
 import ElementIcon from "../../components/ElementIcon";
@@ -80,6 +80,7 @@ const wait = (ms: number) => new Promise<void>((resolve) => {
 });
 
 const SPELL_TYPE_COLORS = ELEMENT_SPELL_COLORS;
+const RESISTANCE_ELEMENT_KEYS: ReadonlySet<ElementalResistanceKey> = new Set(["fire", "water", "earth", "air"]);
 
 type FightEnemy = {
     name: string;
@@ -145,6 +146,7 @@ function Fight() {
         burnMultiplier,
         maxHpMultiplier,
         permanentMaxHpReduction,
+        elementalResistances,
         setBattleEnergyCarryover: setBattleEnergyCarryoverFromContext,
         spellSlots,
     } = usePlayer();
@@ -366,6 +368,18 @@ function Fight() {
     const formatTypeLabel = (value: string) => value.length > 0 ? value.charAt(0).toUpperCase() + value.slice(1) : value;
     const toTypeClass = (value: string) =>
         `type-${value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+    const getResistancePercentForAttackTypes = (attackTypes: string[]) => {
+        const resistanceValues = attackTypes
+            .filter((type): type is ElementalResistanceKey => RESISTANCE_ELEMENT_KEYS.has(type as ElementalResistanceKey))
+            .map((type) => elementalResistances[type] ?? 0);
+
+        if (resistanceValues.length === 0) {
+            return 0;
+        }
+
+        const total = resistanceValues.reduce((sum, value) => sum + value, 0);
+        return total / resistanceValues.length;
+    };
     const pickEnemyAttack = () => {
         const attack = enemy.elements[Math.floor(Math.random() * enemy.elements.length)] ?? null;
         return attack
@@ -874,8 +888,11 @@ function Fight() {
             const baseHitDamage = Math.max(0, attack.damage + soakBonus - soakPenalty + freezeBonus - floatEarthReduction + floatLightningBonus);
             const burnBonus = isFireAttack ? getBurnFireBonus(playerBurnStacks, baseHitDamage) : 0;
             const bonusAdjustedDamage = baseHitDamage + burnBonus;
-            const absorbedDamage = Math.min(currentPlayerShield, bonusAdjustedDamage);
-            const remainingDamage = Math.max(0, bonusAdjustedDamage - absorbedDamage);
+            const resistancePercent = getResistancePercentForAttackTypes(attackTypes);
+            const resistanceMultiplier = Math.max(0, 1 - (resistancePercent / 100));
+            const resistedDamage = Math.max(0, Math.round(bonusAdjustedDamage * resistanceMultiplier));
+            const absorbedDamage = Math.min(currentPlayerShield, resistedDamage);
+            const remainingDamage = Math.max(0, resistedDamage - absorbedDamage);
 
             if (absorbedDamage > 0) {
                 currentPlayerShield = Math.max(0, currentPlayerShield - absorbedDamage);

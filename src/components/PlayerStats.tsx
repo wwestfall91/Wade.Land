@@ -1,6 +1,7 @@
 import { type CSSProperties } from "react";
 import "./PlayerStats.scss";
 import { usePlayer, type PlayerStatuses } from "../context/PlayerContext";
+import ElementIcon from "./ElementIcon";
 import soulIcon from "../assets/icons/Soul.png";
 import energizeIcon from "../assets/icons/Energize.png";
 import {
@@ -9,6 +10,8 @@ import {
     SOAK_FIRE_PENALTY_PER_STACK,
     SOAK_LIGHTNING_BONUS_PER_STACK,
 } from "../combat/statusMath";
+
+const RESISTANCE_ORDER = ["fire", "water", "earth", "air"] as const;
 
 type PlayerStatsProps = {
     playerName?: string;
@@ -31,7 +34,7 @@ function PlayerStats({
     statuses,
     className,
 }: PlayerStatsProps) {
-    const { maxHpMultiplier, permanentMaxHpReduction } = usePlayer();
+    const { maxHpMultiplier, permanentMaxHpReduction, elementalResistances } = usePlayer();
     const computedMaxHp = Math.max(1, Math.round(PLAYER_BASE_HP * maxHpMultiplier) - permanentMaxHpReduction);
     const playerMaxHp = Math.max(1, maxHp ?? computedMaxHp);
     const hpFillPercent = Math.max(0, Math.min(100, (hp / playerMaxHp) * 100));
@@ -68,6 +71,31 @@ function PlayerStats({
                 </div>
                 <div className="player-hp-bar" role="progressbar" aria-valuemin={0} aria-valuemax={playerMaxHp} aria-valuenow={hp}>
                     <div className="player-hp-fill" />
+                </div>
+            </div>
+
+            <div className="player-resistance-section" aria-label="Elemental resistances">
+                <div className="player-resistance-header">
+                    <span className="player-resistance-title">RESISTANCES</span>
+                </div>
+                <div className="player-resistances" aria-label="Elemental resistances">
+                    {RESISTANCE_ORDER.map((element) => {
+                        const value = elementalResistances[element] ?? 0;
+                        const normalizedValue = Number.isFinite(value) ? Math.round(value) : 0;
+                        const resistanceClass = normalizedValue > 0
+                            ? "is-positive"
+                            : normalizedValue < 0
+                                ? "is-negative"
+                                : "is-neutral";
+                        const prefix = normalizedValue > 0 ? "+" : "";
+
+                        return (
+                            <div key={element} className={`player-resistance-item player-resistance-item--${element}`}>
+                                <ElementIcon name={element} className="player-resistance-icon" />
+                                <span className={`player-resistance-value ${resistanceClass}`}>{`${prefix}${normalizedValue}%`}</span>
+                            </div>
+                        );
+                    })}
                 </div>
             </div>
             {statuses && (statuses.burn || statuses.soak || statuses.freeze || statuses.energize || statuses.shield > 0) ? (

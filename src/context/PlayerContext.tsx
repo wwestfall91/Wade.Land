@@ -85,6 +85,10 @@ export type PlayerStatuses = {
 
 export type CombinationModeKey = "water" | "fire" | "earth" | "air" | "soul";
 
+export type ElementalResistanceKey = "fire" | "water" | "earth" | "air";
+
+export type ElementalResistances = Record<ElementalResistanceKey, number>;
+
 const DEFAULT_PLAYER_STATUSES: PlayerStatuses = {
     burn: null,
     soak: null,
@@ -93,6 +97,13 @@ const DEFAULT_PLAYER_STATUSES: PlayerStatuses = {
     thorns: null,
     float: null,
     shield: 0,
+};
+
+const DEFAULT_ELEMENTAL_RESISTANCES: ElementalResistances = {
+    fire: 0,
+    water: 0,
+    earth: 0,
+    air: 0,
 };
 
 type PlayerContextValue = {
@@ -141,6 +152,8 @@ type PlayerContextValue = {
     spellSlots: (number | null)[];
     setSpellSlotElement: (slotIndex: number, elementId: number | null) => void;
     addSpellSlot: () => void;
+    elementalResistances: ElementalResistances;
+    setElementalResistance: (element: ElementalResistanceKey, percent: number) => void;
 };
 
 const DEFAULT_PLAYER_PROGRESS: PlayerProgress = {
@@ -231,6 +244,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
     const [permanentMaxHpReduction, setPermanentMaxHpReduction] = useState(0);
     const [sealedCombinationModes, setSealedCombinationModes] = useState<Set<CombinationModeKey>>(new Set());
     const [spellSlots, setSpellSlots] = useState<(number | null)[]>([null, null, null]);
+    const [elementalResistances, setElementalResistances] = useState<ElementalResistances>(DEFAULT_ELEMENTAL_RESISTANCES);
 
     useEffect(() => {
         fetch("/levels.xlsx")
@@ -406,6 +420,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
         setPermanentMaxHpReduction(0);
         setDiscoveredCraftedLetters(new Set());
         setSealedCombinationModes(new Set());
+        setElementalResistances(DEFAULT_ELEMENTAL_RESISTANCES);
     }, []);
 
     const addDiscoveredCraftedLetter = useCallback((letter: string) => {
@@ -460,6 +475,13 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
         setSpellSlots((previous) => [...previous, null]);
     }, []);
 
+    const setElementalResistance = useCallback((element: ElementalResistanceKey, percent: number) => {
+        setElementalResistances((previous) => ({
+            ...previous,
+            [element]: Number.isFinite(percent) ? percent : previous[element],
+        }));
+    }, []);
+
     const contextValue = useMemo(
         () => ({
             player,
@@ -506,6 +528,8 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             spellSlots,
             setSpellSlotElement,
             addSpellSlot,
+            elementalResistances,
+            setElementalResistance,
         }),
         [
             addSouls,
@@ -551,6 +575,8 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             spellSlots,
             setSpellSlotElement,
             addSpellSlot,
+            elementalResistances,
+            setElementalResistance,
         ],
     );
 

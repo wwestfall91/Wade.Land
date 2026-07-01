@@ -3979,14 +3979,15 @@ function Game() {
 
                             <div className="spell-slots-header">
                                 <span className="spell-slots-label">SPELL SLOTS</span>
-                                <button
+                                <div className="spell-slots-info">Add elements and spells here to use them in battle!</div>
+                                {/* <button
                                     className="spell-slots-add-button"
                                     onClick={addSpellSlot}
                                     title="Add a new spell slot"
                                     aria-label="Add a new spell slot"
                                 >
                                     +
-                                </button>
+                                </button> */}
                             </div>
                         </div>
                     </div>

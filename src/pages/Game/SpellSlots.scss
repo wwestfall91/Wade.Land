@@ -8,17 +8,26 @@
 
 .spell-slots-header {
     display: flex;
+    flex-direction: column;
     align-items: center;
     gap: 0.5rem;
     flex-shrink: 0;
 }
 
 .spell-slots-label {
-    font-size: 0.7rem;
+    font-size: 0.8rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     color: #b8c5d6;
+}
+
+.spell-slots-info {
+    font-size: 0.6rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    color: #818b97;
+    text-align: center;
 }
 
 .spell-slots-add-button {

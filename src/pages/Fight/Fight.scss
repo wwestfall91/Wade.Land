@@ -315,9 +315,8 @@
         align-items: center;
         justify-content: start;
         width: 7rem;
-        height: 7rem;
-        gap:8px;
-        padding: 0.4rem 0.3rem 2.8rem;
+        gap: 6px;
+        padding: 0.4rem 0.5rem 0.5rem;
         border-radius: 8px;
         border: 2px solid rgba(220, 230, 255, 0.7);
         background: var(--spell-slot-bg, #ffffff);
@@ -447,18 +446,16 @@
     .spell-card-badges {
         display: flex;
         justify-content: center;
-        align-items: flex-end;
+        align-items: stretch;
         gap: 0.3rem;
-        pointer-events: none;
-        width:5rem;
+        width: 100%;
+        margin-top:5px;
     }
 
     .spell-card-damage {
-        position: relative;
-        bottom: auto;
-        right: auto;
-        min-width: 2.4rem;
-        height: 2.4rem;
+        flex: 1;
+        min-width: 0;
+        height: 2.2rem;
         padding: 0 0.2rem;
         border-radius: 5px;
         display: inline-flex;
@@ -517,11 +514,9 @@
     }
 
     .spell-card-shield {
-        position: relative;
-        bottom: auto;
-        left: auto;
-        min-width: 2.4rem;
-        height: 2.4rem;
+        flex: 1;
+        min-width: 0;
+        height: 2.2rem;
         padding: 0 0.2rem;
         border-radius: 5px;
         display: inline-flex;
