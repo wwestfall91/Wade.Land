@@ -12,6 +12,13 @@ const spellImageMap = new Map<string, string>(
     }),
 );
 
+/** Elements with no own icon: use their base element's icon rendered in greyscale. */
+const GREYSCALE_FALLBACKS: Record<string, string> = {
+    ash: "fire",
+    oil: "water",
+    dust: "air",
+};
+
 type ElementIconProps = {
     name: string;
     className?: string;
@@ -36,6 +43,21 @@ function ElementIcon({ name, className, alt }: ElementIconProps) {
             />
         );
     }
+
+    const greyscaleFallbackKey = GREYSCALE_FALLBACKS[normalizedName];
+    const fallbackUrl = greyscaleFallbackKey ? spellImageMap.get(greyscaleFallbackKey) : undefined;
+    if (fallbackUrl) {
+        return (
+            <img
+                src={fallbackUrl}
+                alt={alt ?? name}
+                className={`element-icon${className ? ` ${className}` : ""}`}
+                style={{ filter: "grayscale(1)" }}
+                draggable={false}
+            />
+        );
+    }
+
     return <>{name}</>;
 }
 

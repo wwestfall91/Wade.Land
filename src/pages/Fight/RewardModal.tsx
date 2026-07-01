@@ -112,7 +112,12 @@ function RewardModal({ soulsGained, rewardElements, isChestReward = false, chest
                                     onMouseLeave={() => setHoveredLetter(current => (current === element.letter ? null : current))}
                                 >
                                     <span className="reward-element-letter"><ElementIcon name={element.letter} /></span>
-                                    <span className="reward-element-damage">{element.damage} DMG</span>
+                                    <span className="reward-element-damage">
+                                        ⚔ {element.damage}
+                                        {(element.shield ?? 0) > 0 ? (
+                                            <span className="reward-element-shield-stat"> · 🛡 {element.shield}</span>
+                                        ) : null}
+                                    </span>
                                 </button>
                             ))
                         )}

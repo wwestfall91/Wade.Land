@@ -39,6 +39,7 @@ export type PlayerElement = {
     id: number;
     letter: string;
     damage: number;
+    shield?: number;
     energy?: number;
     enhancements?: ElementEnhancements;
     rank: number;
@@ -137,6 +138,9 @@ type PlayerContextValue = {
     unsealCombinationMode: (mode: CombinationModeKey) => void;
     recordElementUses: (counts: Record<number, number>) => void;
     upgradeElement: (elementId: number, newLevel: number, effect: SpellEffectConfig) => void;
+    spellSlots: (number | null)[];
+    setSpellSlotElement: (slotIndex: number, elementId: number | null) => void;
+    addSpellSlot: () => void;
 };
 
 const DEFAULT_PLAYER_PROGRESS: PlayerProgress = {
@@ -226,6 +230,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
     const [battleEnergyCarryover, setBattleEnergyCarryoverState] = useState(0);
     const [permanentMaxHpReduction, setPermanentMaxHpReduction] = useState(0);
     const [sealedCombinationModes, setSealedCombinationModes] = useState<Set<CombinationModeKey>>(new Set());
+    const [spellSlots, setSpellSlots] = useState<(number | null)[]>([null, null, null]);
 
     useEffect(() => {
         fetch("/levels.xlsx")
@@ -443,6 +448,18 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
         );
     }, []);
 
+    const setSpellSlotElement = useCallback((slotIndex: number, elementId: number | null) => {
+        setSpellSlots((previous) => {
+            const updated = [...previous];
+            updated[slotIndex] = elementId;
+            return updated;
+        });
+    }, []);
+
+    const addSpellSlot = useCallback(() => {
+        setSpellSlots((previous) => [...previous, null]);
+    }, []);
+
     const contextValue = useMemo(
         () => ({
             player,
@@ -486,6 +503,9 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             addDiscoveredCraftedLetter,
             recordElementUses,
             upgradeElement,
+            spellSlots,
+            setSpellSlotElement,
+            addSpellSlot,
         }),
         [
             addSouls,
@@ -528,6 +548,9 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             addDiscoveredCraftedLetter,
             recordElementUses,
             upgradeElement,
+            spellSlots,
+            setSpellSlotElement,
+            addSpellSlot,
         ],
     );
 

@@ -10,6 +10,7 @@ export type DraggableItem = {
     id: number;
     letter: string;
     damage: number;
+    shield?: number;
     energy?: number;
     enhancements?: ElementEnhancements;
     rank: number;
@@ -26,6 +27,7 @@ export type DraggableItem = {
 export type PreviewSecondOutput = {
     letter: string;
     damage: number;
+    shield?: number;
     energy?: number;
     rank?: number;
     level: number;
@@ -40,6 +42,7 @@ export type PreviewCombination = {
     consumedIds: number[];
     letter: string;
     damage: number;
+    shield?: number;
     isDamageEnhanced?: boolean;
     baseDamageBeforeEnhance?: number;
     isCombusted?: boolean;

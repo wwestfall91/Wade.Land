@@ -16,6 +16,7 @@ type Props = {
 	id: number;
 	letter: string;
 	damage: number;
+	shield?: number;
 	energy?: number;
 	enhancements?: ElementEnhancements;
 	description: string;
@@ -42,6 +43,7 @@ function Draggable({
 	id,
 	letter,
 	damage,
+	shield,
 	energy,
 	enhancements,
 	description,
@@ -565,6 +567,7 @@ function Draggable({
 				elementDetails={{
 					letter,
 					damage,
+					shield,
 					energy,
 					enhancements,
 					description,

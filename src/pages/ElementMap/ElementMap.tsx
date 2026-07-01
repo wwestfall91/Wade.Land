@@ -12,6 +12,7 @@ import "./ElementMap.scss";
 type ElementNode = {
     letter: string;
     damage: number;
+    shield?: number;
     energy?: number;
     level: number;
     description: string;
@@ -126,6 +127,7 @@ export default function ElementMap() {
                     .map((row) => ({
                         letter: String(row.name ?? row.Name ?? "").trim(),
                         damage: Number(row.damage ?? row.Damage ?? 0) || 0,
+                        shield: Number(row.shield ?? row.Shield ?? 0) || 0,
                         energy: Math.max(0, Number(row.energy ?? row.Energy ?? 0) || 0),
                         level: (() => {
                             const raw = row.Level ?? row.level;

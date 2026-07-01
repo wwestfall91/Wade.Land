@@ -15,6 +15,7 @@ import {
 import { type MonsterReward } from "../../combat/rewardFactory";
 import FloatingTooltip from "./FloatingTooltip";
 import ComparisonTooltip from "./ComparisonTooltip";
+import PreviewOutputTooltip from "./PreviewOutputTooltip";
 import CombinationStation, {
     COMBINATION_STATE_WORKBOOK_PATHS,
     getCombinationStationState,
@@ -46,6 +47,7 @@ import { LevelUpModal } from "../Fight/LevelUpModal";
 import soulIcon from "../../assets/icons/Soul.png";
 import chestIcon from "../../assets/icons/Chest.png";
 import "./Game.scss";
+import "./SpellSlots.scss";
 
 // TODO: Add special effects (Healing, burn, multi-hit)
 // TODO: Balance the current state to be fun
@@ -59,6 +61,8 @@ type ElementRow = {
     ["Element 2"]?: string;
     damage?: number | string;
     Damage?: number | string;
+    shield?: number | string;
+    Shield?: number | string;
     energy?: number | string;
     Energy?: number | string;
     Rank?: number | string;
@@ -255,6 +259,7 @@ function Game() {
     const location = useLocation();
     const {
         player: playerProgress,
+        player,
         playerName,
         setPlayerName,
         combineElements,
@@ -283,6 +288,9 @@ function Game() {
         levels,
         recordElementUses,
         upgradeElement,
+        spellSlots,
+        setSpellSlotElement,
+        addSpellSlot,
     } = usePlayer();
     const gameRef = useRef<HTMLDivElement | null>(null);
     const elementStartRef = useRef<HTMLDivElement | null>(null);
@@ -295,6 +303,7 @@ function Game() {
     const machineSlotRef = useRef<HTMLDivElement | null>(null);
     const previewRef = useRef<HTMLDivElement | null>(null);
     const previewRef2 = useRef<HTMLDivElement | null>(null);
+    const spellSlotRefs = useRef<Array<React.RefObject<HTMLDivElement>>>([]);
 
     const [draggables, setDraggables] = useState<DraggableItem[]>([]);
     const [combinationStateEffectsLookup, setCombinationStateEffectsLookup] = useState<CombinationStateEffectsLookup>({});
@@ -341,6 +350,7 @@ function Game() {
     const zoneOccupantsRef = useRef<Array<number | null>>([null, null]);
     const [returnHomeVersions, setReturnHomeVersions] = useState<Record<number, number>>({});
     const [plasmaForcedSnap, setPlasmaForcedSnap] = useState<{ zone: number; version: number } | null>(null);
+    const [modeTransformForcedSnap, setModeTransformForcedSnap] = useState<{ id: number; version: number } | null>(null);
     const [isPreviewDragging, setIsPreviewDragging] = useState(false);
     const [isPreviewHovered, setIsPreviewHovered] = useState(false);
     const [isPreviewTooltipHovered, setIsPreviewTooltipHovered] = useState(false);
@@ -484,6 +494,7 @@ function Game() {
     const previewTooltipGraceTimeoutRef = useRef<number | null>(null);
     const introChosenNameRef = useRef("");
     const nextId = useRef(1);
+    const pendingModeTransformRef = useRef<string | null>(null);
     const soulFlightIdRef = useRef(1);
     const elementCatalogRef = useRef<Map<string, RewardElement>>(new Map());
     const pendingDropSpawnByIdRef = useRef<Map<number, Position>>(new Map());
@@ -857,6 +868,7 @@ function Game() {
                     elementPreview: {
                         letter: element.letter,
                         damage: element.damage,
+                        shield: element.shield,
                         energy: element.energy,
                         enhancements: element.enhancements,
                         rank: element.rank,
@@ -900,6 +912,11 @@ function Game() {
         ...activeDropZoneRefs,
         ...(isEnhanceStationUnlocked ? [enhanceSlotRef] : []),
         machineSlotRef,
+    ];
+    const spellSlotStartIndex = allDropZoneRefs.length;
+    const allDropZoneRefsWithSpellSlots = [
+        ...allDropZoneRefs,
+        ...spellSlotRefs.current,
     ];
 
     const getDraggableById = useCallback((draggableId: number | null) => {
@@ -1207,6 +1224,7 @@ function Game() {
                     element1: (row["Element 1"] ?? "").trim(),
                     element2: (row["Element 2"] ?? "").trim(),
                     damage: Number(row.damage ?? row.Damage ?? 0) || 0,
+                    shield: Number(row.shield ?? row.Shield ?? 0) || 0,
                     energy: Math.max(0, Number(row.energy ?? row.Energy ?? 0) || 0),
                     rank: (() => {
                             const raw = row.Rank ?? row.rank;
@@ -1246,6 +1264,7 @@ function Game() {
                     return {
                         letter: row.name,
                         damage: row.damage,
+                        shield: row.shield,
                         energy: row.energy,
                         rank: row.rank,
                         level: row.level,
@@ -1262,6 +1281,7 @@ function Game() {
                 parsedRows.map((row) => [normalizeElementName(row.name), {
                     letter: row.name,
                     damage: row.damage,
+                    shield: row.shield,
                     energy: row.energy,
                     rank: row.rank,
                     level: row.level,
@@ -1504,6 +1524,7 @@ function Game() {
                         ...existing,
                         letter: element.letter,
                         damage: element.damage,
+                        shield: element.shield,
                         energy: element.energy,
                         enhancements: element.enhancements,
                         rank: element.rank,
@@ -1794,6 +1815,57 @@ function Game() {
         }, MODE_COLLAPSE_ANIMATION_MS);
     }, [isModeCollapsing, isModeCollapseAnimating, modeOutputElementIds]);
 
+    // When the mode slot finishes collapsing, spawn the transformed element into zone 0.
+    useEffect(() => {
+        if (isModeCollapsing) return;
+        const modeKey = pendingModeTransformRef.current;
+        if (!modeKey) return;
+        pendingModeTransformRef.current = null;
+
+        const MODE_ELEMENT_TRANSFORMS: Partial<Record<string, string>> = {
+            fire: "Ash",
+            water: "Oil",
+            air: "Dust",
+            earth: "Sand",
+        };
+        const transformedName = MODE_ELEMENT_TRANSFORMS[modeKey];
+        if (!transformedName) return;
+
+        const catalogEntry = elementCatalogRef.current.get(normalizeElementName(transformedName));
+        const newId = nextId.current++;
+        const spawnPos = getSpawnPosition(playerProgress.elements.length);
+        const newElement = {
+            id: newId,
+            letter: transformedName,
+            damage: catalogEntry?.damage ?? 0,
+            shield: catalogEntry?.shield,
+            energy: catalogEntry?.energy,
+            rank: catalogEntry?.rank ?? 0,
+            level: catalogEntry?.level ?? 1,
+            description: catalogEntry?.description ?? `${transformedName} element`,
+            type1: catalogEntry?.type1,
+            type2: catalogEntry?.type2,
+            effects: catalogEntry?.effects,
+            category: catalogEntry?.category ?? "element",
+            initialPosition: spawnPos,
+        };
+
+        combineElements([], newElement);
+        setDraggables((prev) => [...prev, newElement]);
+        setZoneOccupants((prev) => {
+            const next = [...prev];
+            next[0] = newId;
+            return next;
+        });
+        setModeTransformForcedSnap({ id: newId, version: Date.now() });
+        // Clear after one frame so the snap fires exactly once and the element
+        // becomes freely draggable immediately afterwards.
+        window.requestAnimationFrame(() => {
+            setModeTransformForcedSnap(null);
+        });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isModeCollapsing, combineElements]);
+
     useEffect(() => {
         if (selectedModeTabElementKey === null) {
             return;
@@ -1975,7 +2047,7 @@ function Game() {
                 ...(otherItem.effects ?? []),
             ];
             const unstableResolved = resolveCombinationPreviewFromEffects(
-                { damage: otherItem.damage, energy: otherItem.energy, effects: unstableItem.effects },
+                { damage: otherItem.damage, shield: otherItem.shield, energy: otherItem.energy, effects: unstableItem.effects },
                 allUnstableInputEffects,
             );
 
@@ -1983,6 +2055,7 @@ function Game() {
                 consumedIds: withBrittleFormulaConsumedIds(consumedIds, [unstableItem, otherItem]),
                 letter: `${otherItem.letter}+`,
                 damage: unstableResolved.damage,
+                shield: unstableResolved.shield,
                 energy: unstableResolved.energy,
                 enhancements: mergeEnhancements(secondInputItem?.enhancements, currentEnhancementStateKey),
                 level: otherItem.level,
@@ -2038,6 +2111,7 @@ function Game() {
                 consumedIds: withBrittleFormulaConsumedIds(consumedIds, [leftItem, middleItem, rightItem]),
                 letter: "Unstable Element",
                 damage: plasmaResolved.damage,
+                shield: plasmaResolved.shield,
                 energy: plasmaResolved.energy,
                 enhancements: mergeEnhancements(middleItem.enhancements, currentEnhancementStateKey),
                 level: 2,
@@ -2082,6 +2156,55 @@ function Game() {
         // rules above so those keep priority. ──
         return combinationStationRulesEngine.buildPreview(currentStationStateKey, modePreviewContext);
     }, [combinationStateEffectsLookup, getDraggableById, insertedModeStateKey, zoneOccupants]);
+
+    /** Convert a PreviewCombination to the ElementDetails shape used by both tooltip types. */
+    const previewToElementDetails = (pc: PreviewCombination): import("./FloatingTooltip").ElementDetails => ({
+        letter: pc.letter,
+        damage: pc.damage,
+        shield: pc.shield,
+        isDamageEnhanced: pc.isDamageEnhanced,
+        baseDamageBeforeEnhance: pc.baseDamageBeforeEnhance,
+        isCombusted: pc.isCombusted,
+        baseDamageBeforeCombust: pc.baseDamageBeforeCombust,
+        energy: pc.energy,
+        baseEnergyBeforeCreation: pc.baseEnergyBeforeCreation,
+        enhancements: pc.enhancements,
+        description: pc.description,
+        type1: pc.type1,
+        type2: pc.type2,
+        effects: pc.effects,
+        level: pc.level,
+        category: pc.category,
+    });
+
+    /** Convert a DraggableItem to the ElementDetails shape used by both tooltip types. */
+    const draggableToElementDetails = (d: DraggableItem): import("./FloatingTooltip").ElementDetails => ({
+        letter: d.letter,
+        damage: d.damage,
+        shield: d.shield,
+        energy: d.energy,
+        enhancements: d.enhancements,
+        description: d.description,
+        type1: d.type1,
+        type2: d.type2,
+        effects: d.effects,
+        level: d.level,
+        category: d.category,
+    });
+
+    /** Convert a PreviewSecondOutput to the ElementDetails shape used by both tooltip types. */
+    const secondOutputToElementDetails = (so: import("./combinationTypes").PreviewSecondOutput): import("./FloatingTooltip").ElementDetails => ({
+        letter: so.letter,
+        damage: so.damage,
+        shield: so.shield,
+        energy: so.energy,
+        description: so.description,
+        type1: so.type1,
+        type2: so.type2,
+        effects: so.effects,
+        level: so.level,
+        category: so.category,
+    });
 
     const canCombine = previewCombination !== null;
     const firstSlotConnectorKey: string = activeModeElementKeyForState;
@@ -2146,6 +2269,8 @@ function Game() {
                 modeUseCountsRef.current = { ...modeUseCountsRef.current, [modeKey]: 0 };
                 setIsModeCollapsing(true);
                 setModeUsesRemaining(0);
+                // Store the modeKey so the slot-open effect can spawn the transformed element
+                pendingModeTransformRef.current = modeKey;
             } else {
                 setModeUsesRemaining(3 - nextCount);
             }
@@ -2252,6 +2377,7 @@ function Game() {
                 id: nextId.current++,
                 letter: previewCombination.letter,
                 damage: previewCombination.damage,
+                shield: previewCombination.shield,
                 energy: previewCombination.energy,
                 enhancements: previewCombination.enhancements,
                 rank: previewCombination.rank ?? 0,
@@ -2316,6 +2442,7 @@ function Game() {
             id: nextId.current,
             letter: previewCombination.letter,
             damage: previewCombination.damage,
+            shield: previewCombination.shield,
             energy: previewCombination.energy,
             enhancements: previewCombination.enhancements,
             rank: previewCombination.rank ?? 0,
@@ -2797,6 +2924,27 @@ function Game() {
     );
 
     const handleSnapChange = (draggableId: number, zoneIndex: number | null) => {
+        // Clear from spell slots whenever this element moves
+        for (let i = 0; i < spellSlots.length; i++) {
+            if (spellSlots[i] === draggableId) {
+                setSpellSlotElement(i, null);
+                break;
+            }
+        }
+
+        // If dropping onto a spell slot, assign it and stop
+        if (zoneIndex !== null && zoneIndex >= spellSlotStartIndex) {
+            const slotLocalIndex = zoneIndex - spellSlotStartIndex;
+            setSpellSlotElement(slotLocalIndex, draggableId);
+            // Also clear from combination zones
+            setZoneOccupants((previous) => normalizeZoneOccupants(
+                previous.map((occupantId) => (occupantId === draggableId ? null : occupantId)),
+            ));
+            setEnhanceSlotOccupantId((previous) => (previous === draggableId ? null : previous));
+            setMachineSlotOccupantId((previous) => (previous === draggableId ? null : previous));
+            return;
+        }
+
         if (Object.values(modeOutputElementIds).some((ids) => ids?.includes(draggableId))) {
             setModeOutputElementIds((previous) => {
                 const next: Partial<Record<string, number[]>> = {};
@@ -2886,6 +3034,14 @@ function Game() {
         const draggable = draggables.find((item) => item.id === draggableId);
         if (!draggable) {
             return false;
+        }
+
+        // Spell slots: any element can snap to a spell slot
+        if (zoneIndex >= spellSlotStartIndex) {
+            const slotLocalIndex = zoneIndex - spellSlotStartIndex;
+            if (slotLocalIndex >= spellSlots.length) return false;
+            // Allow if the slot is empty or already holds this element
+            return spellSlots[slotLocalIndex] === null || spellSlots[slotLocalIndex] === draggableId;
         }
 
         // Block the logic panel slot while a deferred job is processing for this mode.
@@ -3528,6 +3684,7 @@ function Game() {
                     id={draggable.id}
                     letter={draggable.letter}
                     damage={draggable.damage}
+                    shield={draggable.shield}
                     energy={draggable.energy}
                     enhancements={draggable.enhancements}
                     description={draggable.description}
@@ -3539,12 +3696,16 @@ function Game() {
                     level={draggable.level}
                     category={draggable.category}
                     containerRef={gameRef}
-                    dropZoneRefs={allDropZoneRefs}
+                    dropZoneRefs={allDropZoneRefsWithSpellSlots}
                     initialPosition={draggable.initialPosition}
                     onSnapChange={handleSnapChange}
                     canSnapToZone={canSnapToZone}
                     isNewFromChest={newChestElementIds.has(draggable.id)}
-                    forcedSnapZone={isPlasmaName(draggable.letter) ? plasmaForcedSnap : null}
+                    forcedSnapZone={
+                        draggable.id === modeTransformForcedSnap?.id
+                            ? { zone: 0, version: modeTransformForcedSnap.version }
+                            : isPlasmaName(draggable.letter) ? plasmaForcedSnap : null
+                    }
                     returnHomeVersion={returnHomeVersions[draggable.id] ?? 0}
                 />
             ))}
@@ -3582,85 +3743,35 @@ function Game() {
                             ? <span className="drag-preview__deferred-label">?</span>
                             : <ElementIcon name={previewCombination.letter} />}
                     </div>
-                    <FloatingTooltip
+                    <PreviewOutputTooltip
                         anchorElement={previewRef.current}
-                        open={isPreviewTooltipOpen && !(slotTwoPreviewDraggable && (isOutputHovered || isPreviewHovered || isCombineButtonHovered))}
-                        selected={isPreviewTooltipPinned}
-                        className={`drag-description-popup${isPreviewTooltipPinned ? " is-pinned" : ""}`}
-                        interactive={isPreviewAltHeld || isPreviewTooltipPinned}
+                        afterDetails={previewToElementDetails(previewCombination)}
+                        beforeDetails={slotTwoPreviewDraggable ? draggableToElementDetails(slotTwoPreviewDraggable) : null}
+                        showComparison={Boolean(slotTwoPreviewDraggable) && (isOutputHovered || isPreviewHovered || isCombineButtonHovered)}
+                        isOpen={isPreviewTooltipOpen}
+                        isSelected={isPreviewTooltipPinned}
+                        isInteractive={isPreviewAltHeld || isPreviewTooltipPinned}
                         onTooltipMouseEnter={handlePreviewTooltipMouseEnter}
                         onTooltipMouseLeave={handlePreviewTooltipMouseLeave}
-                        clampHorizontal={false}
+                        className={`drag-description-popup${isPreviewTooltipPinned ? " is-pinned" : ""}`}
+                        changedKeys={changedKeys}
                         typeMultipliers={typeMultipliers}
-                        {...(previewCombination.isDeferred
-                            ? { children: <p className="deferred-tooltip-message">{previewCombination.description}</p> }
-                            : {
-                                elementDetails: {
-                                    letter: previewCombination.letter,
-                                    damage: previewCombination.damage,
-                                    energy: previewCombination.energy,
-                                    baseEnergyBeforeCreation: previewCombination.baseEnergyBeforeCreation,
-                                    enhancements: previewCombination.enhancements,
-                                    isDamageEnhanced: previewCombination.isDamageEnhanced,
-                                    baseDamageBeforeEnhance: previewCombination.baseDamageBeforeEnhance,
-                                    isCombusted: previewCombination.isCombusted,
-                                    baseDamageBeforeCombust: previewCombination.baseDamageBeforeCombust,
-                                    description: previewCombination.description,
-                                    type1: previewCombination.type1,
-                                    type2: previewCombination.type2,
-                                    effects: previewCombination.effects,
-                                    category: previewCombination.category,
-                                },
-                            }
-                        )}
-                    />
-                    {slotTwoPreviewDraggable && (isOutputHovered || isPreviewHovered || isCombineButtonHovered) ? (
-                        <ComparisonTooltip
-                            anchorElement={previewRef.current}
-                            open={true}
-                            beforeElement={{
-                                letter: slotTwoPreviewDraggable.letter,
-                                damage: slotTwoPreviewDraggable.damage,
-                                energy: slotTwoPreviewDraggable.energy,
-                                enhancements: slotTwoPreviewDraggable.enhancements,
-                                description: slotTwoPreviewDraggable.description,
-                                type1: slotTwoPreviewDraggable.type1,
-                                type2: slotTwoPreviewDraggable.type2,
-                                effects: slotTwoPreviewDraggable.effects,
-                                level: slotTwoPreviewDraggable.level,
-                                category: slotTwoPreviewDraggable.category,
-                            }}
-                            afterElement={{
-                                letter: previewCombination.letter,
-                                damage: previewCombination.damage,
-                                energy: previewCombination.energy,
-                                enhancements: previewCombination.enhancements,
-                                description: previewCombination.description,
-                                type1: previewCombination.type1,
-                                type2: previewCombination.type2,
-                                effects: previewCombination.effects,
-                                level: previewCombination.level,
-                                category: previewCombination.category,
-                            }}
-                            changedKeys={changedKeys}
-                            typeMultipliers={typeMultipliers}
-                            {... (previewCombination.isDeferred
-                                ? {
-                                    afterContent: (
-                                        <div className={`floating-tooltip__panel tooltip-theme-${(slotTwoPreviewDraggable.type1 ?? slotTwoPreviewDraggable.type2 ?? "none").toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}>
-                                            <div className="tooltip-container">
-                                                <div className="element-title">
-                                                    <div>?</div>
-                                                    <div className="description">{previewCombination.description}</div>
-                                                </div>
-                                            </div>
+                        standaloneContent={previewCombination.isDeferred
+                            ? <p className="deferred-tooltip-message">{previewCombination.description}</p>
+                            : undefined}
+                        comparisonAfterContent={previewCombination.isDeferred && slotTwoPreviewDraggable
+                            ? (
+                                <div className={`floating-tooltip__panel tooltip-theme-${(slotTwoPreviewDraggable.type1 ?? slotTwoPreviewDraggable.type2 ?? "none").toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}>
+                                    <div className="tooltip-container">
+                                        <div className="element-title">
+                                            <div>?</div>
+                                            <div className="description">{previewCombination.description}</div>
                                         </div>
-                                    ),
-                                }
-                                : {}
-                            )}
-                        />
-                    ) : null}
+                                    </div>
+                                </div>
+                            )
+                            : undefined}
+                    />
                 </>
             ) : null}
             {previewCombination?.secondOutput ? (
@@ -3688,22 +3799,14 @@ function Game() {
                     >
                         <ElementIcon name={previewCombination.secondOutput.letter} />
                     </div>
-                    <FloatingTooltip
+                    <PreviewOutputTooltip
                         anchorElement={previewRef2.current}
-                        open={isOutputHovered2}
-                        className="drag-description-popup"
-                        clampHorizontal={false}
+                        afterDetails={secondOutputToElementDetails(previewCombination.secondOutput)}
+                        beforeDetails={slotTwoPreviewDraggable ? draggableToElementDetails(slotTwoPreviewDraggable) : null}
+                        showComparison={Boolean(slotTwoPreviewDraggable) && (isOutputHovered2 || isCombineButtonHovered)}
+                        isOpen={isOutputHovered2}
+                        changedKeys={changedKeys}
                         typeMultipliers={typeMultipliers}
-                        elementDetails={{
-                            letter: previewCombination.secondOutput.letter,
-                            damage: previewCombination.secondOutput.damage,
-                            energy: previewCombination.secondOutput.energy,
-                            description: previewCombination.secondOutput.description,
-                            type1: previewCombination.secondOutput.type1,
-                            type2: previewCombination.secondOutput.type2,
-                            effects: previewCombination.secondOutput.effects,
-                            category: previewCombination.secondOutput.category,
-                        }}
                     />
                 </>
             ) : null}
@@ -3849,6 +3952,43 @@ function Game() {
                         <button className="fight-button" onClick={handleFight} disabled={!nextEnemy}>
                             FIGHT!
                         </button>
+                        {/* Spell Slots */}
+                        <div className="spell-slots-section">
+                            <div className="spell-slots-container">
+                                {spellSlots.map((elementId, slotIndex) => {
+                                    // Ensure refs array is long enough
+                                    while (spellSlotRefs.current.length <= slotIndex) {
+                                        spellSlotRefs.current.push({ current: null });
+                                    }
+
+                                    const hasElement = elementId !== null;
+
+                                    return (
+                                        <div
+                                            key={`spell-slot-${slotIndex}`}
+                                            className={`spell-slot${hasElement ? " has-element" : ""}`}
+                                            ref={spellSlotRefs.current[slotIndex]}
+                                        >
+                                            {!hasElement && (
+                                                <span className="spell-slot-empty-text">+</span>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            <div className="spell-slots-header">
+                                <span className="spell-slots-label">SPELL SLOTS</span>
+                                <button
+                                    className="spell-slots-add-button"
+                                    onClick={addSpellSlot}
+                                    title="Add a new spell slot"
+                                    aria-label="Add a new spell slot"
+                                >
+                                    +
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

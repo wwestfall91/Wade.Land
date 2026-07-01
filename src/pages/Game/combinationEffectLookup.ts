@@ -26,12 +26,14 @@ export type EffectWorkbookValues = {
 
 type CombinationPreviewBase = {
     damage: number;
+    shield?: number;
     energy?: number;
     effects?: SpellEffectConfig[];
 };
 
 export type CombinationPreviewResolution = {
     damage: number;
+    shield?: number;
     energy?: number;
     effects?: SpellEffectConfig[];
     isDamageEnhanced?: boolean;
@@ -130,12 +132,14 @@ export const resolveCombinationPreviewFromEffects = (
     if (creationEffects.length === 0) {
         return {
             damage: base.damage,
+            shield: base.shield,
             energy: base.energy,
             effects: base.effects,
         };
     }
 
     let resolvedDamage = base.damage;
+    let resolvedShield = base.shield;
     let resolvedEnergy = base.energy;
     let resolvedEffects = [...(base.effects ?? [])];
     let isDamageEnhanced = false;
@@ -152,6 +156,9 @@ export const resolveCombinationPreviewFromEffects = (
             if (nextDamage !== resolvedDamage) {
                 isDamageEnhanced = true;
                 resolvedDamage = nextDamage;
+            }
+            if (resolvedShield !== undefined) {
+                resolvedShield = Math.max(0, Math.round(resolvedShield * multiplier));
             }
             return;
         }
@@ -174,6 +181,7 @@ export const resolveCombinationPreviewFromEffects = (
 
     return {
         damage: resolvedDamage,
+        shield: resolvedShield,
         energy: resolvedEnergy,
         effects: resolvedEffects,
         isDamageEnhanced: isDamageEnhanced || undefined,

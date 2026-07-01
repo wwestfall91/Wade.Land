@@ -96,6 +96,7 @@ const mixRule: CombinationModeRule = {
             preview: {
                 letter: primaryItem.letter,
                 damage: primaryItem.damage,
+                shield: primaryItem.shield,
                 energy: primaryItem.energy,
                 enhancements: mergeEnhancements(primaryItem.enhancements, "mix"),
                 level: primaryItem.level,
@@ -161,6 +162,8 @@ const divideRule: CombinationModeRule = {
         }
 
         const halfPower = Math.ceil(rightItem.damage / 2);
+        const topShield = rightItem.shield !== undefined ? Math.ceil(rightItem.shield / 2) : undefined;
+        const bottomShield = rightItem.shield !== undefined ? Math.floor(rightItem.shield / 2) : undefined;
         const effects = rightItem.effects ?? [];
         const topCount = Math.ceil(effects.length / 2);
         const topEffects = effects.slice(0, topCount);
@@ -174,6 +177,7 @@ const divideRule: CombinationModeRule = {
             preview: {
                 letter: rightItem.letter,
                 damage: halfPower,
+                shield: topShield,
                 energy: topEnergy,
                 enhancements: mergeEnhancements(rightItem.enhancements, "divide"),
                 level: rightItem.level,
@@ -185,6 +189,7 @@ const divideRule: CombinationModeRule = {
                 secondOutput: {
                     letter: rightItem.letter,
                     damage: halfPower,
+                    shield: bottomShield,
                     energy: bottomEnergy,
                     level: rightItem.level,
                     description: rightItem.description,

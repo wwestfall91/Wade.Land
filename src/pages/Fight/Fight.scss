@@ -303,27 +303,27 @@
         display: flex;
         flex-direction: row;
         flex-wrap: wrap;
-        gap: 0.65rem;
+        gap: 2rem;
         justify-content: center;
         align-items: flex-end;
     }
 
     .spell-card {
-        position: relative;
         display: flex;
+        position: relative;
         flex-direction: column;
         align-items: center;
-        justify-content: space-between;
-        width: 5rem;
+        justify-content: start;
+        width: 7rem;
         height: 7rem;
-        padding: 0.4rem 0.3rem 0.35rem;
+        gap:8px;
+        padding: 0.4rem 0.3rem 2.8rem;
         border-radius: 8px;
         border: 2px solid rgba(220, 230, 255, 0.7);
         background: var(--spell-slot-bg, #ffffff);
         color: var(--spell-slot-text, #1c1c1c);
         cursor: pointer;
         font-family: "Trebuchet MS", "Segoe UI", sans-serif;
-        font-weight: 700;
         transition: transform 120ms ease, box-shadow 120ms ease, filter 140ms ease, opacity 140ms ease;
         box-shadow:
             inset 0 0 0 1px rgba(255, 255, 255, 0.32),
@@ -433,7 +433,7 @@
     }
 
     .spell-card-name {
-        font-size: 0.62rem;
+        font-size: 14px;
         font-weight: 800;
         text-align: center;
         line-height: 1.1;
@@ -444,14 +444,41 @@
         letter-spacing: 0.01em;
     }
 
+    .spell-card-badges {
+        display: flex;
+        justify-content: center;
+        align-items: flex-end;
+        gap: 0.3rem;
+        pointer-events: none;
+        width:5rem;
+    }
+
     .spell-card-damage {
         position: relative;
-        font-size: 1rem;
-        font-weight: 900;
-        font-variant-numeric: tabular-nums;
-        text-align: center;
-        line-height: 1;
-        text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+        bottom: auto;
+        right: auto;
+        min-width: 2.4rem;
+        height: 2.4rem;
+        padding: 0 0.2rem;
+        border-radius: 5px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.22rem;
+        font-size: 0.95rem;
+        font-weight: 800;
+        color: #2a0000;
+        background: radial-gradient(circle at 30% 25%, #ffd8d8 0%, #f85555 62%, #c41a1a 100%);
+        border: 2px solid #ffaaaa;
+        box-shadow: 0 3px 8px rgba(90, 10, 10, 0.45);
+        pointer-events: auto;
+
+        .spell-card-damage-icon {
+            width: 1.1rem;
+            height: 1.1rem;
+            object-fit: contain;
+            flex-shrink: 0;
+        }
 
         .spell-card-power-tooltip {
             position: absolute;
@@ -489,11 +516,39 @@
         }
     }
 
+    .spell-card-shield {
+        position: relative;
+        bottom: auto;
+        left: auto;
+        min-width: 2.4rem;
+        height: 2.4rem;
+        padding: 0 0.2rem;
+        border-radius: 5px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.22rem;
+        font-size: 0.95rem;
+        font-weight: 800;
+        color: #0a2030;
+        background: radial-gradient(circle at 30% 25%, #d8f8ff 0%, #55d8f8 62%, #1a99c4 100%);
+        border: 2px solid #aaeeff;
+        box-shadow: 0 3px 8px rgba(10, 60, 90, 0.45);
+        pointer-events: auto;
+
+        .spell-card-shield-icon {
+            width: 1.1rem;
+            height: 1.1rem;
+            object-fit: contain;
+            flex-shrink: 0;
+        }
+    }
+
     // â”€â”€â”€ Player HUD â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     .player-hud {
         display: flex;
         flex-direction: row;
-        align-items: center;
+        align-items: stretch;
         justify-content: space-between;
         width: 100%;
         padding: 0.65rem 1rem;
@@ -508,25 +563,21 @@
     }
 
     .player-hud-left {
-        display: flex;
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.3rem;
-        flex: 0 0 auto;
-        min-width: 9rem;
+        display: none;
     }
 
     .player-hud-center {
         display: flex;
         flex-direction: column;
-        align-items: center;
+        align-items: stretch;
         flex: 1 1 auto;
         min-width: 0;
+        gap: 0.3rem;
     }
 
     .player-hud-right {
         display: flex;
-        align-items: center;
+        align-items: stretch;
         justify-content: flex-end;
         flex: 0 0 auto;
         min-width: 9rem;
@@ -606,6 +657,7 @@
         align-items: center;
         gap: 0.3rem;
         flex-wrap: wrap;
+        min-height: 0;
     }
 
     .event-log-panel {
@@ -822,8 +874,8 @@
     }
 
     .end-turn-button {
-        height: 2.8rem;
-        min-width: 8rem;
+        height: 100%;
+        width: 100%;
         border-radius: 4px;
         border: 2px solid #e8edff;
         background: linear-gradient(180deg, #566cdf 0%, #2a3da8 100%);
@@ -877,13 +929,6 @@
         font-weight: 700;
         letter-spacing: 0.04em;
         text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.72);
-    }
-
-    .player-hp-row {
-        display: flex;
-        flex-direction: row;
-        align-items: center;
-        gap: 0.5rem;
     }
 
     .player-status-strip {
@@ -974,8 +1019,8 @@
         position: relative;
         align-items: center;
         justify-content: center;
-        width: 100%;
-        min-width: 14rem;
+        flex: 1 1 0;
+        min-width: 0;
         min-height: 2rem;
         overflow: visible;
         border: 2px solid #e7ecff;
@@ -1054,10 +1099,13 @@
     }
 
     .player-shield-badge {
-        position: relative;
-        flex-shrink: 0;
-        width: 2.75rem;
-        height: 2.75rem;
+        position: absolute;
+        left: 0.3rem;
+        top: 50%;
+        transform: translateY(-50%);
+        z-index: 2;
+        width: 2.2rem;
+        height: 2.2rem;
         display: inline-flex;
         align-items: center;
         justify-content: center;

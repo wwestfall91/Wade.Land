@@ -39,6 +39,7 @@ import FloatingTooltip from "../Game/FloatingTooltip";
 import { ELEMENT_SPELL_COLORS, type ElementSpellColor } from "../../styles/elementThemes";
 import ElementIcon from "../../components/ElementIcon";
 import shieldIcon from "../../assets/icons/Shield.png";
+import powerIcon from "../../assets/icons/Power.png";
 import soulIcon from "../../assets/icons/Soul.png";
 import energizeIcon from "../../assets/icons/Energize.png";
 import { ExpResultsModal, type ExpEntry, type ExpSegment } from "./ExpResultsModal";
@@ -110,6 +111,7 @@ type CastableSpell = {
     id: number;
     letter: string;
     damage: number;
+    shield?: number;
     energy?: number;
     type1?: string;
     type2?: string;
@@ -144,6 +146,7 @@ function Fight() {
         maxHpMultiplier,
         permanentMaxHpReduction,
         setBattleEnergyCarryover: setBattleEnergyCarryoverFromContext,
+        spellSlots,
     } = usePlayer();
     const playerStatuses = playerStatusesFromContext ?? {
         burn: null,
@@ -383,12 +386,17 @@ function Fight() {
         Boolean(effects?.some((effect) => effect.kind === EFFECTS.EXPLODE));
 
     const castableSpells = useMemo(
-        () => player.elements.filter((element) => {
-            const category = normalizeType(element.category);
-            const letter = normalizeType(element.letter);
-            return category !== "soul" && letter !== "soul";
-        }),
-        [player.elements],
+        () => {
+            const spellElementIds = spellSlots.filter((id): id is number => id !== null);
+            return player.elements
+                .filter((element) => spellElementIds.includes(element.id))
+                .filter((element) => {
+                    const category = normalizeType(element.category);
+                    const letter = normalizeType(element.letter);
+                    return category !== "soul" && letter !== "soul";
+                });
+        },
+        [player.elements, spellSlots],
     );
 
     /** Passive float percent from player's owned elements (affects incoming damage). */
@@ -1611,6 +1619,8 @@ function Fight() {
             await wait(EFFECT_STEP_DELAY_MS);
         }
 
+        totalShieldGranted += (spell.shield ?? 0);
+
         if (totalShieldGranted > 0) {
             setPlayerShield((previous) => previous + Math.round(totalShieldGranted * effectiveShieldMultiplier));
             await wait(EFFECT_STEP_DELAY_MS);
@@ -1949,6 +1959,7 @@ function Fight() {
                                     id: spell.id,
                                     letter: spell.letter,
                                     damage: spell.damage,
+                                    shield: spell.shield,
                                     energy: spell.energy,
                                     type1: spell.type1,
                                     type2: spell.type2,
@@ -1970,6 +1981,7 @@ function Fight() {
                                 elementDetails={{
                                     letter: spell.letter,
                                     damage: totalDisplayedDamage,
+                                    shield: spell.shield,
                                     energy: spell.energy,
                                     description: spell.description,
                                     type1: spell.type1,
@@ -1983,17 +1995,28 @@ function Fight() {
                             <div className="spell-card-icon">
                                 <ElementIcon name={spell.letter} />
                             </div>
+                            <div>
                             <div className="spell-card-name">{spell.letter}</div>
-                            <div className="spell-card-damage">
-                                {totalDisplayedDamage}
-                                {isCombustSpell ? (
-                                    <span className="spell-card-power-tooltip" role="tooltip">
-                                        {(() => {
-                                            const cEffect = spell.effects?.find(e => e.kind === "explode");
-                                            return <span>{`Combust: deals ${cEffect?.amount ?? 10}% of damage as self-damage on use`}</span>;
-                                        })()}
-                                    </span>
-                                ) : null}
+                            <div className="spell-card-badges">
+                                <div className="spell-card-damage">
+                                    <img src={powerIcon} alt="" aria-hidden="true" className="spell-card-damage-icon" />
+                                    {totalDisplayedDamage}
+                                    {isCombustSpell ? (
+                                        <span className="spell-card-power-tooltip" role="tooltip">
+                                            {(() => {
+                                                const cEffect = spell.effects?.find(e => e.kind === "explode");
+                                                return <span>{`Combust: deals ${cEffect?.amount ?? 10}% of damage as self-damage on use`}</span>;
+                                            })()}
+                                        </span>
+                                    ) : null}
+                                </div>
+                                {spell.shield != null && spell.shield > 0 && (
+                                    <div className="spell-card-shield">
+                                        <img src={shieldIcon} alt="" aria-hidden="true" className="spell-card-shield-icon" />
+                                        {spell.shield}
+                                    </div>
+                                )}
+                            </div>
                             </div>
                         </button>
                             );
@@ -2004,8 +2027,54 @@ function Fight() {
 
             {/* ─── Player HUD ─── */}
             <div className="player-hud">
-                <div className="player-hud-left">
-                    {playerName.trim().length > 0 ? <div className="player-name-banner">{playerName.trim()}</div> : null}
+                <div className="player-hud-center">
+                    <div className="player-hp-row">
+                        <div
+                            ref={playerHpBarRef}
+                            className={`player-hp-bar ${playerShield > 0 ? "has-shield" : ""} ${isPlayerHealingFlash ? "is-healing" : ""} ${isPlayerShieldFlash ? "is-shield-gain" : ""} ${isPlayerBurnHitFlash ? "is-burn-hit" : ""}`}
+                            role="progressbar"
+                            aria-valuemin={0}
+                            aria-valuemax={playerMaxHp}
+                            aria-valuenow={displayedPlayerHp}
+                        >
+                            {playerShield > 0 ? (
+                                <span
+                                    className={`player-shield-badge${isShieldExpiring ? " is-expiring" : ""}`}
+                                    style={{ backgroundImage: `url(${shieldIcon})` }}
+                                    aria-label={`Shield ${playerShield}`}
+                                >
+                                    <span className="player-shield-value">{playerShield}</span>
+                                    <span className="player-shield-tooltip">You have {playerShield} shield this turn</span>
+                                </span>
+                            ) : null}
+                            <div
+                                className="player-hp-fill player-hp-fill--shield"
+                                style={{ width: `${playerShieldTailFillPercent}%` }}
+                            />
+                            <div
+                                className="player-hp-fill player-hp-fill--health"
+                                style={{
+                                    left: `${playerShieldTailFillPercent}%`,
+                                    width: `${playerHealthFillPercent}%`,
+                                }}
+                            />
+                            {playerDamagePopups.map((popup, index) => (
+                                <span
+                                    key={popup.id}
+                                    className={`player-damage-popup ${popup.kind === "burn" ? "player-damage-popup--burn" : ""}`}
+                                    style={{
+                                        ["--player-popup-offset" as string]: `${index * 0.58}rem`,
+                                        ["--player-popup-left" as string]: `${Math.max(4, Math.min(96, playerShieldTailFillPercent + playerHealthFillPercent / 2))}%`,
+                                    }}
+                                >
+                                    {popup.text}
+                                </span>
+                            ))}
+                            <span className={`player-hp-label ${playerShield > 0 ? "has-shield" : ""}`}>
+                                {displayedPlayerHp} / {playerMaxHp} HP
+                            </span>
+                        </div>
+                    </div>
                     <div ref={playerStatusStripRef} className="player-status-strip" aria-label="Player status effects">
                         <span
                             className={`player-status-badge player-status-badge--burn ${playerBurnStatus ? "" : "is-hidden"}`}
@@ -2052,55 +2121,6 @@ function Fight() {
                             Next turn +{playerEnergizeStatus?.stacks ?? 0} energy
                         </span>
                     </span>
-                    </div>
-                </div>
-                <div className="player-hud-center">
-                    <div className="player-hp-row">
-                        {playerShield > 0 ? (
-                            <span
-                                className={`player-shield-badge${isShieldExpiring ? " is-expiring" : ""}`}
-                                style={{ backgroundImage: `url(${shieldIcon})` }}
-                                aria-label={`Shield ${playerShield}`}
-                            >
-                                <span className="player-shield-value">{playerShield}</span>
-                                <span className="player-shield-tooltip">You have {playerShield} shield this turn</span>
-                            </span>
-                        ) : null}
-                        <div
-                            ref={playerHpBarRef}
-                            className={`player-hp-bar ${playerShield > 0 ? "has-shield" : ""} ${isPlayerHealingFlash ? "is-healing" : ""} ${isPlayerShieldFlash ? "is-shield-gain" : ""} ${isPlayerBurnHitFlash ? "is-burn-hit" : ""}`}
-                            role="progressbar"
-                            aria-valuemin={0}
-                            aria-valuemax={playerMaxHp}
-                            aria-valuenow={displayedPlayerHp}
-                        >
-                            <div
-                                className="player-hp-fill player-hp-fill--health"
-                                style={{ width: `${playerHealthFillPercent}%` }}
-                            />
-                            <div
-                                className="player-hp-fill player-hp-fill--shield"
-                                style={{
-                                    left: `${playerHealthFillPercent}%`,
-                                    width: `${playerShieldTailFillPercent}%`,
-                                }}
-                            />
-                            {playerDamagePopups.map((popup, index) => (
-                                <span
-                                    key={popup.id}
-                                    className={`player-damage-popup ${popup.kind === "burn" ? "player-damage-popup--burn" : ""}`}
-                                    style={{
-                                        ["--player-popup-offset" as string]: `${index * 0.58}rem`,
-                                        ["--player-popup-left" as string]: `${Math.max(4, Math.min(96, playerHealthFillPercent))}%`,
-                                    }}
-                                >
-                                    {popup.text}
-                                </span>
-                            ))}
-                            <span className={`player-hp-label ${playerShield > 0 ? "has-shield" : ""}`}>
-                                {displayedPlayerHp} / {playerMaxHp} HP
-                            </span>
-                        </div>
                     </div>
                 </div>
                 <div className="player-hud-right">

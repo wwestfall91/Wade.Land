@@ -62,6 +62,7 @@ export const applyRefine = (input: ElementStats, battles: number): ElementStats 
     return {
         ...input,
         damage: Math.round(input.damage * multiplier),
+        shield: input.shield !== undefined ? Math.round(input.shield * multiplier) : undefined,
         enhancements: mergeEnhancements(input.enhancements, "refine"),
     };
 };
@@ -97,12 +98,14 @@ export const applyDivide = (input: ElementStats): DivideOutput => {
     return {
         top: {
             ...base,
+            shield: input.shield !== undefined ? Math.ceil(input.shield / 2) : undefined,
             energy: input.energy !== undefined ? Math.ceil(input.energy / 2) : undefined,
             enhancements: mergeEnhancements(input.enhancements, "divide"),
             effects: effects.slice(0, topCount),
         },
         bottom: {
             ...base,
+            shield: input.shield !== undefined ? Math.floor(input.shield / 2) : undefined,
             energy: input.energy !== undefined ? Math.floor(input.energy / 2) : undefined,
             effects: effects.slice(topCount),
         },

@@ -20,6 +20,7 @@ type TooltipLayout = {
 export type ElementDetails = {
     letter: string;
     damage: number;
+    shield?: number;
     isDamageEnhanced?: boolean;
     baseDamageBeforeEnhance?: number;
     isCombusted?: boolean;
@@ -147,6 +148,7 @@ export function TooltipPanelContent({ elementDetails, changedKeys, highlightedEf
         : 1;
     const finalDamage = Math.round(baseDamage * masteryMultiplier);
     const masteryBonus = finalDamage - baseDamage;
+    const finalShield = elementDetails.shield ?? 0;
     const hasEnhanceDamagePreview = Boolean(
         elementDetails.isDamageEnhanced && typeof elementDetails.baseDamageBeforeEnhance === "number",
     );
@@ -170,24 +172,14 @@ export function TooltipPanelContent({ elementDetails, changedKeys, highlightedEf
     return (
         <div className={`floating-tooltip__panel ${toTypeThemeClass(primaryThemeType)}`}>
             <div className="tooltip-container">
-                {typeof elementDetails.energy === "number" ? (
+                {typeof elementDetails.level === "number" ? (
                     <span
-                        className={[
-                            "element-energy-badge",
-                            typeof elementDetails.baseEnergyBeforeCreation === "number" ? "is-energy-delta" : "",
-                            changedKeys?.has("energy") ? "property-changed" : "",
-                        ].filter(Boolean).join(" ")}
-                        aria-label={`Energy ${elementDetails.energy}`}
+                        className="element-level-badge"
+                        aria-label={`Level ${elementDetails.level}`}
                     >
-                        {typeof elementDetails.baseEnergyBeforeCreation === "number" ? (
-                            <>
-                                <span className="energy-value-before">{elementDetails.baseEnergyBeforeCreation}</span>
-                                <span className="energy-value-arrow" aria-hidden="true">➔</span>
-                                <span className="energy-value-after">{elementDetails.energy}</span>
-                            </>
-                        ) : elementDetails.energy}
-                        <span className="element-energy-badge-tooltip" role="tooltip">
-                            Energy required to use.
+                        {elementDetails.level}
+                        <span className="element-level-badge-tooltip" role="tooltip">
+                            Level {elementDetails.level}
                         </span>
                     </span>
                 ) : null}
@@ -206,24 +198,46 @@ export function TooltipPanelContent({ elementDetails, changedKeys, highlightedEf
                         ) : null}
                     </div>
                 </div>
-                <span className={`damage-details${changedKeys?.has("damage") ? " property-changed" : ""}`}>
-                    <span className="damage-label">Damage:</span>
-                    <span className={`damage-value${elementDetails.isDamageEnhanced ? " damage-value--enhanced" : ""}${elementDetails.isCombusted ? " damage-value--combusted" : ""}${changedKeys?.has("damage") ? " property-changed-value" : ""}`}>
-                        {hasEnhanceDamagePreview ? (
-                            <>
-                                <span className="damage-value-before">{enhancedDamageBefore}</span>
-                                <span className="damage-value-arrow" aria-hidden="true">➔</span>
-                                <span className="damage-value-after">{finalDamage}</span>
-                            </>
-                        ) : hasCombustDamagePreview ? (
-                            <>
-                                <span className="damage-value-before">{combustDamageBefore}</span>
-                                <span className="damage-value-arrow" aria-hidden="true">➔</span>
-                                <span className="damage-value-after">{finalDamage}</span>
-                            </>
-                        ) : finalDamage}
-                    </span>
-                </span>
+                <div className={`damage-details${changedKeys?.has("damage") ? " property-changed" : ""}${finalShield > 0 ? " damage-details--with-shield" : ""}`}>
+                    <div className="stat-block stat-block--damage">
+                        <span className="stat-block-label">DAMAGE</span>
+                        <span className={`damage-value${elementDetails.isDamageEnhanced ? " damage-value--enhanced" : ""}${elementDetails.isCombusted ? " damage-value--combusted" : ""}${changedKeys?.has("damage") ? " property-changed-value" : ""}`}>
+                            {hasEnhanceDamagePreview ? (
+                                <>
+                                    <span className="damage-value-before">{enhancedDamageBefore}</span>
+                                    <span className="damage-value-arrow" aria-hidden="true">➔</span>
+                                    <span className="damage-value-after">{finalDamage}</span>
+                                </>
+                            ) : hasCombustDamagePreview ? (
+                                <>
+                                    <span className="damage-value-before">{combustDamageBefore}</span>
+                                    <span className="damage-value-arrow" aria-hidden="true">➔</span>
+                                    <span className="damage-value-after">{finalDamage}</span>
+                                </>
+                            ) : finalDamage}
+                        </span>
+                    </div>
+                    {finalShield > 0 ? (
+                        <div className="stat-block stat-block--shield">
+                            <span className="stat-block-label">SHIELD</span>
+                            <span className="shield-value">{finalShield}</span>
+                        </div>
+                    ) : null}
+                    {typeof elementDetails.energy === "number" ? (
+                        <div className={`stat-block stat-block--energy${changedKeys?.has("energy") ? " property-changed" : ""}`}>
+                            <span className="stat-block-label">ENERGY</span>
+                            <span className="energy-stat-value">
+                                {typeof elementDetails.baseEnergyBeforeCreation === "number" ? (
+                                    <>
+                                        <span className="energy-value-before">{elementDetails.baseEnergyBeforeCreation}</span>
+                                        <span className="damage-value-arrow" aria-hidden="true">➔</span>
+                                        <span className="energy-value-after">{elementDetails.energy}</span>
+                                    </>
+                                ) : elementDetails.energy}
+                            </span>
+                        </div>
+                    ) : null}
+                </div>
                 {masteryBonus > 0 ? (
                     <span className="damage-mastery-breakdown">
                         <span className="damage-base">base {baseDamage}</span>
