@@ -33,6 +33,8 @@ type Props = {
 	canSnapToZone: (draggableId: number, zoneIndex: number) => boolean;
 	isNewFromChest?: boolean;
 	forcedSnapZone?: { zone: number; version: number } | null;
+	/** Increment this to trigger an animated slide back to initialPosition. */
+	returnHomeVersion?: number;
 	zIndexOverride?: number;
 };
 
@@ -57,6 +59,7 @@ function Draggable({
 	canSnapToZone,
 	isNewFromChest = false,
 	forcedSnapZone = null,
+	returnHomeVersion = 0,
 	zIndexOverride,
 }: Props) {
 	const { typeMultipliers } = usePlayer();
@@ -72,8 +75,10 @@ function Draggable({
 	const [isPointerDown, setIsPointerDown] = useState(false);
 	const [mouseOffset, setMouseOffset] = useState({ x: 0, y: 0 });
 	const [position, setPosition] = useState<Position>(initialPosition);
+	const [isReturningHome, setIsReturningHome] = useState(false);
 	const draggableRef = useRef<HTMLDivElement | null>(null);
 	const tooltipGraceTimeoutRef = useRef<number | null>(null);
+	const returnHomeTimeoutRef = useRef<number | null>(null);
 	const altHeldRef = useRef(false);
 	const pointerDownRef = useRef<Position | null>(null);
 	const dragStartedRef = useRef(false);
@@ -119,7 +124,35 @@ function Draggable({
 
 	useEffect(() => () => {
 		clearTooltipGraceTimeout();
+		if (returnHomeTimeoutRef.current !== null) {
+			window.clearTimeout(returnHomeTimeoutRef.current);
+		}
 	}, []);
+
+	// When returnHomeVersion increments, slide the element back to its home position.
+	useEffect(() => {
+		if (!returnHomeVersion) return;
+
+		const containerRect = containerRef.current?.getBoundingClientRect();
+		if (!containerRect) return;
+
+		const homeX = Math.round(containerRect.left + initialPosition.x);
+		const homeY = Math.round(containerRect.top + initialPosition.y);
+
+		// Enable the position transition and move in the same render so the browser
+		// transitions from the current painted position to the new home position.
+		setIsReturningHome(true);
+		setPosition({ x: homeX, y: homeY });
+
+		if (returnHomeTimeoutRef.current !== null) {
+			window.clearTimeout(returnHomeTimeoutRef.current);
+		}
+		returnHomeTimeoutRef.current = window.setTimeout(() => {
+			setIsReturningHome(false);
+			returnHomeTimeoutRef.current = null;
+		}, 450);
+	// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [returnHomeVersion]);
 
 	useEffect(() => {
 		const syncAltState = (isAltPressed: boolean) => {
@@ -196,6 +229,12 @@ function Draggable({
 
 				setIsDragging(true);
 				dragStartedRef.current = true;
+				// Cancel any in-progress return-home animation so dragging feels instant.
+				if (returnHomeTimeoutRef.current !== null) {
+					window.clearTimeout(returnHomeTimeoutRef.current);
+					returnHomeTimeoutRef.current = null;
+				}
+				setIsReturningHome(false);
 				setIsTooltipPinned(false);
 				setIsHovered(false);
 				setIsTooltipHovered(false);
@@ -494,6 +533,7 @@ function Draggable({
 				category === "spell" ? `is-spell--${(type1 || type2 || "none")}` : "",
 				category === "weapon" ? "is-weapon" : "",			category === "soul" ? "is-soul" : "",				isInvalidDrop ? "is-invalid-drop" : "",
 				isDragging ? "is-dragging" : "",
+				isReturningHome ? "is-returning-home" : "",
 				isTooltipPinned ? "is-tooltip-pinned" : "",
 				showTutorialCue && !hasBeenDragged ? "is-discoverable" : "",
 			].filter(Boolean).join(" ")}

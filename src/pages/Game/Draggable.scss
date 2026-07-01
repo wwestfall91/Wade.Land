@@ -80,6 +80,15 @@
         touch-action: none;
         z-index: 1;
 
+        &.is-returning-home {
+            transition:
+                top 380ms cubic-bezier(0.22, 1, 0.36, 1),
+                left 380ms cubic-bezier(0.22, 1, 0.36, 1),
+                transform 120ms ease,
+                box-shadow 120ms ease,
+                border-color 120ms ease;
+        }
+
         &.is-discoverable:not(.drag-preview)::after {
             content: "";
             position: absolute;

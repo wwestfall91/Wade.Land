@@ -30,7 +30,7 @@ const makeContext = (
 ): ModePreviewContext => ({
     occupantItems,
     consumedIds: occupantItems
-        .filter((item): item is DraggableItem => Boolean(item) && !isModeSentinelId(item.id))
+        .filter((item): item is DraggableItem => item !== undefined && !isModeSentinelId(item.id))
         .map((item) => item.id),
     isModeSentinelId,
     lookupCatalogElement,

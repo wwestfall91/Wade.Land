@@ -1,9 +1,7 @@
 import type { RefObject } from "react";
 import MixLogicContent from "./modes/MixLogicContent";
-import IncubateLogicContent from "./modes/IncubateLogicContent";
-import DivideLogicContent from "./modes/DivideLogicContent";
-import RefineLogicContent from "./modes/RefineLogicContent";
-import DuplicateLogicContent from "./modes/DuplicateLogicContent";
+import DeferredInputLogicContent from "./modes/DeferredInputLogicContent";
+import SingleInputLogicContent from "./modes/SingleInputLogicContent";
 import CombinationCombineButton from "./CombinationCombineButton";
 import "./CombinationLogicPanel.scss";
 
@@ -70,7 +68,8 @@ function CombinationLogicPanel({
                 );
             case "incubate":
                 return (
-                    <IncubateLogicContent
+                    <DeferredInputLogicContent
+                        wrapperClassName="incubate-logic-content"
                         dropZoneClassName={primaryDropZoneClassName}
                         dropZoneRef={dropZoneRefB}
                         onHoverInsertSlot={onHoverInsertSlot}
@@ -84,7 +83,8 @@ function CombinationLogicPanel({
                 );
             case "divide":
                 return (
-                    <DivideLogicContent
+                    <SingleInputLogicContent
+                        wrapperClassName="divide-logic-content"
                         dropZoneClassName={primaryDropZoneClassName}
                         dropZoneRef={dropZoneRefB}
                         onHoverInsertSlot={onHoverInsertSlot}
@@ -93,7 +93,8 @@ function CombinationLogicPanel({
                 );
             case "refine":
                 return (
-                    <RefineLogicContent
+                    <DeferredInputLogicContent
+                        wrapperClassName="refine-logic-content"
                         dropZoneClassName={primaryDropZoneClassName}
                         dropZoneRef={dropZoneRefB}
                         onHoverInsertSlot={onHoverInsertSlot}
@@ -107,7 +108,8 @@ function CombinationLogicPanel({
                 );
             case "duplicate":
                 return (
-                    <DuplicateLogicContent
+                    <SingleInputLogicContent
+                        wrapperClassName="duplicate-logic-content"
                         dropZoneClassName={primaryDropZoneClassName}
                         dropZoneRef={dropZoneRefB}
                         onHoverInsertSlot={onHoverInsertSlot}

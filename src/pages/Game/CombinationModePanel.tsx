@@ -1,21 +1,11 @@
 import type { RefObject } from "react";
 import ElementIcon from "../../components/ElementIcon";
+import ModeSlot from "./slots/ModeSlot";
 import "./CombinationModePanel.scss";
 
 const MODE_TAB_ORDER = ["water", "fire", "earth", "air", "soul"] as const;
 
 export type ModeTabElementKey = (typeof MODE_TAB_ORDER)[number];
-
-type CombineStationTooltipProps = {
-    message: string;
-    className?: string;
-};
-
-const CombineStationTooltip = ({ message, className = "" }: CombineStationTooltipProps) => (
-    <div className={`combine-station-tooltip ${className}`.trim()} role="tooltip">
-        {message}
-    </div>
-);
 
 type CombinationModePanelProps = {
     className: string;
@@ -79,39 +69,18 @@ function CombinationModePanel({
                 <div className={`combination-mode-panel ${className} ${hasSelectedModeTab ? "" : "is-hidden"}`.trim()}>
                     <div className="mode-panel-body">
                         <div className="drop-zone-area">
-                            <div className={`mode-drop-zone-shell ${isModeInserted ? "is-closed" : ""} ${shouldAnimateModeShutter ? "is-animating-close" : ""}`.trim()}>
-                                <div
-                                    className={dropZoneClassName}
-                                    ref={dropZoneRefA}
-                                    onMouseEnter={() => {
-                                        onHoverInsertSlot(1);
-                                    }}
-                                    onMouseLeave={() => {
-                                        onHoverInsertSlot(null);
-                                    }}
-                                >
-                                    {activeModeTabElementKey ? (
-                                        <span className="mode-slot-icon" aria-hidden="true">
-                                            <ElementIcon name={activeModeTabElementKey} />
-                                        </span>
-                                    ) : null}
-                                    {shouldShowSlotOneInsertPrompt ? (
-                                        <CombineStationTooltip
-                                            className="combine-station-tooltip--slot-one"
-                                            message="Please insert element"
-                                        />
-                                    ) : null}
-                                </div>
-                                {showModeInsertedElementOverlay && modeInsertedElementLetter ? (
-                                    <span
-                                        className={`mode-drop-zone-inserted-element ${modeInsertedElementCategory === "soul" ? "is-soul" : ""}`.trim()}
-                                        aria-hidden="true"
-                                    >
-                                        <ElementIcon name={modeInsertedElementLetter} />
-                                    </span>
-                                ) : null}
-                                <span className="mode-drop-zone-shutter" aria-hidden="true" />
-                            </div>
+                            <ModeSlot
+                                dropZoneClassName={dropZoneClassName}
+                                dropZoneRef={dropZoneRefA}
+                                onHoverInsertSlot={onHoverInsertSlot}
+                                shouldShowInsertPrompt={shouldShowSlotOneInsertPrompt}
+                                isModeInserted={isModeInserted}
+                                shouldAnimateModeShutter={shouldAnimateModeShutter}
+                                activeModeTabElementKey={activeModeTabElementKey}
+                                showInsertedElementOverlay={showModeInsertedElementOverlay}
+                                insertedElementLetter={modeInsertedElementLetter}
+                                insertedElementCategory={modeInsertedElementCategory}
+                            />
                         </div>
                     </div>
                     <div className="insert-mode-button-wrap">

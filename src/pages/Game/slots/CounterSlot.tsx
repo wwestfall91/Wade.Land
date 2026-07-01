@@ -1,6 +1,6 @@
-import "./ModeCounter.scss";
+import "./CounterSlot.scss";
 
-type ModeCounterProps = {
+type CounterSlotProps = {
     value: number;
     min?: number;
     max?: number;
@@ -9,7 +9,13 @@ type ModeCounterProps = {
     disabled?: boolean;
 };
 
-function ModeCounter({ value, min = 1, max = 5, label, onChange, disabled = false }: ModeCounterProps) {
+/**
+ * A numeric configuration slot. Unlike {@link InputSlot} / {@link OutputSlot},
+ * which hold dragged elements, a CounterSlot holds a bounded number the player
+ * dials in (e.g. the number of battles a deferred job waits for). It is the
+ * combination station's third slot type.
+ */
+function CounterSlot({ value, min = 1, max = 5, label, onChange, disabled = false }: CounterSlotProps) {
     return (
         <div className={`mode-counter${disabled ? " is-disabled" : ""}`}>
             {label ? <span className="mode-counter-label">{label}</span> : null}
@@ -38,4 +44,4 @@ function ModeCounter({ value, min = 1, max = 5, label, onChange, disabled = fals
     );
 }
 
-export default ModeCounter;
+export default CounterSlot;

@@ -338,6 +338,8 @@ function Game() {
     });
     const [hasStartedDraggingElement, setHasStartedDraggingElement] = useState(false);
     const [zoneOccupants, setZoneOccupants] = useState<Array<number | null>>([null, null]);
+    const zoneOccupantsRef = useRef<Array<number | null>>([null, null]);
+    const [returnHomeVersions, setReturnHomeVersions] = useState<Record<number, number>>({});
     const [plasmaForcedSnap, setPlasmaForcedSnap] = useState<{ zone: number; version: number } | null>(null);
     const [isPreviewDragging, setIsPreviewDragging] = useState(false);
     const [isPreviewHovered, setIsPreviewHovered] = useState(false);
@@ -1579,6 +1581,10 @@ function Game() {
     }, [draggables, normalizeZoneOccupants]);
 
     useEffect(() => {
+        zoneOccupantsRef.current = zoneOccupants;
+    }, [zoneOccupants]);
+
+    useEffect(() => {
         if (enemies.length === 0 || nextEnemy) return;
         // Start with the first enemy row from the sheet.
         setNextEnemy(enemies[0]);
@@ -1725,6 +1731,23 @@ function Game() {
 
     const handleModeTabSelect = useCallback((elementKey: ModeTabElementKey) => {
         setSelectedModeTabElementKey((current) => (current === elementKey ? null : elementKey));
+
+        // Evict formula input slots (1+) and animate elements back to their home position.
+        const inputIds = zoneOccupantsRef.current
+            .slice(1)
+            .filter((id): id is number => id !== null);
+        if (inputIds.length > 0) {
+            setZoneOccupants((prev) => {
+                const next = [...prev];
+                for (let i = 1; i < next.length; i++) next[i] = null;
+                return next;
+            });
+            setReturnHomeVersions((prev) => {
+                const next = { ...prev };
+                for (const id of inputIds) next[id] = (next[id] ?? 0) + 1;
+                return next;
+            });
+        }
     }, []);
 
     useEffect(() => {
@@ -3522,6 +3545,7 @@ function Game() {
                     canSnapToZone={canSnapToZone}
                     isNewFromChest={newChestElementIds.has(draggable.id)}
                     forcedSnapZone={isPlasmaName(draggable.letter) ? plasmaForcedSnap : null}
+                    returnHomeVersion={returnHomeVersions[draggable.id] ?? 0}
                 />
             ))}
 

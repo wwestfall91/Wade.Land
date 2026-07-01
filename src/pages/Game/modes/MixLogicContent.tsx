@@ -1,15 +1,5 @@
 import type { RefObject } from "react";
-
-type CombineStationTooltipProps = {
-    message: string;
-    className?: string;
-};
-
-const CombineStationTooltip = ({ message, className = "" }: CombineStationTooltipProps) => (
-    <div className={`combine-station-tooltip ${className}`.trim()} role="tooltip">
-        {message}
-    </div>
-);
+import InputSlot from "../slots/InputSlot";
 
 type MixLogicContentProps = {
     primaryDropZoneClassName: string;
@@ -35,39 +25,31 @@ function MixLogicContent({
     return (
         <div className="mix-logic-content">
             <div className="mix-slot-group">
-                <div
+                <InputSlot
                     className={`${primaryDropZoneClassName} mix-slot mix-slot--primary`.trim()}
-                    ref={dropZoneRefB}
-                    onMouseEnter={() => onHoverInsertSlot(2)}
-                    onMouseLeave={() => onHoverInsertSlot(null)}
-                >
-                    <span className="mix-slot-label mix-slot-label--inside">Primary</span>
-                    {shouldShowPrimaryInsertPrompt ? (
-                        <CombineStationTooltip
-                            className="combine-station-tooltip--slot-two"
-                            message="Please insert element"
-                        />
-                    ) : null}
-                </div>
+                    slotRef={dropZoneRefB}
+                    onHover={onHoverInsertSlot}
+                    hoverValue={2}
+                    label="Primary"
+                    labelClassName="mix-slot-label mix-slot-label--inside"
+                    showInsertPrompt={shouldShowPrimaryInsertPrompt}
+                    insertPromptClassName="combine-station-tooltip--slot-two"
+                />
             </div>
 
             <div className={slotConnectorClassName} aria-hidden="true" />
 
             <div className="mix-slot-group">
-                <div
+                <InputSlot
                     className={`${secondaryDropZoneClassName} mix-slot mix-slot--secondary`.trim()}
-                    ref={dropZoneRefC}
-                    onMouseEnter={() => onHoverInsertSlot(null)}
-                    onMouseLeave={() => onHoverInsertSlot(null)}
-                >
-                    <span className="mix-slot-label mix-slot-label--inside">Secondary</span>
-                    {shouldShowSecondaryInsertPrompt ? (
-                        <CombineStationTooltip
-                            className="combine-station-tooltip--slot-three"
-                            message="Please insert element"
-                        />
-                    ) : null}
-                </div>
+                    slotRef={dropZoneRefC}
+                    onHover={onHoverInsertSlot}
+                    hoverValue={null}
+                    label="Secondary"
+                    labelClassName="mix-slot-label mix-slot-label--inside"
+                    showInsertPrompt={shouldShowSecondaryInsertPrompt}
+                    insertPromptClassName="combine-station-tooltip--slot-three"
+                />
             </div>
         </div>
     );
