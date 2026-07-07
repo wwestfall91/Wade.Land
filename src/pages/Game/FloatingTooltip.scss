@@ -292,9 +292,8 @@
     color: #e8e8e8;
     font-weight: 600;
     text-transform: uppercase;
-    background: linear-gradient(180deg, rgba(35, 40, 50, 0.88) 0%, rgba(28, 32, 42, 0.92) 100%);
-    border: 1px solid rgba(100, 120, 150, 0.4);
     overflow: hidden;
+    gap:5px;
 
     .stat-block {
         display: flex;
@@ -309,17 +308,17 @@
     }
 
     .stat-block--damage {
-        background: linear-gradient(135deg, rgba(255, 80, 60, 0.35), rgba(220, 40, 20, 0.28));
+        background: linear-gradient(145deg, rgb(255, 93, 75), rgb(100, 18, 9));
         border-color: rgba(255, 120, 100, 0.6);
     }
 
     .stat-block--shield {
-        background: linear-gradient(135deg, rgba(80, 200, 255, 0.35), rgba(40, 160, 220, 0.28));
+        background: linear-gradient(145deg, rgb(115, 165, 231), rgb(25, 93, 128));
         border-color: rgba(120, 210, 255, 0.6);
     }
 
     .stat-block--energy {
-        background: linear-gradient(135deg, rgba(255, 200, 60, 0.35), rgba(220, 170, 20, 0.28));
+        background: linear-gradient(145deg, rgb(241, 194, 74), rgb(122, 95, 11));
         border-color: rgba(255, 210, 100, 0.6);
     }
 

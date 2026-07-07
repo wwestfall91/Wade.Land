@@ -8,6 +8,7 @@ import ElementIcon from "../../components/ElementIcon";
 import { EFFECTS, parseSpellEffectsFromRow, type SpellEffectConfig } from "../../combat/spellEffects";
 import {
     type CombinationModeKey,
+    type ElementalResistanceKey,
     type ElementEnhancements,
     type RewardElement,
     usePlayer,
@@ -40,6 +41,7 @@ import {
 } from "./CombinationStationRulesEngine";
 import {
     STARTER_BUTTON_THEME_BY_TYPE,
+    ELEMENT_SPELL_COLORS,
     STARTER_BUTTON_THEME_DEFAULT,
 } from "../../styles/elementThemes";
 import MonsterUpgradeModal from "./MonsterUpgradeModal";
@@ -213,6 +215,24 @@ type ElementFlightIcon = {
 
 const normalizeType = (value?: string): string => value?.trim().toLowerCase() ?? "";
 const normalizeElementName = (value?: string): string => value?.trim().toLowerCase() ?? "";
+const RESISTANCE_ELEMENT_KEYS = ["fire", "water", "earth", "air"] as const;
+const RESISTANCE_COUNTER_TYPE: Record<ElementalResistanceKey, ElementalResistanceKey> = {
+    fire: "water",
+    water: "fire",
+    earth: "air",
+    air: "earth",
+};
+
+const resolveResistanceElementType = (type1?: string, letter?: string): ElementalResistanceKey | null => {
+    const candidates = [normalizeType(type1), normalizeType(letter)];
+    for (const candidate of candidates) {
+        if (candidate === "fire" || candidate === "water" || candidate === "earth" || candidate === "air") {
+            return candidate;
+        }
+    }
+
+    return null;
+};
 const isModeTabElementKey = (value: string): value is ModeTabElementKey =>
     value === "water" || value === "fire" || value === "earth" || value === "air" || value === "soul";
 const MODE_SENTINEL_IDS: Record<ModeTabElementKey, number> = {
@@ -291,6 +311,7 @@ function Game() {
         spellSlots,
         setSpellSlotElement,
         addSpellSlot,
+        setElementalResistance,
     } = usePlayer();
     const gameRef = useRef<HTMLDivElement | null>(null);
     const elementStartRef = useRef<HTMLDivElement | null>(null);
@@ -382,6 +403,35 @@ function Game() {
     const [isCombineButtonHovered, setIsCombineButtonHovered] = useState(false);
     const [incubateCounter, setIncubateCounter] = useState(1);
     const [refineCounter, setRefineCounter] = useState(1);
+
+    useEffect(() => {
+        const nextResistances: Record<ElementalResistanceKey, number> = {
+            fire: 0,
+            water: 0,
+            earth: 0,
+            air: 0,
+        };
+
+        for (let slotIndex = 0; slotIndex < spellSlots.length; slotIndex += 1) {
+            const slottedElementId = spellSlots[slotIndex];
+            if (slottedElementId === null) {
+                break;
+            }
+
+            const slottedElement = player.elements.find((element) => element.id === slottedElementId);
+            const slotElementType = resolveResistanceElementType(slottedElement?.type1, slottedElement?.letter);
+            if (!slotElementType) {
+                continue;
+            }
+
+            nextResistances[slotElementType] += 25;
+            nextResistances[RESISTANCE_COUNTER_TYPE[slotElementType]] -= 25;
+        }
+
+        RESISTANCE_ELEMENT_KEYS.forEach((element) => {
+            setElementalResistance(element, nextResistances[element]);
+        });
+    }, [player.elements, setElementalResistance, spellSlots]);
 
     type DeferredJob = {
         jobId: number;
@@ -3962,16 +4012,31 @@ function Game() {
                                     }
 
                                     const hasElement = elementId !== null;
+                                    const slottedElement = hasElement
+                                        ? player.elements.find((element) => element.id === elementId) ?? null
+                                        : null;
+                                    const slotTypeKey = normalizeType(slottedElement?.type1)
+                                        || normalizeType(slottedElement?.letter);
+                                    const slotWireColor = ELEMENT_SPELL_COLORS[slotTypeKey]?.border ?? "#8ea0bb";
+                                    const slotWireStyle = {
+                                        ["--spell-wire-color" as string]: slotWireColor,
+                                    };
 
                                     return (
                                         <div
                                             key={`spell-slot-${slotIndex}`}
-                                            className={`spell-slot${hasElement ? " has-element" : ""}`}
-                                            ref={spellSlotRefs.current[slotIndex]}
+                                            className={`spell-slot-node ${slotIndex === 0 ? "spell-slot-node--first" : ""} ${hasElement ? "has-element" : ""}`.trim()}
+                                            style={slotWireStyle}
                                         >
-                                            {!hasElement && (
-                                                <span className="spell-slot-empty-text">+</span>
-                                            )}
+                                            <span className={`spell-slot-wire ${hasElement ? "is-lit" : ""}`.trim()} aria-hidden="true" />
+                                            <div
+                                                className={`spell-slot${hasElement ? " has-element" : ""}`}
+                                                ref={spellSlotRefs.current[slotIndex]}
+                                            >
+                                                {!hasElement && (
+                                                    <span className="spell-slot-empty-text">+</span>
+                                                )}
+                                            </div>
                                         </div>
                                     );
                                 })}

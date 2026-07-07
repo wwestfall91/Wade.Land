@@ -476,10 +476,17 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
     }, []);
 
     const setElementalResistance = useCallback((element: ElementalResistanceKey, percent: number) => {
-        setElementalResistances((previous) => ({
-            ...previous,
-            [element]: Number.isFinite(percent) ? percent : previous[element],
-        }));
+        setElementalResistances((previous) => {
+            const nextValue = Number.isFinite(percent) ? percent : previous[element];
+            if (previous[element] === nextValue) {
+                return previous;
+            }
+
+            return {
+                ...previous,
+                [element]: nextValue,
+            };
+        });
     }, []);
 
     const contextValue = useMemo(

@@ -2222,7 +2222,8 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    width: 14rem;
+    width: 100%;
+    min-height: 17.8rem;
     border-radius: 4px;
     border: 2px solid #e4e9ff;
     background:
@@ -2259,14 +2260,19 @@
     }
 
     .next-enemy-text {
+        display: flex;
+        justify-content: center;
+        align-items: center;
         text-align: center;
-        font-size: 0.7rem;
+        font-size: 0.64rem;
         font-weight: 700;
         letter-spacing: 0.06em;
         text-transform: uppercase;
-        color: #c4ccff;
-        padding: 0.3rem 0.5rem 0.1rem;
-        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+        color: #fff7ab;
+        padding: 0.24rem 0.5rem;
+        border-bottom: 1px solid rgba(228, 234, 255, 0.45);
+        background: linear-gradient(180deg, rgba(40, 57, 168, 0.95) 0%, rgba(28, 41, 133, 0.95) 100%);
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.72);
     }
 
     .game-enemy-card-header {
@@ -2280,28 +2286,43 @@
             inset 0 0 0 1px #8ea0ff,
             inset 0 0 0 2px #101964;
         padding: 0.2rem 0.4rem;
+        min-height: 2rem;
 
         .game-enemy-card-name {
-            font-size: 1.1rem;
+            font-size: 1rem;
             font-weight: 700;
             color: #ffffff;
             text-transform: uppercase;
             text-align: center;
+            line-height: 1.1;
         }
     }
 
     .game-enemy-stage {
         position: static;
         z-index: auto;
-        flex-grow: 1;
+        flex: 1 1 auto;
+        min-height: 11.6rem;
         justify-content: center;
         background: radial-gradient(circle at 38% 30%, rgba(156, 180, 255, 0.25), rgba(20, 30, 104, 0.94));
-        padding: 0.6rem;
+        padding: 0.55rem;
 
         .enemy-sprite-card {
-            border: none;
-            box-shadow: none;
-            background: none;
+            width: 100%;
+            height: 100%;
+            min-height: 10.4rem;
+            border: 2px solid rgba(228, 234, 255, 0.72);
+            background:
+                radial-gradient(circle at 38% 26%, rgba(176, 198, 255, 0.28), rgba(18, 28, 102, 0.94));
+            box-shadow:
+                inset 0 0 0 1px rgba(148, 164, 255, 0.55),
+                inset 0 0 0 2px rgba(12, 21, 88, 0.9),
+                0 5px 0 rgba(0, 0, 0, 0.3);
+
+            .enemy-sprite-hitbox {
+                padding: 0.45rem;
+                box-sizing: border-box;
+            }
         }
     }
 
@@ -2316,12 +2337,16 @@
         justify-content: center;
         align-items: center;
         width: 100%;
+        min-height: 1.65rem;
         border-top: 1px solid rgba(228, 234, 255, 0.58);
-        background-color: #0d1557;
-        color: #ffffff;
-        font-size: 0.75rem;
-        padding: 0.25rem 0;
+        background: linear-gradient(180deg, rgba(23, 36, 127, 0.95) 0%, rgba(15, 24, 87, 0.95) 100%);
+        color: #dce5ff;
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        padding: 0.2rem 0.35rem;
         text-shadow: 0 1px 1px rgba(0, 0, 0, 0.82);
+        text-transform: uppercase;
     }
 }
 

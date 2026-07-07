@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import EnemyInfoSprite from "./EnemyInfoSprite";
 import ElementDetailsTooltip from "./ElementDetailsTooltip";
 import ElementIcon from "./ElementIcon";
-import soulIcon from "../assets/icons/Soul.png";
 import "./EnemyStage.scss";
 import type { RewardElement } from "../context/PlayerContext";
 import type { ActiveBurnStatus, ActiveFreezeStatus, ActiveSoakStatus } from "../combat/spellEffects";
@@ -41,9 +40,6 @@ type EnemyStageProps = {
     freezeStatus?: ActiveFreezeStatus | null;
 };
 
-const toTypeClass = (value: string) =>
-    `type-${value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
-
 function EnemyStage({
     enemyName,
     spritePath,
@@ -63,6 +59,7 @@ function EnemyStage({
     soakStatus = null,
     freezeStatus = null,
 }: EnemyStageProps) {
+    const enemyHpFillPercent = Math.max(0, Math.min(100, (enemyHealth / Math.max(1, enemyMaxHp)) * 100));
     const stageRef = useRef<HTMLDivElement | null>(null);
     const [isEnemyStageHovered, setIsEnemyStageHovered] = useState(false);
     const [hoveredElementIndex, setHoveredElementIndex] = useState<number | null>(null);
@@ -224,17 +221,25 @@ function EnemyStage({
                         </span>
                     ) : null}
                     <div className="enemy-meta-tooltip" aria-hidden="true">
-                        <div className="enemy-meta-section">
+                        <div className="enemy-meta-section enemy-meta-section--hp">
                             <span className="enemy-meta-label">HP</span>
-                            <span className="enemy-meta-value">{enemyHealth} / {enemyMaxHp}</span>
+                            <div className="enemy-meta-hp-track" role="progressbar" aria-valuemin={0} aria-valuemax={enemyMaxHp} aria-valuenow={enemyHealth}>
+                                <span className="enemy-meta-hp-fill" style={{ width: `${enemyHpFillPercent}%` }} />
+                                <span className="enemy-meta-hp-text">{enemyHealth} / {enemyMaxHp}</span>
+                            </div>
                         </div>
                         <div className="enemy-meta-section">
                             <span className="enemy-meta-label">Weaknesses</span>
-                            <div className="enemy-meta-chip-list">
+                            <div className="enemy-meta-icon-list">
                                 {weaknesses.length > 0 ? (
                                     weaknesses.map((weakness) => (
-                                        <span key={weakness} className={`enemy-meta-chip ${toTypeClass(weakness)}`}>
-                                            {weakness}
+                                        <span
+                                            key={weakness}
+                                            className="enemy-meta-icon-chip"
+                                            aria-label={weakness}
+                                            title={weakness}
+                                        >
+                                            <ElementIcon name={weakness} />
                                         </span>
                                     ))
                                 ) : (
@@ -256,7 +261,8 @@ function EnemyStage({
                                             onMouseEnter={() => handleElementChipMouseEnter(index)}
                                             onMouseLeave={handleElementChipMouseLeave}
                                         >
-                                            <ElementIcon name={element.letter} /> ({enemyPower ?? element.damage})
+                                            <ElementIcon name={element.letter} />
+                                            <span className="enemy-meta-attack-value">{enemyPower ?? element.damage}</span>
                                         </span>
                                     ))
                                 ) : (
