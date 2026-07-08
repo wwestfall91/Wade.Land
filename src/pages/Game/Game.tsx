@@ -1,6 +1,7 @@
 ﻿import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import Draggable from "./Draggable";
+import { HomunculusWorkbook, type HomunculusRow } from "./homunculusWorkbook";
 import { useLocation, useNavigate } from "react-router";
 import PlayerStats from "../../components/PlayerStats";
 import EnemyStage from "../../components/EnemyStage";
@@ -163,6 +164,7 @@ type GameLocationState = {
     fightReward?: FightRewardState;
     battleEnded?: boolean;
     elementUseCounts?: Record<number, number>;
+    defeatedEnemy?: Enemy;
 };
 
 const SPREAD_X = 200;
@@ -183,6 +185,7 @@ const MODE_COLLAPSE_ANIMATION_MS = 420;
 const ENABLE_FIRST_BATTLE_OLD_ONE_SCENE = false;
 const COMBUST_DAMAGE_MULTIPLIER = 2.5;
 const PREVIEW_DRAG_START_THRESHOLD_PX = 6;
+const HOMUNCULUS_CREATE_ANIMATION_MS = 2000;
 
 type SoulFlightIcon = {
     id: number;
@@ -272,6 +275,21 @@ const resolvePublicAssetUrl = (assetPath: string): string => {
 const isSuccessfulResponse = (response: Response): boolean =>
     typeof response.ok === "boolean" ? response.ok : true;
 
+// Homunculus sprites — populated when files are added to src/assets/homunculus/.
+const homunculusSpriteModules = import.meta.glob("../../assets/homunculus/*", {
+    eager: true,
+    import: "default",
+}) as Record<string, string>;
+
+const resolveHomunculusSpriteUrl = (name: string): string | null => {
+    const key = name.replace(/\s+/g, "").toLowerCase();
+    const entry = Object.entries(homunculusSpriteModules).find(([path]) => {
+        const fileName = path.split("/").pop()?.replace(/\.[^.]+$/, "").toLowerCase() ?? "";
+        return fileName === key;
+    });
+    return entry ? entry[1] : null;
+};
+
 type IntroPhase = "hidden" | "line1" | "line2" | "input" | "line3" | "line4" | "fadeout";
 
 function Game() {
@@ -325,6 +343,11 @@ function Game() {
     const previewRef = useRef<HTMLDivElement | null>(null);
     const previewRef2 = useRef<HTMLDivElement | null>(null);
     const spellSlotRefs = useRef<Array<React.RefObject<HTMLDivElement>>>([]);
+    const createBaseSlotRef = useRef<HTMLDivElement | null>(null);
+    const createElemSlotRef0 = useRef<HTMLDivElement | null>(null);
+    const createElemSlotRef1 = useRef<HTMLDivElement | null>(null);
+    const createElemSlotRef2 = useRef<HTMLDivElement | null>(null);
+    const createHomunculusTimeoutRef = useRef<number | null>(null);
 
     const [draggables, setDraggables] = useState<DraggableItem[]>([]);
     const [combinationStateEffectsLookup, setCombinationStateEffectsLookup] = useState<CombinationStateEffectsLookup>({});
@@ -372,6 +395,8 @@ function Game() {
     const [returnHomeVersions, setReturnHomeVersions] = useState<Record<number, number>>({});
     const [plasmaForcedSnap, setPlasmaForcedSnap] = useState<{ zone: number; version: number } | null>(null);
     const [modeTransformForcedSnap, setModeTransformForcedSnap] = useState<{ id: number; version: number } | null>(null);
+    /** Forces spell-slot elements back to their slots after Game remounts from a fight. */
+    const [spellSlotForcedSnaps, setSpellSlotForcedSnaps] = useState<Record<number, { zone: number; version: number }>>({});
     const [isPreviewDragging, setIsPreviewDragging] = useState(false);
     const [isPreviewHovered, setIsPreviewHovered] = useState(false);
     const [isPreviewTooltipHovered, setIsPreviewTooltipHovered] = useState(false);
@@ -393,6 +418,19 @@ function Game() {
     const [isFightVictoryCueVisible, setIsFightVictoryCueVisible] = useState(false);
     const [isSoulPulseVisible, setIsSoulPulseVisible] = useState(false);
     const [soulPulseAmount, setSoulPulseAmount] = useState(0);
+    // ── Homunculus / enemy-card mode ──────────────────────────────────────────
+    const [enemyCardMode, setEnemyCardMode] = useState<"create" | "fight" | "consume">("fight");
+    const [isCreatingHomunculus, setIsCreatingHomunculus] = useState(false);
+    const [pendingCreatedEnemy, setPendingCreatedEnemy] = useState<Enemy | null>(null);
+    const [pendingBaseElemLetter, setPendingBaseElemLetter] = useState<string | null>(null);
+    const [isConsuming, setIsConsuming] = useState(false);
+    const [isDrainShaking, setIsDrainShaking] = useState(false);
+    const [drainShakeColor, setDrainShakeColor] = useState("");
+    const [consumeDrainedMeters, setConsumeDrainedMeters] = useState<Set<string>>(new Set());
+    const [createBaseSlotId, setCreateBaseSlotId] = useState<number | null>(null);
+    const [elemSlotCount, setElemSlotCount] = useState(1);
+    const [createElemSlotIds, setCreateElemSlotIds] = useState<(number | null)[]>([null]);
+    const [homunculusWorkbook, setHomunculusWorkbook] = useState<HomunculusWorkbook | null>(null);
     const [isSoulCounterPopping] = useState(false);
     const [isSoulPanelErrorFeedback, setIsSoulPanelErrorFeedback] = useState(false);
     const [hoveredInsertSlot, setHoveredInsertSlot] = useState<1 | 2 | null>(null);
@@ -826,6 +864,13 @@ function Game() {
         }
     }, [deferredJobs]);
 
+    useEffect(() => () => {
+        if (createHomunculusTimeoutRef.current !== null) {
+            window.clearTimeout(createHomunculusTimeoutRef.current);
+            createHomunculusTimeoutRef.current = null;
+        }
+    }, []);
+
     useEffect(() => {
         const state = location.state as GameLocationState | null;
         if (state?.battleEnded || state?.fightReward) {
@@ -875,6 +920,27 @@ function Game() {
                 });
 
                 setIsFightVictoryCueVisible(false);
+                if (state.defeatedEnemy) {
+                    setNextEnemy(state.defeatedEnemy);
+                }
+                setEnemyCardMode("consume");
+                setConsumeDrainedMeters(new Set());
+
+                // Re-snap any spell-slot elements back to their slots.
+                // Game remounts after navigation so Draggables start at their
+                // inventory initialPosition rather than the slot they were in.
+                setSpellSlotForcedSnaps((prev) => {
+                    const next: Record<number, { zone: number; version: number }> = {};
+                    spellSlots.forEach((elementId, slotIndex) => {
+                        if (elementId !== null) {
+                            next[elementId] = {
+                                zone: spellSlotStartIndex + slotIndex,
+                                version: (prev[elementId]?.version ?? 0) + 1,
+                            };
+                        }
+                    });
+                    return Object.keys(next).length > 0 ? { ...prev, ...next } : prev;
+                });
             }, REWARD_CUE_MS);
         }
     }, [isOldOneIntroTriggered, location.state, navigate, startOldOneStoryPrelude]);
@@ -967,6 +1033,14 @@ function Game() {
     const allDropZoneRefsWithSpellSlots = [
         ...allDropZoneRefs,
         ...spellSlotRefs.current,
+    ];
+    const createSlotStartIndex = allDropZoneRefsWithSpellSlots.length;
+    const allDropZoneRefsAll = [
+        ...allDropZoneRefsWithSpellSlots,
+        createBaseSlotRef,
+        createElemSlotRef0,
+        createElemSlotRef1,
+        createElemSlotRef2,
     ];
 
     const getDraggableById = useCallback((draggableId: number | null) => {
@@ -1502,6 +1576,60 @@ function Game() {
                 }
 
                 console.error("Failed to load enemies workbook.", error);
+            }
+
+            // Load homunculus workbook (non-fatal — create mode works without it)
+            try {
+                const hwb = await HomunculusWorkbook.load(resolvePublicAssetUrl("homunculus.xlsx"));
+                if (!isCancelled) {
+                    setHomunculusWorkbook(hwb);
+
+                    // Use the first row (Scarecrow) as the opening enemy.
+                    const scarecrowRow = hwb.rows[0];
+                    if (scarecrowRow) {
+                        const scarecrowHp = Number(scarecrowRow.extras["HP"] ?? scarecrowRow.extras["hp"] ?? 30);
+                        const scarecrowPwr = Number(scarecrowRow.extras["Power"] ?? scarecrowRow.extras["power"] ?? 5);
+                        const scarecrowDef = Number(
+                            scarecrowRow.extras["DEF"]
+                            ?? scarecrowRow.extras["def"]
+                            ?? scarecrowRow.extras["Defense"]
+                            ?? scarecrowRow.extras["defense"]
+                            ?? 0,
+                        );
+                        const scarecrowSpd = Number(
+                            scarecrowRow.extras["SPD"]
+                            ?? scarecrowRow.extras["spd"]
+                            ?? scarecrowRow.extras["Speed"]
+                            ?? scarecrowRow.extras["speed"]
+                            ?? scarecrowRow.extras["EXP"]
+                            ?? scarecrowRow.extras["exp"]
+                            ?? scarecrowRow.extras["Energy"]
+                            ?? scarecrowRow.extras["energy"]
+                            ?? 0,
+                        );
+                        setNextEnemy({
+                            name: scarecrowRow.name,
+                            hp: scarecrowHp,
+                            power: scarecrowPwr,
+                            souls: Number(scarecrowRow.extras["Souls"] ?? scarecrowRow.extras["souls"] ?? 0),
+                            description: String(scarecrowRow.extras["Description"] ?? scarecrowRow.extras["description"] ?? ""),
+                            sprite: `homunculus/${scarecrowRow.name.replace(/\s+/g, "")}`,
+                            weaknesses: [],
+                            elements: [{
+                                letter: "Scarecrow",
+                                damage: scarecrowPwr,
+                                shield: scarecrowDef,
+                                energy: scarecrowSpd,
+                                rank: 1,
+                                level: 1,
+                                description: "Homunculus attack profile",
+                                category: "element",
+                            }],
+                        });
+                    }
+                }
+            } catch {
+                console.warn("Failed to load homunculus workbook.");
             }
         };
 
@@ -2982,6 +3110,32 @@ function Game() {
             }
         }
 
+        // Clear from create slots whenever this element moves
+        setCreateBaseSlotId((prev) => (prev === draggableId ? null : prev));
+        setCreateElemSlotIds((prev) => prev.map((id) => (id === draggableId ? null : id)));
+
+        // If dropping onto a create slot
+        if (zoneIndex !== null && zoneIndex >= createSlotStartIndex) {
+            const localIndex = zoneIndex - createSlotStartIndex;
+            if (localIndex === 0) {
+                setCreateBaseSlotId(draggableId);
+            } else {
+                const elemIndex = localIndex - 1;
+                setCreateElemSlotIds((prev) => {
+                    const next = [...prev];
+                    while (next.length <= elemIndex) next.push(null);
+                    next[elemIndex] = draggableId;
+                    return next;
+                });
+            }
+            setZoneOccupants((previous) => normalizeZoneOccupants(
+                previous.map((occupantId) => (occupantId === draggableId ? null : occupantId)),
+            ));
+            setEnhanceSlotOccupantId((previous) => (previous === draggableId ? null : previous));
+            setMachineSlotOccupantId((previous) => (previous === draggableId ? null : previous));
+            return;
+        }
+
         // If dropping onto a spell slot, assign it and stop
         if (zoneIndex !== null && zoneIndex >= spellSlotStartIndex) {
             const slotLocalIndex = zoneIndex - spellSlotStartIndex;
@@ -3087,11 +3241,23 @@ function Game() {
         }
 
         // Spell slots: any element can snap to a spell slot
-        if (zoneIndex >= spellSlotStartIndex) {
+        if (zoneIndex >= spellSlotStartIndex && zoneIndex < createSlotStartIndex) {
             const slotLocalIndex = zoneIndex - spellSlotStartIndex;
             if (slotLocalIndex >= spellSlots.length) return false;
             // Allow if the slot is empty or already holds this element
             return spellSlots[slotLocalIndex] === null || spellSlots[slotLocalIndex] === draggableId;
+        }
+
+        // Create slots: accept any draggable element (not soul, not spell) when in create mode
+        if (zoneIndex >= createSlotStartIndex) {
+            if (enemyCardMode !== "create" || isCreatingHomunculus) return false;
+            if (draggable.category === "spell" || draggable.category === "soul") return false;
+            const localIndex = zoneIndex - createSlotStartIndex;
+            if (localIndex === 0) return createBaseSlotId === null || createBaseSlotId === draggableId;
+            const elemIndex = localIndex - 1;
+            if (elemIndex >= elemSlotCount) return false;
+            const occupant = createElemSlotIds[elemIndex] ?? null;
+            return occupant === null || occupant === draggableId;
         }
 
         // Block the logic panel slot while a deferred job is processing for this mode.
@@ -3186,9 +3352,21 @@ function Game() {
 
         setNewChestElementIds(new Set());
 
-        // Fight the currently selected enemy and preselect the next row in order.
+        // If the current enemy was created (homunculus) it won't be in the regular
+        // enemies list. Fight it directly without advancing the regular enemy queue.
         const currentIndex = enemies.findIndex((enemy) => enemy.name === nextEnemy.name);
-        const safeCurrentIndex = currentIndex >= 0 ? currentIndex : 0;
+        if (currentIndex === -1) {
+            navigate("/fight", {
+                state: {
+                    enemy: nextEnemy,
+                    elementPool: allElementOptions,
+                },
+            });
+            return;
+        }
+
+        // Fight the currently selected enemy and preselect the next row in order.
+        const safeCurrentIndex = currentIndex;
         const fullEnemy = enemies[safeCurrentIndex] ?? nextEnemy;
         const nextIndex = (safeCurrentIndex + 1) % enemies.length;
         setNextEnemy(enemies[nextIndex]);
@@ -3199,6 +3377,194 @@ function Game() {
                 elementPool: allElementOptions,
             },
         });
+    };
+
+    /** Build the matched homunculus row from the current create-slot elements. */
+    const matchedHomunculusRow = useMemo((): HomunculusRow | null => {
+        if (!createBaseSlotId || !homunculusWorkbook) return null;
+        const primaryElemId = createElemSlotIds[0] ?? null;
+        const baseElem = getDraggableById(createBaseSlotId);
+        if (!baseElem) return null;
+        const baseType = normalizeType(baseElem.type1 || baseElem.letter);
+        const rowsForBase = homunculusWorkbook.filterByBaseElement(baseType);
+
+        if (primaryElemId) {
+            const elemItem = getDraggableById(primaryElemId);
+            if (!elemItem) return null;
+            const elemType = normalizeType(elemItem.type1 || elemItem.letter);
+            return rowsForBase.find((row) => normalizeType(row.element) === elemType) ?? null;
+        }
+
+        // Support base-only recipes when no primary element is inserted.
+        const baseOnlyRows = rowsForBase.filter((row) => {
+            const elementType = normalizeType(row.element);
+            return (
+                elementType.length === 0
+                || elementType === "none"
+                || elementType === "base"
+                || elementType === "self"
+                || elementType === "solo"
+                || elementType === "any"
+                || elementType === "na"
+                || elementType === "n/a"
+                || elementType === baseType
+            );
+        });
+
+        if (baseOnlyRows.length > 0) {
+            return baseOnlyRows[0] ?? null;
+        }
+
+        // If there is exactly one row for this base type, allow it as base-only.
+        if (rowsForBase.length === 1) {
+            return rowsForBase[0] ?? null;
+        }
+
+        return null;
+    }, [createBaseSlotId, createElemSlotIds, homunculusWorkbook, getDraggableById]);
+
+    /** Stat meters shown to the right of the enemy card. */
+    const homunculusMeters = useMemo(() => {
+        // Fight / Consume mode: derive from the enemy's first element; fall back to 5% floor
+        // for enemies that have no elements (e.g. Scarecrow).
+        if (enemyCardMode === "fight" || enemyCardMode === "consume") {
+            const fightElem = nextEnemy?.elements?.[0];
+            if (!fightElem) return { hp: 5, def: 0, pwr: 0, exp: 5 };
+            const d = fightElem.damage ?? 0;
+            const s = fightElem.shield ?? 0;
+            const e = fightElem.energy ?? 0;
+            return {
+                hp:  Math.min(100, s + d),
+                def: Math.min(100, s),
+                pwr: Math.min(100, d),
+                exp: Math.min(100, e * 3),
+            };
+        }
+        // Create mode: combine base element + all slotted elements.
+        const base = getDraggableById(createBaseSlotId);
+        const slottedElems = createElemSlotIds
+            .map((id) => getDraggableById(id))
+            .filter(Boolean) as NonNullable<ReturnType<typeof getDraggableById>>[];
+        const damage = (base?.damage ?? 0) + slottedElems.reduce((s, e) => s + (e.damage ?? 0), 0);
+        const shield = (base?.shield ?? 0) + slottedElems.reduce((s, e) => s + (e.shield ?? 0), 0);
+        const energy = (base?.energy ?? 0) + slottedElems.reduce((s, e) => s + (e.energy ?? 0), 0);
+        return {
+            hp:  Math.min(100, shield + damage),
+            def: Math.min(100, shield),
+            pwr: Math.min(100, damage),
+            exp: Math.min(100, energy * 3),
+        };
+    }, [createBaseSlotId, createElemSlotIds, getDraggableById, enemyCardMode, nextEnemy]);
+
+    const handleCreate = () => {
+        if (!matchedHomunculusRow || isCreatingHomunculus) return;
+        const row = matchedHomunculusRow;
+
+        const consumedIds = [createBaseSlotId, ...createElemSlotIds]
+            .filter((id): id is number => id !== null);
+
+        const hpStat = homunculusMeters.hp;
+        const pwrStat = homunculusMeters.pwr;
+        const defStat = homunculusMeters.def;
+        const baseElem = getDraggableById(createBaseSlotId);
+        const energyStat = (baseElem?.energy ?? 0) + createElemSlotIds
+            .map((id) => getDraggableById(id))
+            .filter(Boolean)
+            .reduce((sum, elem) => sum + (elem?.energy ?? 0), 0);
+
+        const homunculus: Enemy = {
+            name: row.name,
+            // Homunculus HP/PWR/DEF come directly from the meter stats.
+            hp: hpStat,
+            power: pwrStat,
+            souls: Number(row.extras["Souls"] ?? row.extras["souls"] ?? 1),
+            description: String(row.extras["Description"] ?? row.extras["description"] ?? ""),
+            sprite: `homunculus/${row.name.replace(/\s+/g, "")}`,
+            weaknesses: [],
+            elements: [{
+                letter: row.name,
+                damage: pwrStat,
+                shield: defStat,
+                energy: energyStat,
+                rank: 1,
+                level: 1,
+                description: "Homunculus attack profile",
+                type1: normalizeType(baseElem?.type1 || baseElem?.letter),
+                category: "element",
+            }],
+        };
+
+        setPendingCreatedEnemy(homunculus);
+        setPendingBaseElemLetter(baseElem?.letter ?? null);
+        setIsCreatingHomunculus(true);
+
+        if (createHomunculusTimeoutRef.current !== null) {
+            window.clearTimeout(createHomunculusTimeoutRef.current);
+        }
+
+        createHomunculusTimeoutRef.current = window.setTimeout(() => {
+            // Consume slotted elements once forge animation is complete.
+            consumeElements(consumedIds);
+            setDraggables((prev) => prev.filter((d) => !consumedIds.includes(d.id)));
+            setCreateBaseSlotId(null);
+            setCreateElemSlotIds(Array(elemSlotCount).fill(null));
+
+            setNextEnemy(homunculus);
+            setEnemyCardMode("fight");
+            setIsCreatingHomunculus(false);
+            setPendingCreatedEnemy(null);
+            setPendingBaseElemLetter(null);
+            createHomunculusTimeoutRef.current = null;
+        }, HOMUNCULUS_CREATE_ANIMATION_MS);
+    };
+
+    const handleAddElemSlot = () => {
+        if (elemSlotCount >= 3) return;
+        setElemSlotCount((prev) => prev + 1);
+        setCreateElemSlotIds((prev) => [...prev, null]);
+    };
+
+    const handleRemoveElemSlot = () => {
+        if (elemSlotCount <= 0) return;
+        const removedId = createElemSlotIds[elemSlotCount - 1] ?? null;
+        if (removedId !== null) {
+            setReturnHomeVersions((prev) => ({ ...prev, [removedId]: (prev[removedId] ?? 0) + 1 }));
+        }
+        setElemSlotCount((prev) => prev - 1);
+        setCreateElemSlotIds((prev) => prev.slice(0, prev.length - 1));
+    };
+
+    const handleConsume = () => {
+        if (isConsuming || isDrainShaking || !nextEnemy) return;
+
+        // Ordered meter definitions — only ones with pct > 0 can be drained.
+        const meterDefs = [
+            { key: "hp",  pct: homunculusMeters.hp,  color: "#4ade80" },
+            { key: "def", pct: homunculusMeters.def, color: "#60a5fa" },
+            { key: "pwr", pct: homunculusMeters.pwr, color: "#fb923c" },
+            { key: "spd", pct: homunculusMeters.exp, color: "#fb923c" },
+        ];
+        const filled = meterDefs.filter((m) => m.pct > 0);
+
+        const drainedSoFar = consumeDrainedMeters.size;
+
+        if (drainedSoFar < filled.length) {
+            // Drain the next filled meter with a colored shake.
+            const meter = filled[drainedSoFar];
+            setDrainShakeColor(meter.color);
+            setIsDrainShaking(true);
+            setConsumeDrainedMeters((prev) => new Set([...prev, meter.key]));
+            window.setTimeout(() => setIsDrainShaking(false), 700);
+        } else {
+            // All meters drained — final red shake-and-disappear.
+            setDrainShakeColor("#ef4444");
+            setIsConsuming(true);
+            window.setTimeout(() => {
+                setIsConsuming(false);
+                setConsumeDrainedMeters(new Set());
+                setEnemyCardMode("create");
+            }, 2000);
+        }
     };
 
     const handleFeedOverlayClose = () => {
@@ -3727,7 +4093,16 @@ function Game() {
                 />
             ) : null}
             {draggables
-                .filter((draggable) => draggable.id !== hiddenInsertedModeElementId && !hiddenModeOutputElementIds.has(draggable.id))
+                .filter((draggable) => {
+                    if (draggable.id === hiddenInsertedModeElementId) return false;
+                    if (hiddenModeOutputElementIds.has(draggable.id)) return false;
+                    // During create animation hide the elements that were in the create slots.
+                    if (isCreatingHomunculus) {
+                        if (createBaseSlotId === draggable.id) return false;
+                        if (createElemSlotIds.includes(draggable.id)) return false;
+                    }
+                    return true;
+                })
                 .map((draggable) => (
                 <Draggable
                     key={draggable.id}
@@ -3746,15 +4121,16 @@ function Game() {
                     level={draggable.level}
                     category={draggable.category}
                     containerRef={gameRef}
-                    dropZoneRefs={allDropZoneRefsWithSpellSlots}
+                    dropZoneRefs={allDropZoneRefsAll}
                     initialPosition={draggable.initialPosition}
                     onSnapChange={handleSnapChange}
                     canSnapToZone={canSnapToZone}
                     isNewFromChest={newChestElementIds.has(draggable.id)}
                     forcedSnapZone={
-                        draggable.id === modeTransformForcedSnap?.id
-                            ? { zone: 0, version: modeTransformForcedSnap.version }
-                            : isPlasmaName(draggable.letter) ? plasmaForcedSnap : null
+                        spellSlotForcedSnaps[draggable.id]
+                            ?? (draggable.id === modeTransformForcedSnap?.id
+                                ? { zone: 0, version: modeTransformForcedSnap.version }
+                                : isPlasmaName(draggable.letter) ? plasmaForcedSnap : null)
                     }
                     returnHomeVersion={returnHomeVersions[draggable.id] ?? 0}
                 />
@@ -3980,28 +4356,212 @@ function Game() {
                     </div>
                 </div>
                 <div className="game-scene-col game-scene-col--right">
-                    <div className="game-enemy-card">
-                        <div className="next-enemy-text">Next Enemy</div>
-                        <div className="game-enemy-card-header">
-                            <div className="game-enemy-card-name">{nextEnemy?.name ?? "Unknown Enemy"}</div>
+                    <div className="enemy-card-with-meters">
+                    {enemyCardMode === "create" ? (
+                        <div className="game-enemy-card game-enemy-card--create">
+                            <div className="next-enemy-text">
+                                <span>Homunculus Lab</span>
+                            </div>
+                            <div className="game-enemy-card-header">
+                                <div className="game-enemy-card-name">
+                                    {isCreatingHomunculus
+                                        ? (pendingCreatedEnemy?.name ?? matchedHomunculusRow?.name ?? "???")
+                                        : (matchedHomunculusRow?.name ?? "???")}
+                                </div>
+                            </div>
+                            <div className="game-enemy-stage create-stage">
+                                {isCreatingHomunculus && pendingCreatedEnemy ? (
+                                    <div className="create-forge-animation" aria-live="polite">
+                                        <EnemyStage
+                                            className="create-forge-stage"
+                                            enemyName={pendingCreatedEnemy.name}
+                                            spritePath={pendingCreatedEnemy.sprite}
+                                            enemyHealth={pendingCreatedEnemy.hp}
+                                            enemyMaxHp={pendingCreatedEnemy.hp}
+                                            enemyPower={pendingCreatedEnemy.power}
+                                            weaknesses={pendingCreatedEnemy.weaknesses}
+                                            elements={pendingCreatedEnemy.elements}
+                                            souls={pendingCreatedEnemy.souls}
+                                        />
+                                        {pendingBaseElemLetter ? (
+                                            <div className="create-forge-elem-icon" aria-hidden="true">
+                                                <ElementIcon name={pendingBaseElemLetter} />
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                ) : (
+                                <div className="create-slot-layout">
+                                    <div className="create-slot-group">
+                                        <span className="create-slot-label">Base Element</span>
+                                        <div
+                                            className={`create-slot-drop-zone${createBaseSlotId ? " has-element" : ""}`}
+                                            ref={createBaseSlotRef}
+                                        >
+                                            {!createBaseSlotId && <span className="create-slot-empty">+</span>}
+                                        </div>
+                                    </div>
+                                    <div
+                                        className={`create-slot-connector${createBaseSlotId && (createElemSlotIds[0] ?? null) ? " is-lit" : ""}${elemSlotCount === 0 ? " is-hidden" : ""}`}
+                                    />
+                                    {/* Variable element slots */}
+                                    <div className={`create-elem-section${elemSlotCount === 3 ? " create-elem-section--count-3" : ""}`}>
+                                        <button
+                                            className={`create-elem-btn${elemSlotCount <= 0 ? " is-hidden" : ""}`}
+                                            onClick={handleRemoveElemSlot}
+                                            disabled={elemSlotCount <= 0 || isCreatingHomunculus}
+                                            aria-label="Remove element slot"
+                                        >−</button>
+                                        <div className={`create-elem-slots${elemSlotCount === 0 ? " is-empty" : ""}`}>
+                                            {elemSlotCount === 0 ? (
+                                                <div className="create-elem-slot-entry" aria-hidden="true">
+                                                    <div className="create-slot-drop-zone create-elem-slot-spacer" />
+                                                </div>
+                                            ) : Array.from({ length: elemSlotCount }, (_, i) => {
+                                                const slotRef = [createElemSlotRef0, createElemSlotRef1, createElemSlotRef2][i];
+                                                const slotId = createElemSlotIds[i] ?? null;
+                                                const prevSlotId = i > 0 ? (createElemSlotIds[i - 1] ?? null) : null;
+                                                return (
+                                                    <div key={i} className="create-elem-slot-entry">
+                                                        {i > 0 && (
+                                                            <div className={`create-slot-connector create-slot-connector--h${prevSlotId && slotId ? " is-lit" : ""}`} />
+                                                        )}
+                                                        <div
+                                                            className={`create-slot-drop-zone${slotId ? " has-element" : ""}`}
+                                                            ref={slotRef}
+                                                        >
+                                                            {!slotId && <span className="create-slot-empty">+</span>}
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                        <button
+                                            className={`create-elem-btn${elemSlotCount >= 3 ? " is-hidden" : ""}`}
+                                            onClick={handleAddElemSlot}
+                                            disabled={elemSlotCount >= 3 || isCreatingHomunculus}
+                                            aria-label="Add element slot"
+                                            aria-hidden={elemSlotCount >= 3}
+                                            tabIndex={elemSlotCount >= 3 ? -1 : 0}
+                                        >+
+                                        </button>
+                                    </div>
+                                    <span className="create-slot-label">Element</span>
+                                </div>
+                                )}
+   
+                            </div>
+                            <div className="game-enemy-card-footer">
+                                {isCreatingHomunculus
+                                    ? "Creating homunculus..."
+                                    : (matchedHomunculusRow ? "" : "Insert element(s) to Begin Creation")}
+                            </div>
                         </div>
-                        <EnemyStage
-                            className="game-enemy-stage"
-                            enemyName={nextEnemy?.name ?? "Unknown Enemy"}
-                            spritePath={nextEnemy?.sprite ?? ""}
-                            enemyHealth={nextEnemy?.hp ?? 0}
-                            enemyMaxHp={nextEnemy?.hp ?? 0}
-                            enemyPower={nextEnemy?.power ?? 0}
-                            weaknesses={nextEnemy?.weaknesses ?? []}
-                            elements={nextEnemy?.elements ?? []}
-                            souls={nextEnemy?.souls ?? 0}
-                        />
-                        <div className="game-enemy-card-footer">Hover for details</div>
+                    ) : enemyCardMode === "consume" ? (
+                        <div className={`game-enemy-card game-enemy-card--consume${isConsuming ? " is-consuming" : ""}`}>
+                            <div className="next-enemy-text">
+                                <span>Consume</span>
+                            </div>
+                            <div className="game-enemy-card-header">
+                                <div className="game-enemy-card-name">{nextEnemy?.name ?? "Unknown Enemy"}</div>
+                            </div>
+                            <div
+                                className={`consume-stage-wrapper${isConsuming ? " is-consuming" : ""}${isDrainShaking ? " is-drain-shaking" : ""}`}
+                                style={{ "--consume-glow-color": drainShakeColor } as React.CSSProperties}
+                            >
+                                <EnemyStage
+                                    className="game-enemy-stage consume-mode-stage"
+                                    frozen
+                                    enemyName={nextEnemy?.name ?? "Unknown Enemy"}
+                                    spritePath={nextEnemy?.sprite ?? ""}
+                                    enemyHealth={nextEnemy?.hp ?? 0}
+                                    enemyMaxHp={nextEnemy?.hp ?? 0}
+                                    enemyPower={nextEnemy?.power ?? 0}
+                                    weaknesses={nextEnemy?.weaknesses ?? []}
+                                    elements={nextEnemy?.elements ?? []}
+                                    souls={nextEnemy?.souls ?? 0}
+                                />
+                            </div>
+                            <div className="game-enemy-card-footer">Absorb this enemy's essence</div>
+                        </div>
+                    ) : (
+                        <div className="game-enemy-card">
+                            <div className="next-enemy-text">
+                                <span>Next Enemy</span>
+                            </div>
+                            <div className="game-enemy-card-header">
+                                <div className="game-enemy-card-name">{nextEnemy?.name ?? "Unknown Enemy"}</div>
+                            </div>
+                            <EnemyStage
+                                className="game-enemy-stage"
+                                enemyName={nextEnemy?.name ?? "Unknown Enemy"}
+                                spritePath={nextEnemy?.sprite ?? ""}
+                                enemyHealth={nextEnemy?.hp ?? 0}
+                                enemyMaxHp={nextEnemy?.hp ?? 0}
+                                enemyPower={nextEnemy?.power ?? 0}
+                                weaknesses={nextEnemy?.weaknesses ?? []}
+                                elements={nextEnemy?.elements ?? []}
+                                souls={nextEnemy?.souls ?? 0}
+                            />
+                            <div className="game-enemy-card-footer">Hover for details</div>
+                        </div>
+                    )}
+                    {/* ── Stat meters ──────────────────────────────────────── */}
+                    <div className="homunculus-meters">
+                        {([
+                            { id: "hp",  label: "HP",  pct: homunculusMeters.hp  },
+                            { id: "def", label: "DEF", pct: homunculusMeters.def },
+                            { id: "pwr", label: "PWR", pct: homunculusMeters.pwr },
+                            { id: "spd", label: "SPD", pct: homunculusMeters.exp },
+                        ] as const).map(({ id, label, pct }) => (
+                            <div key={id} className="hmeter">
+                                <div className="hmeter-track">
+                                    <div
+                                        className={`hmeter-fill hmeter-fill--${id}`}
+                                        style={{
+                                            height: `${
+                                                enemyCardMode === "consume" && consumeDrainedMeters.has(id)
+                                                    ? 0
+                                                    : pct
+                                            }%`,
+                                        }}
+                                    />
+                                </div>
+                                <span className="hmeter-label">{label}</span>
+                            </div>
+                        ))}
                     </div>
+                    </div>{/* end .enemy-card-with-meters */}
                     <div className="game-enemy-actions">
-                        <button className="fight-button" onClick={handleFight} disabled={!nextEnemy}>
-                            FIGHT!
-                        </button>
+                        {enemyCardMode === "create" ? (
+                            <button
+                                className="create-button"
+                                onClick={handleCreate}
+                                disabled={!matchedHomunculusRow || isCreatingHomunculus}
+                            >
+                                {isCreatingHomunculus ? "CREATING..." : "CREATE"}
+                            </button>
+                        ) : enemyCardMode === "consume" ? (
+                            <button
+                                className="consume-button"
+                                onClick={handleConsume}
+                                disabled={isConsuming || isDrainShaking || !nextEnemy}
+                            >
+                                CONSUME
+                            </button>
+                        ) : (
+                            <div
+                                className="fight-btn-wrap"
+                                data-tip={!spellSlots.some((id) => id !== null) ? "Please insert at least one element into the spell slots below" : undefined}
+                            >
+                                <button
+                                    className="fight-button"
+                                    onClick={handleFight}
+                                    disabled={!nextEnemy || !spellSlots.some((id) => id !== null)}
+                                >
+                                    FIGHT!
+                                </button>
+                            </div>
+                        )}
                         {/* Spell Slots */}
                         <div className="spell-slots-section">
                             <div className="spell-slots-container">

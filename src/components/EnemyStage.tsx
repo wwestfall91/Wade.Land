@@ -38,6 +38,8 @@ type EnemyStageProps = {
     burnStatus?: ActiveBurnStatus | null;
     soakStatus?: ActiveSoakStatus | null;
     freezeStatus?: ActiveFreezeStatus | null;
+    /** Freeze the sprite on its current frame (renders a canvas snapshot). */
+    frozen?: boolean;
 };
 
 function EnemyStage({
@@ -58,6 +60,7 @@ function EnemyStage({
     burnStatus = null,
     soakStatus = null,
     freezeStatus = null,
+    frozen = false,
 }: EnemyStageProps) {
     const enemyHpFillPercent = Math.max(0, Math.min(100, (enemyHealth / Math.max(1, enemyMaxHp)) * 100));
     const stageRef = useRef<HTMLDivElement | null>(null);
@@ -175,7 +178,7 @@ function EnemyStage({
                     style={{ ["--enemy-hit-flash" as string]: hitFlashColor }}
                 >
                     <span className="enemy-sprite-hitbox">
-                        <EnemyInfoSprite enemyName={enemyName} spritePath={spritePath} />
+                        <EnemyInfoSprite enemyName={enemyName} spritePath={spritePath} frozen={frozen} />
                     </span>
                     {isSteamVisible ? (
                         <span className="enemy-steam-pop" aria-hidden="true">

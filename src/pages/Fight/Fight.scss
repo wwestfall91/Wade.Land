@@ -66,10 +66,15 @@
             justify-content: center;
             min-width: 14rem;
             min-height: 1.7rem;
-            overflow: hidden;
+            overflow: visible;
             border: 2px solid #ffe6e6;
             border-radius: 4px;
             background: linear-gradient(180deg, #0a0a0a 0%, #383838 100%);
+
+            &.has-shield {
+                box-shadow: 0 0 0.62rem rgba(103, 164, 248, 0.42);
+                border-color: rgba(145, 198, 255, 0.75);
+            }
 
         }
 
@@ -78,9 +83,16 @@
             left: 0;
             top: 0;
             bottom: 0;
-            background: linear-gradient(90deg, #ff9478 0%, #f4624f 50%, #db3e33c0 100%);
-            transition: width 138ms ease;
+            transition: width 138ms ease, left 138ms ease;
             z-index: 0;
+
+            &.enemy-hp-fill--health {
+                background: linear-gradient(90deg, #ff9478 0%, #f4624f 50%, #db3e33c0 100%);
+            }
+
+            &.enemy-hp-fill--shield {
+                background: linear-gradient(90deg, #99ccff 0%, #5ea8f6 65%, #3f86d6 100%);
+            }
         }
 
         .enemy-hp-label {
@@ -93,6 +105,77 @@
             font-variant-numeric: tabular-nums;
             letter-spacing: 0;
             text-shadow: 0 1px 1px rgba(0, 0, 0, 0.82);
+
+            &.has-shield {
+                color: #d9eeff;
+                border-radius: 999px;
+                padding: 0.08rem 0.5rem;
+            }
+        }
+
+        .enemy-shield-badge {
+            position: absolute;
+            left: 0.3rem;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 2;
+            width: 2.1rem;
+            height: 2.1rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-size: contain;
+            filter: drop-shadow(0 4px 8px rgba(9, 34, 72, 0.5));
+        }
+
+        .enemy-shield-value {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -62%);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+            font-size: 1.2rem;
+            font-weight: 600;
+            font-family: Verdana, Tahoma, "Segoe UI", sans-serif;
+            font-variant-numeric: tabular-nums;
+            line-height: 1;
+            letter-spacing: 0;
+            text-shadow:
+                1px 0 0 rgba(0, 0, 0, 0.98),
+                -1px 0 0 rgba(0, 0, 0, 0.98),
+                0 1px 0 rgba(0, 0, 0, 0.98),
+                0 -1px 0 rgba(0, 0, 0, 0.98),
+                0 2px 3px rgba(0, 0, 0, 0.7);
+        }
+
+        .enemy-shield-tooltip {
+            position: absolute;
+            left: 50%;
+            bottom: calc(100% + 0.35rem);
+            transform: translateX(-50%);
+            padding: 0.2rem 0.46rem;
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.28);
+            background: rgba(12, 12, 12, 0.93);
+            color: #ffffff;
+            font-size: 0.66rem;
+            font-weight: 700;
+            font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+            white-space: nowrap;
+            line-height: 1.25;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 140ms ease;
+            z-index: 3;
+        }
+
+        .enemy-shield-badge:hover .enemy-shield-tooltip {
+            opacity: 1;
         }
     }
 
@@ -198,14 +281,41 @@
         }
     }
 
-    .enemy-intent-damage {
-        font-size: 1.2rem;
+    .enemy-intent-stats {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.45rem;
+    }
+
+    .enemy-intent-stat {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.16rem;
+        min-width: 2rem;
+        font-size: 0.98rem;
         font-weight: 900;
-        color: #fff7c2;
         font-family: "Trebuchet MS", "Segoe UI", sans-serif;
         font-variant-numeric: tabular-nums;
         line-height: 1;
-        text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+
+        &.enemy-intent-stat--damage {
+            color: #ffd4bf;
+        }
+
+        &.enemy-intent-stat--shield {
+            color: #c9e8ff;
+        }
+    }
+
+    .enemy-intent-stat-icon {
+        width: 0.88rem;
+        height: 0.88rem;
+        object-fit: contain;
+        image-rendering: auto;
+        filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.55));
     }
 
     .enemy-intent-label {

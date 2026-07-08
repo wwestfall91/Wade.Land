@@ -1024,6 +1024,96 @@
         pointer-events: none;
     }
 
+    .create-forge-animation {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+    }
+
+    .create-forge-elem-icon {
+        position: absolute;
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+
+        .element-icon {
+            width: 3.8rem;
+            height: 3.8rem;
+            animation: forge-elem-glow 2000ms ease-in forwards;
+        }
+    }
+
+    .create-forge-stage {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        transform: scale(0.82);
+        animation: forge-sprite-reveal 2000ms ease-out forwards;
+        pointer-events: none;
+    }
+
+    @keyframes forge-elem-glow {
+        0% {
+            transform: scale(1);
+            filter: brightness(1) drop-shadow(0 0 0px rgba(255,255,255,0));
+            opacity: 1;
+        }
+        28% {
+            transform: scale(1.08);
+            filter: brightness(2.5) drop-shadow(0 0 10px rgba(255,255,255,0.65));
+            opacity: 1;
+        }
+        55% {
+            transform: scale(1.22);
+            filter: brightness(8) drop-shadow(0 0 20px rgba(255,255,255,0.95));
+            opacity: 1;
+        }
+        72% {
+            transform: scale(1.4);
+            filter: brightness(22) drop-shadow(0 0 30px rgba(255,255,255,1));
+            opacity: 1;
+        }
+        84% {
+            transform: scale(2.0);
+            filter: brightness(30) drop-shadow(0 0 40px rgba(255,255,255,1));
+            opacity: 0.85;
+        }
+        93% {
+            transform: scale(3.4);
+            filter: brightness(30) drop-shadow(0 0 20px rgba(255,255,255,0.5));
+            opacity: 0.2;
+        }
+        100% {
+            transform: scale(4.2);
+            filter: brightness(1) drop-shadow(0 0 0px rgba(255,255,255,0));
+            opacity: 0;
+        }
+    }
+
+    @keyframes forge-sprite-reveal {
+        0%, 74% {
+            opacity: 0;
+            transform: scale(0.82);
+            filter: brightness(4) saturate(0.2);
+        }
+        90% {
+            opacity: 0.92;
+            transform: scale(1.03);
+            filter: brightness(1.25) saturate(0.85);
+        }
+        100% {
+            opacity: 1;
+            transform: scale(1);
+            filter: none;
+        }
+    }
+
     .enhance-station {
         display: flex;
         flex-direction: column;
@@ -1439,6 +1529,7 @@
         align-items: flex-start;
         gap: 1rem;
         align-self: flex-start;
+        width: auto;
     }
 
     .game-controls-stack {
@@ -1461,12 +1552,56 @@
         z-index: 30;
     }
 
+    .fight-btn-wrap {
+        position: relative;
+
+        &[data-tip]:hover::after {
+            content: attr(data-tip);
+            position: absolute;
+            bottom: calc(100% + 0.5rem);
+            left: 50%;
+            transform: translateX(-50%);
+            width: 14rem;
+            padding: 0.4rem 0.6rem;
+            border-radius: 4px;
+            border: 1px solid rgba(228, 234, 255, 0.45);
+            background: linear-gradient(180deg, #1e2d6e 0%, #111d52 100%);
+            box-shadow:
+                inset 0 0 0 1px rgba(130, 148, 255, 0.25),
+                0 4px 12px rgba(0, 0, 0, 0.5);
+            color: #cdd8ff;
+            font-size: 0.65rem;
+            font-weight: 600;
+            font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+            text-align: center;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+            letter-spacing: 0.02em;
+            line-height: 1.4;
+            pointer-events: none;
+            z-index: 100;
+            white-space: normal;
+        }
+
+        // Small arrow pointing down toward the button
+        &[data-tip]:hover::before {
+            content: "";
+            position: absolute;
+            bottom: calc(100% + 0.15rem);
+            left: 50%;
+            transform: translateX(-50%);
+            border: 5px solid transparent;
+            border-top-color: #1e2d6e;
+            pointer-events: none;
+            z-index: 101;
+        }
+    }
+
     .fight-button{
         display: flex;
         justify-content: center;
         align-items: center;
         min-height: 3.5rem;
-        min-width: 13rem;
+        width: 16rem;
         padding: 0 1.15rem;
         border-radius: 4px;
         border: 2px solid var(--element-fire-accent-border);
@@ -1495,6 +1630,62 @@
 
         &:active {
             transform: translateY(0);
+        }
+
+        &:disabled {
+            border-color: #4a4f5e;
+            background: linear-gradient(180deg, #3a3f50 0%, #272b38 100%);
+            color: #6b7180;
+            box-shadow:
+                inset 0 0 0 1px #555a6a,
+                inset 0 0 0 2px #1a1d26,
+                0 5px 0 rgba(0, 0, 0, 0.32);
+            cursor: not-allowed;
+            transform: none;
+        }
+    }
+
+    // ── Create button (light blue) ──────────────────────────────────────────
+    .create-button {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 3.5rem;
+        width: 16rem;
+        padding: 0 1.15rem;
+        border-radius: 4px;
+        border: 2px solid #93d8ff;
+        background: linear-gradient(180deg, #4cb8e8 0%, #2790c4 100%);
+        color: #e8f8ff;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        font-size: 1.5rem;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        cursor: pointer;
+        transition: transform 110ms ease, box-shadow 110ms ease, border-color 110ms ease;
+        box-shadow:
+            inset 0 0 0 1px #beeeff,
+            inset 0 0 0 2px #0d4a6e,
+            0 5px 0 rgba(0, 0, 0, 0.32);
+
+        &:hover:not(:disabled) {
+            transform: translateY(-1px);
+            border-color: #c2ecff;
+            box-shadow:
+                inset 0 0 0 1px #d0f4ff,
+                inset 0 0 0 2px #0a3857,
+                0 8px 0 rgba(0, 0, 0, 0.36);
+        }
+
+        &:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        &:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+            transform: none;
         }
     }
 
@@ -2222,7 +2413,8 @@
     overflow: hidden;
     display: flex;
     flex-direction: column;
-    width: 100%;
+    width: 16rem;
+    height: 17.8rem;
     min-height: 17.8rem;
     border-radius: 4px;
     border: 2px solid #e4e9ff;
@@ -2273,6 +2465,7 @@
         border-bottom: 1px solid rgba(228, 234, 255, 0.45);
         background: linear-gradient(180deg, rgba(40, 57, 168, 0.95) 0%, rgba(28, 41, 133, 0.95) 100%);
         text-shadow: 0 1px 2px rgba(0, 0, 0, 0.72);
+        position: relative;
     }
 
     .game-enemy-card-header {
@@ -2302,7 +2495,7 @@
         position: static;
         z-index: auto;
         flex: 1 1 auto;
-        min-height: 11.6rem;
+        min-height: 0;
         justify-content: center;
         background: radial-gradient(circle at 38% 30%, rgba(156, 180, 255, 0.25), rgba(20, 30, 104, 0.94));
         padding: 0.55rem;
@@ -2348,6 +2541,477 @@
         text-shadow: 0 1px 1px rgba(0, 0, 0, 0.82);
         text-transform: uppercase;
     }
+
+    // ── Create-mode overrides ─────────────────────────────────────────────────
+    &.game-enemy-card--create {
+        width: 16rem;
+        border-color: #7ad4ff;
+        background:
+            radial-gradient(circle at 18% 16%, rgba(82, 188, 255, 0.22), transparent 34%),
+            linear-gradient(180deg, #1a5ea0 0%, #0d3562 100%);
+        box-shadow:
+            inset 0 0 0 1px #4ab9f5,
+            inset 0 0 0 2px #081e3a,
+            0 8px 0 rgba(0, 0, 0, 0.34);
+
+        .next-enemy-text {
+            color: #aae8ff;
+        }
+
+        .game-enemy-card-header {
+            background: linear-gradient(180deg, rgba(40, 120, 200, 0.95) 0%, rgba(18, 68, 130, 0.95) 100%);
+            box-shadow:
+                inset 0 0 0 1px #5ab9f8,
+                inset 0 0 0 2px #081e3a;
+        }
+
+        .game-enemy-card-footer {
+            background: linear-gradient(180deg, rgba(12, 48, 96, 0.95) 0%, rgba(7, 30, 62, 0.95) 100%);
+            border-top-color: rgba(120, 200, 255, 0.45);
+        }
+    }
+}
+
+// ── Mode toggle button inside card header-bar ─────────────────────────────────
+.next-enemy-text {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+    position: relative;
+
+    .enemy-card-mode-toggle--left {
+        position: absolute;
+        left: 0.3rem;
+        right: auto;
+    }
+}
+
+// ── Consume mode card ─────────────────────────────────────────────────────────
+.game-enemy-card--consume {
+    border-color: #6b21a8;
+    background:
+        radial-gradient(circle at 18% 16%, rgba(120, 50, 200, 0.2), transparent 34%),
+        linear-gradient(180deg, #2d0a4e 0%, #1a0630 100%);
+    box-shadow:
+        inset 0 0 0 1px #7c3aed,
+        inset 0 0 0 2px #0d0020,
+        0 8px 0 rgba(0, 0, 0, 0.4);
+
+    .next-enemy-text {
+        color: #d8b4fe;
+        background: linear-gradient(180deg, rgba(60, 20, 100, 0.95) 0%, rgba(35, 10, 65, 0.95) 100%);
+        border-bottom-color: rgba(168, 85, 247, 0.45);
+    }
+
+    .game-enemy-card-header {
+        background: linear-gradient(180deg, rgba(80, 30, 140, 0.95) 0%, rgba(50, 15, 100, 0.95) 100%);
+        box-shadow:
+            inset 0 0 0 1px #a855f7,
+            inset 0 0 0 2px #0d0020;
+        border-bottom-color: rgba(168, 85, 247, 0.6);
+    }
+
+    .game-enemy-card-footer {
+        background: linear-gradient(180deg, rgba(30, 8, 56, 0.95) 0%, rgba(18, 4, 36, 0.95) 100%);
+        border-top-color: rgba(168, 85, 247, 0.3);
+    }
+}
+
+// ── Consume stage — static b&w, plus animation when consuming ────────────────
+.consume-mode-stage {
+    background: radial-gradient(circle at 38% 30%, rgba(80, 40, 120, 0.15), rgba(10, 4, 28, 0.94)) !important;
+
+    // Only the sprite image goes greyscale; the card frame keeps its colours.
+    .enemy-sprite-image {
+        filter: grayscale(1) brightness(0.85);
+        animation: none !important;
+    }
+}
+
+.consume-stage-wrapper {
+    display: contents;
+
+    // Per-meter drain: shake tinted with the meter's glow color
+    &.is-drain-shaking .consume-mode-stage {
+        animation: consume-shake 0.09s linear infinite;
+
+        .enemy-sprite-image {
+            filter: grayscale(0) brightness(1.4) drop-shadow(0 0 10px var(--consume-glow-color, white)) !important;
+            animation: none !important;
+        }
+    }
+
+    &.is-consuming .consume-mode-stage {
+        animation: consume-shake 0.09s linear infinite, consume-fade 2s ease-out forwards;
+
+        .enemy-sprite-image {
+            filter: grayscale(0) brightness(1.4) drop-shadow(0 0 10px var(--consume-glow-color, #ef4444)) !important;
+            animation: none !important;
+        }
+    }
+}
+
+@keyframes consume-shake {
+    0%   { transform: translate(0, 0) rotate(0deg); }
+    10%  { transform: translate(-6px, 3px) rotate(-3deg); }
+    20%  { transform: translate(7px, -3px) rotate(3deg); }
+    30%  { transform: translate(-7px, 2px) rotate(-4deg); }
+    40%  { transform: translate(8px, 4px) rotate(3deg); }
+    50%  { transform: translate(-5px, -3px) rotate(-3deg); }
+    60%  { transform: translate(6px, 2px) rotate(4deg); }
+    70%  { transform: translate(-7px, -2px) rotate(-3deg); }
+    80%  { transform: translate(7px, 3px) rotate(2deg); }
+    90%  { transform: translate(-4px, -2px) rotate(-2deg); }
+    100% { transform: translate(0, 0) rotate(0deg); }
+}
+
+@keyframes consume-redden {
+    0%   { filter: grayscale(0) brightness(1); }
+    15%  { filter: brightness(1.4) saturate(3) hue-rotate(-20deg); }
+    45%  { filter: brightness(1.2) saturate(5) hue-rotate(-45deg); }
+    75%  { filter: brightness(0.9) saturate(6) hue-rotate(-60deg); }
+    100% { filter: brightness(0.3) saturate(8) hue-rotate(-70deg); }
+}
+
+@keyframes consume-fade {
+    0%, 55% { opacity: 1; }
+    100%    { opacity: 0; }
+}
+
+// ── Consume button ────────────────────────────────────────────────────────────
+.consume-button {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 3.5rem;
+    width: 16rem;
+    padding: 0 1.15rem;
+    border-radius: 4px;
+    border: 2px solid #7c3aed;
+    background: linear-gradient(180deg, #4c1d95 0%, #2e1065 100%);
+    color: #e9d5ff;
+    font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: transform 110ms ease, box-shadow 110ms ease, border-color 110ms ease;
+    box-shadow:
+        inset 0 0 0 1px #a855f7,
+        inset 0 0 0 2px #1a0050,
+        0 5px 0 rgba(0, 0, 0, 0.36);
+
+    &:hover:not(:disabled) {
+        transform: translateY(-1px);
+        border-color: #c084fc;
+        box-shadow:
+            inset 0 0 0 1px #c084fc,
+            inset 0 0 0 2px #200060,
+            0 8px 0 rgba(0, 0, 0, 0.4);
+    }
+
+    &:active:not(:disabled) {
+        transform: translateY(0);
+    }
+
+    &:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+        transform: none;
+    }
+}
+
+// ── Create-stage slot layout ──────────────────────────────────────────────────
+.create-stage {
+    display: flex !important;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+    background: radial-gradient(circle at 38% 30%, rgba(82, 188, 255, 0.18), rgba(8, 24, 72, 0.94)) !important;
+}
+
+.create-slot-layout {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+}
+
+.create-slot-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.28rem;
+}
+
+.create-slot-label {
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #9dd6ff;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+    user-select: none;
+}
+
+.create-slot-drop-zone {
+    width: 3.2rem;
+    height: 3.2rem;
+    border: 2px solid #4ab9f5;
+    border-radius: 245px;
+    background:
+        radial-gradient(circle at 34% 30%, rgba(82, 188, 255, 0.2), rgba(14, 44, 102, 0.24) 38%, rgba(8, 22, 72, 0.88) 78%),
+        radial-gradient(circle at 50% 62%, rgba(6, 16, 60, 1), rgba(5, 12, 44, 0.78));
+    box-shadow:
+        inset 0 1px 0 rgba(140, 200, 255, 0.28),
+        inset 0 0 0 1px #2d8cd6,
+        inset 0 0 0 2px #081c52,
+        inset 0 4px 6px rgba(4, 12, 44, 0.34),
+        0 5px 0 rgba(0, 0, 0, 0.3);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: default;
+    position: relative;
+
+    &.has-element {
+        border-color: #7adbff;
+        box-shadow:
+            inset 0 0 0 1px #3ab4f0,
+            inset 0 0 0 2px #061830,
+            0 0 10px rgba(80, 190, 255, 0.35),
+            0 5px 0 rgba(0, 0, 0, 0.3);
+    }
+}
+
+.create-slot-empty {
+    font-size: 1.2rem;
+    color: rgba(120, 190, 255, 0.45);
+    user-select: none;
+    pointer-events: none;
+}
+
+.create-slot-connector {
+    width: 0.18rem;
+    height: 1.6rem;
+    border-radius: 999px;
+    border: 1px solid #2d6fa8;
+    background: rgba(80, 160, 220, 0.5);
+    box-shadow:
+        inset 0 0 0 1px rgba(120, 200, 255, 0.2),
+        0 0 0 1px rgba(3, 10, 28, 0.45);
+    pointer-events: none;
+    transition: background 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+    margin: -10px 0;
+    z-index: -1;
+
+    &.is-lit {
+        border-color: #7ad4ff;
+        background: linear-gradient(180deg, #3aacf0 0%, #2090d8 100%);
+        box-shadow:
+            inset 0 0 0 1px rgba(180, 230, 255, 0.36),
+            0 0 10px rgba(80, 190, 255, 0.55);
+    }
+
+    &.is-hidden {
+        visibility: hidden;
+    }
+
+    // Horizontal variant (between side-by-side element slots)
+    &--h {
+        width: 1rem;
+        height: 0.18rem;
+        margin: 0 -10px;
+        z-index: -1;
+    }
+}
+
+// ── Variable-count element slots +/− controls ─────────────────────────────────
+.create-elem-section {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 1rem;
+    width: 13.2rem;
+    justify-content: center;
+}
+
+.create-elem-section--count-3 {
+    width: 15rem;
+    gap: 1rem;
+}
+
+.create-elem-slots {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: .5rem;
+    width: 10rem;
+    flex: 0 0 10rem;
+    min-height: 3.2rem;
+    justify-content: center;
+}
+
+.create-elem-slots.is-empty {
+    width: 10rem;
+}
+
+.create-elem-slot-entry {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+}
+
+.create-elem-btn {
+    width: 1.15rem;
+    height: 1.15rem;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    border: 1px solid rgba(100, 170, 255, 0.45);
+    background: rgba(15, 40, 90, 0.6);
+    color: #80c8ff;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    padding: 0;
+    flex-shrink: 0;
+    transition: background 100ms ease, border-color 100ms ease, color 100ms ease;
+    font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+    user-select: none;
+
+    &:not(:disabled) + .create-elem-slot-spacer {
+        display: none;
+    }
+
+    &.is-hidden {
+        visibility: hidden;
+        pointer-events: none;
+    }
+}
+
+.create-elem-slot-spacer {
+    width: 3.2rem;
+    height: 3.2rem;
+    flex: 0 0 3.2rem;
+    border-radius: 245px;
+    border-color: transparent;
+    background: transparent;
+    box-shadow: none;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.create-homunculus-name {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 0.5rem;
+}
+
+.create-homunculus-label {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #b8e8ff;
+    text-transform: uppercase;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+    letter-spacing: 0.04em;
+    animation: create-name-pop 180ms ease-out;
+}
+
+.create-homunculus-sprite {
+    max-width: 4rem;
+    max-height: 4rem;
+    object-fit: contain;
+    image-rendering: pixelated;
+    filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.35));
+}
+
+@keyframes create-name-pop {
+    from { opacity: 0; transform: scale(0.9); }
+    to   { opacity: 1; transform: scale(1); }
+}
+
+// ── Enemy card + meters row ───────────────────────────────────────────────────
+.enemy-card-with-meters {
+    display: flex;
+    flex-direction: row;
+    align-items: stretch;
+    gap: 0.45rem;
+    width: 100%;
+}
+
+// ── Stat meters (HP / DEF / PWR / EXP) ───────────────────────────────────────
+.homunculus-meters {
+    display: flex;
+    flex-direction: row;
+    gap: 0.4rem;
+    align-items: flex-end;
+    flex-shrink: 0;
+}
+
+.hmeter {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.18rem;
+    height: 100%;
+}
+
+.hmeter-track {
+    flex: 1;
+    width: 0.3rem;
+    min-height: 4rem;
+    background: rgba(5, 10, 32, 0.7);
+    border: 1px solid rgba(90, 110, 180, 0.38);
+    box-shadow:
+        inset 0 2px 4px rgba(0, 0, 0, 0.4),
+        0 1px 0 rgba(255, 255, 255, 0.05);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+}
+
+.hmeter-fill {
+    width: 100%;
+    border-radius: 0 0 2px 2px;
+    transition: height 380ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+
+    // Sheen overlay
+    &::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, rgba(255,255,255,0.12) 0%, transparent 60%);
+        pointer-events: none;
+    }
+
+    &--hp  { background: linear-gradient(0deg, #15803d 0%, #4ade80 100%); }
+    &--def { background: linear-gradient(0deg, #1d4ed8 0%, #60a5fa 100%); }
+    &--pwr { background: linear-gradient(0deg, #b91c1c 0%, #ff4f4f 100%); }
+    &--exp { background: linear-gradient(0deg, #ffec3f 0%, #ffbc12 100%); }
+    &--spd { background: linear-gradient(0deg, #c2410c 0%, #fb923c 100%); }
+}
+
+.hmeter-label {
+    font-size: 0.5rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: rgba(180, 200, 255, 0.65);
+    text-align: center;
+    user-select: none;
+    font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
 }
 
 .game-enemy-actions {
@@ -2355,8 +3019,12 @@
     display: flex;
     flex-direction: column;
     justify-content: center;
-    align-items: center;
+    align-items: flex-start;
     gap: 0.75rem;
+
+    .spell-slots-section {
+        width: 16rem;
+    }
 }
 
 @keyframes upgrades-panel-in {

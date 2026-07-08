@@ -106,6 +106,7 @@ type GameLocationState = {
     fightReward?: FightRewardState;
     battleEnded?: boolean;
     elementUseCounts?: Record<number, number>;
+    defeatedEnemy?: FightEnemy;
 };
 
 type CastableSpell = {
@@ -356,6 +357,11 @@ function Fight() {
     const [enemyHealth, setEnemyHealth] = useState(() => enemy.hp);
     const enemyMaxHp = Math.max(1, enemy.hp);
     const enemyHpFillPercent = Math.max(0, Math.min(100, (enemyHealth / enemyMaxHp) * 100));
+    const displayedEnemyHp = enemyHealth + Math.max(0, enemyShield);
+    const enemyShieldFillPercent = Math.max(0, Math.min(100, (Math.max(0, enemyShield) / enemyMaxHp) * 100));
+    const enemyTotalFillPercent = Math.min(100, enemyHpFillPercent + enemyShieldFillPercent);
+    const enemyShieldTailFillPercent = Math.min(enemyShieldFillPercent, enemyTotalFillPercent);
+    const enemyHealthFillPercent = Math.max(0, enemyTotalFillPercent - enemyShieldTailFillPercent);
     const playerMaxHp = Math.max(1, Math.round(100 * effectiveMaxHpMultiplier) - (permanentMaxHpReduction ?? 0));
     const displayedPlayerHp = player.hp + Math.max(0, playerShield);
     const playerHpFillPercent = Math.max(0, Math.min(100, (player.hp / playerMaxHp) * 100));
@@ -770,6 +776,7 @@ function Fight() {
                 battleEnded: true,
                 fightReward: { soulsGained: enemy.souls, rewardElements: chosen },
                 elementUseCounts: { ...useCounts },
+                defeatedEnemy: enemy,
             };
             setExpResultsEntries(entries);
         }
@@ -863,6 +870,7 @@ function Fight() {
         let currentPlayerSoakStacks = currentPlayerSoak?.stacks ?? 0;
         let currentPlayerFreezeStacks = currentPlayerFreeze?.stacks ?? 0;
         let totalEnemyHealing = 0;
+        let totalEnemyShieldGranted = 0;
         let totalThornsReflected = 0;
         let totalPlayerFreezeSoakConvertPercent = 0;
         let convertedPlayerFreezeStacksFromEffect = 0;
@@ -1052,6 +1060,13 @@ function Fight() {
             await wait(EFFECT_STEP_DELAY_MS);
         }
 
+        // Enemy shield gain from the attacking element's DEF stat.
+        totalEnemyShieldGranted = Math.max(0, Math.round(attack.shield ?? 0));
+        if (totalEnemyShieldGranted > 0) {
+            setEnemyShield((previous) => previous + totalEnemyShieldGranted);
+            await wait(EFFECT_STEP_DELAY_MS);
+        }
+
         const detailLines: string[] = [];
         if (hitCount > 1) {
             detailLines.push(`Hits ${hitCount}x | ${attackDamageBreakdown.join(" + ")}`);
@@ -1079,6 +1094,9 @@ function Fight() {
         }
         if (totalThornsReflected > 0) {
             detailLines.push(`Thorns reflects ${totalThornsReflected}`);
+        }
+        if (totalEnemyShieldGranted > 0) {
+            detailLines.push(`Enemy shield +${totalEnemyShieldGranted}`);
         }
 
         if (detailLines.length > 0) {
@@ -1803,6 +1821,17 @@ function Fight() {
         hoveredEnemyAttack || isEnemyIntentTooltipHovered || isEnemyIntentTooltipGraceOpen;
     const isEnemyIntentTooltipClosing =
         isEnemyIntentTooltipGraceOpen && !hoveredEnemyAttack && !isEnemyIntentTooltipHovered;
+    const queuedEnemyAttackDamage = queuedEnemyAttack
+        ? (() => {
+            const baseDamage = Number(queuedEnemyAttack.damage ?? 0);
+            return baseDamage + (
+                getSpellTypeList(queuedEnemyAttack).includes("fire")
+                    ? getBurnFireBonus(playerBurnStatus?.stacks ?? 0, baseDamage)
+                    : 0
+            );
+        })()
+        : 0;
+    const queuedEnemyAttackShield = queuedEnemyAttack ? Number(queuedEnemyAttack.shield ?? 0) : 0;
 
     const handlePlayAgain = () => {
         resetGame();
@@ -1835,9 +1864,29 @@ function Fight() {
                 <div className="enemy-header">
                     <span className="enemy-name">{enemy.name}</span>
                 </div>
-                <div className="enemy-hp-bar" role="progressbar" aria-valuemin={0} aria-valuemax={enemyMaxHp} aria-valuenow={enemyHealth}>
-                    <div className="enemy-hp-fill" style={{ width: `${enemyHpFillPercent}%` }} />
-                    <span className="enemy-hp-label">{enemyHealth} / {enemyMaxHp} HP</span>
+                <div className={`enemy-hp-bar ${enemyShield > 0 ? "has-shield" : ""}`} role="progressbar" aria-valuemin={0} aria-valuemax={enemyMaxHp} aria-valuenow={displayedEnemyHp}>
+                    {enemyShield > 0 ? (
+                        <span
+                            className="enemy-shield-badge"
+                            style={{ backgroundImage: `url(${shieldIcon})` }}
+                            aria-label={`Enemy shield ${enemyShield}`}
+                        >
+                            <span className="enemy-shield-value">{enemyShield}</span>
+                            <span className="enemy-shield-tooltip">Enemy has {enemyShield} shield</span>
+                        </span>
+                    ) : null}
+                    <div
+                        className="enemy-hp-fill enemy-hp-fill--shield"
+                        style={{ width: `${enemyShieldTailFillPercent}%` }}
+                    />
+                    <div
+                        className="enemy-hp-fill enemy-hp-fill--health"
+                        style={{
+                            left: `${enemyShieldTailFillPercent}%`,
+                            width: `${enemyHealthFillPercent}%`,
+                        }}
+                    />
+                    <span className={`enemy-hp-label ${enemyShield > 0 ? "has-shield" : ""}`}>{displayedEnemyHp} / {enemyMaxHp} HP</span>
                 </div>
                 <div className="enemy-stage-row">
                     <div className="enemy-stage-shell">
@@ -1865,7 +1914,7 @@ function Fight() {
                     <div
                         ref={enemyAttackMarkerRef}
                         className={`enemy-intent-badge ${queuedEnemyAttack ? "" : "is-hidden"} ${isReadyingNextAttack ? "is-readying" : ""}`}
-                        aria-label={queuedEnemyAttack ? `Enemy intends to attack with ${queuedEnemyAttack.letter}` : "Enemy attack not yet queued"}
+                        aria-label={queuedEnemyAttack ? `Enemy intends ${queuedEnemyAttackDamage} damage and ${queuedEnemyAttackShield} shield with ${queuedEnemyAttack.letter}` : "Enemy attack not yet queued"}
                         aria-hidden={!queuedEnemyAttack}
                         onMouseEnter={handleEnemyIntentMouseEnter}
                         onMouseLeave={handleEnemyIntentMouseLeave}
@@ -1875,17 +1924,15 @@ function Fight() {
                                 <ElementIcon name={queuedEnemyAttack.letter} className="enemy-attack-marker-icon" />
                             ) : "?"}
                         </div>
-                        <div className="enemy-intent-damage">
-                            {queuedEnemyAttack
-                                ? (() => {
-                                    const baseDamage = Number(queuedEnemyAttack.damage ?? 0);
-                                    return baseDamage + (
-                                        getSpellTypeList(queuedEnemyAttack).includes("fire")
-                                            ? getBurnFireBonus(playerBurnStatus?.stacks ?? 0, baseDamage)
-                                            : 0
-                                    );
-                                })()
-                                : "?"}
+                        <div className="enemy-intent-stats">
+                            <div className="enemy-intent-stat enemy-intent-stat--damage">
+                                <img src={powerIcon} alt="" aria-hidden="true" className="enemy-intent-stat-icon" />
+                                <span>{queuedEnemyAttack ? queuedEnemyAttackDamage : "?"}</span>
+                            </div>
+                            <div className="enemy-intent-stat enemy-intent-stat--shield">
+                                <img src={shieldIcon} alt="" aria-hidden="true" className="enemy-intent-stat-icon" />
+                                <span>{queuedEnemyAttack ? queuedEnemyAttackShield : "?"}</span>
+                            </div>
                         </div>
                         <div className="enemy-intent-label">NEXT ATTACK</div>
                     </div>
@@ -1894,14 +1941,8 @@ function Fight() {
                     <ElementDetailsTooltip
                             element={{
                                 ...queuedEnemyAttack,
-                                damage: (() => {
-                                    const baseDamage = Number(queuedEnemyAttack.damage ?? 0);
-                                    return baseDamage + (
-                                        getSpellTypeList(queuedEnemyAttack).includes("fire")
-                                            ? getBurnFireBonus(playerBurnStatus?.stacks ?? 0, baseDamage)
-                                            : 0
-                                    );
-                                })(),
+                                damage: queuedEnemyAttackDamage,
+                                shield: queuedEnemyAttackShield,
                             }}
                         anchorElement={enemyIntentIconRef.current ?? enemyAttackMarkerRef.current}
                         open={isEnemyIntentTooltipOpen && Boolean(enemyIntentIconRef.current ?? enemyAttackMarkerRef.current)}

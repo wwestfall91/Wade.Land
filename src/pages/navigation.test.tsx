@@ -176,6 +176,16 @@ describe("Game/Fight navigation", () => {
     it("navigates from game scene to fight scene when clicking FIGHT", async () => {
         renderWithRouter(["/game"]);
 
+        // Game now starts in Create mode — switch to Fight mode first
+        await waitFor(() => {
+            expect(document.querySelector(".enemy-card-mode-toggle")).toBeTruthy();
+        });
+
+        const modeToggle = document.querySelector(".enemy-card-mode-toggle") as HTMLButtonElement | null;
+        if (modeToggle) {
+            fireEvent.click(modeToggle);
+        }
+
         await waitFor(() => {
             expect(screen.getAllByText("Next Enemy").length).toBeGreaterThan(0);
         });
