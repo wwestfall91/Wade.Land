@@ -150,6 +150,7 @@ type PlayerContextValue = {
     unsealCombinationMode: (mode: CombinationModeKey) => void;
     recordElementUses: (counts: Record<number, number>) => void;
     upgradeElement: (elementId: number, newLevel: number, effect: SpellEffectConfig) => void;
+    levelUpElementOnly: (elementId: number, newLevel: number) => void;
     spellSlots: (number | null)[];
     setSpellSlotElement: (slotIndex: number, elementId: number | null) => void;
     addSpellSlot: () => void;
@@ -464,6 +465,14 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
         );
     }, []);
 
+    const levelUpElementOnly = useCallback((elementId: number, newLevel: number) => {
+        setElements((previous) =>
+            previous.map((element) =>
+                element.id === elementId ? { ...element, level: newLevel } : element,
+            ),
+        );
+    }, []);
+
     const setSpellSlotElement = useCallback((slotIndex: number, elementId: number | null) => {
         setSpellSlots((previous) => {
             const updated = [...previous];
@@ -533,6 +542,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             addDiscoveredCraftedLetter,
             recordElementUses,
             upgradeElement,
+            levelUpElementOnly,
             spellSlots,
             setSpellSlotElement,
             addSpellSlot,
@@ -580,6 +590,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             addDiscoveredCraftedLetter,
             recordElementUses,
             upgradeElement,
+            levelUpElementOnly,
             spellSlots,
             setSpellSlotElement,
             addSpellSlot,

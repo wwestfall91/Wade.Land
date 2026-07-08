@@ -2821,10 +2821,12 @@
 }
 
 .create-slot-empty {
-    font-size: 1.2rem;
-    color: rgba(120, 190, 255, 0.45);
+    width: 1.4rem;
+    height: 1.4rem;
+    opacity: 0.45;
     user-select: none;
     pointer-events: none;
+    display: block;
 }
 
 .create-slot-connector {

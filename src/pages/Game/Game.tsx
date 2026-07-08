@@ -49,6 +49,7 @@ import MonsterUpgradeModal from "./MonsterUpgradeModal";
 import { LevelUpModal } from "../Fight/LevelUpModal";
 import soulIcon from "../../assets/icons/Soul.png";
 import chestIcon from "../../assets/icons/Chest.png";
+import slotIcon from "../../assets/icons/Slot.png";
 import "./Game.scss";
 import "./SpellSlots.scss";
 
@@ -329,6 +330,7 @@ function Game() {
         levels,
         recordElementUses,
         upgradeElement,
+        levelUpElementOnly,
         spellSlots,
         setSpellSlotElement,
         addSpellSlot,
@@ -598,6 +600,8 @@ function Game() {
     const enhanceSoulFlightTimeoutsRef = useRef<number[]>([]);
     const elementFlightIdRef = useRef(1);
     const elementFlightTimeoutsRef = useRef<number[]>([]);
+    const consumeCardRef = useRef<HTMLDivElement | null>(null);
+    const consumeFlightTimeoutsRef = useRef<number[]>([]);
     const hasShownInitialRewardModalRef = useRef(false);
     const levelZeroElementsRef = useRef<RewardElement[]>([]);
     const allElementOptionsRef = useRef<RewardElement[]>([]);
@@ -648,6 +652,9 @@ function Game() {
             window.clearTimeout(timeoutId);
         });
         elementFlightTimeoutsRef.current.forEach((timeoutId) => {
+            window.clearTimeout(timeoutId);
+        });
+        consumeFlightTimeoutsRef.current.forEach((timeoutId) => {
             window.clearTimeout(timeoutId);
         });
         if (starterChoiceLabelTimeoutRef.current !== null) {
@@ -949,13 +956,12 @@ function Game() {
     }, [isOldOneIntroTriggered, location.state, navigate, startOldOneStoryPrelude]);
 
     useEffect(() => {
-        if (!pendingElementUseCounts || levelUpEffectPool.length === 0 || levels.length === 0) return;
+        if (!pendingElementUseCounts || levels.length === 0) return;
 
         const counts = pendingElementUseCounts;
         setPendingElementUseCounts(null);
         recordElementUses(counts);
 
-        const newPendingLevelUps: PendingLevelUp[] = [];
         for (const [idStr, usesGained] of Object.entries(counts)) {
             const elementId = Number(idStr);
             const element = playerProgress.elements.find((e) => e.id === elementId);
@@ -969,73 +975,14 @@ function Game() {
                 const levelDef = levels.find((l) => l.level === currentLevel);
                 if (!levelDef || levelDef.usesRequired <= 0 || newUses < levelDef.usesRequired) break;
                 currentLevel++;
+            }
 
-                const elementTypes = [element.type1, element.type2]
-                    .filter(Boolean)
-                    .map((t) => (t ?? "").trim().toLowerCase());
-
-                const compatible = levelUpEffectPool.filter((entry) =>
-                    entry.types.some((t) => elementTypes.includes(t)),
-                );
-                if (compatible.length === 0) continue;
-
-                const shuffled = [...compatible].sort(() => Math.random() - 0.5);
-                const choices = shuffled.slice(0, 2).map((e) => e.config);
-
-                newPendingLevelUps.push({
-                    elementId,
-                    elementPreview: {
-                        letter: element.letter,
-                        damage: element.damage,
-                        shield: element.shield,
-                        energy: element.energy,
-                        enhancements: element.enhancements,
-                        rank: element.rank,
-                        level: element.level,
-                        uses: element.uses,
-                        description: element.description,
-                        type1: element.type1,
-                        type2: element.type2,
-                        effects: element.effects,
-                        category: element.category,
-                        initialPosition: element.initialPosition,
-                    },
-                    elementLetter: element.letter,
-                    elementType1: element.type1,
-                    elementType2: element.type2,
-                    newLevel: currentLevel,
-                    choices,
-                });
+            if (currentLevel > Math.max(1, element.level || 1)) {
+                levelUpElementOnly(elementId, currentLevel);
             }
         }
-
-        if (newPendingLevelUps.length > 0) {
-            setPendingLevelUps((prev) => [...prev, ...newPendingLevelUps]);
-        }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [pendingElementUseCounts, levelUpEffectPool, levels]);
-
-    const handleLevelUpConfirm = useCallback((choice: SpellEffectConfig) => {
-        setPendingLevelUps((prev) => {
-            if (prev.length === 0) return prev;
-            const [current, ...rest] = prev;
-            upgradeElement(current.elementId, current.newLevel, choice);
-            return rest;
-        });
-    }, [upgradeElement]);
-
-    // When the level-up modal is disabled, auto-apply the first available choice
-    // so the queue drains silently and elements still level up.
-    useEffect(() => {
-        if (ENABLE_LEVEL_UP_MODAL || pendingLevelUps.length === 0) return;
-        const first = pendingLevelUps[0];
-        const autoChoice = first.choices[0];
-        if (!autoChoice) {
-            setPendingLevelUps((prev) => prev.slice(1));
-            return;
-        }
-        handleLevelUpConfirm(autoChoice);
-    }, [ENABLE_LEVEL_UP_MODAL, pendingLevelUps, handleLevelUpConfirm]);
+    }, [pendingElementUseCounts, levels]);
 
     const activeDropZoneRefs = zoneOccupants.length === 3
         ? [dropZoneRefA, dropZoneRefB, dropZoneRefC]
@@ -3568,6 +3515,84 @@ function Game() {
         setCreateElemSlotIds((prev) => prev.slice(0, prev.length - 1));
     };
 
+    const STAT_ELEMENT_TYPE: Record<string, string> = {
+        hp:  "earth",
+        def: "water",
+        pwr: "fire",
+        spd: "air",
+    };
+
+    const getConsumeElementCount = (pct: number) => pct > 0 ? Math.floor(pct / 25) + 1 : 0;
+
+    const CONSUME_ELEMENT_STAGGER_MS = 500;
+    const CONSUME_ELEMENT_FLIGHT_MS = ELEMENT_FLIGHT_TRAVEL_MS;
+
+    const launchConsumeElementFlights = (elementType: string, count: number, baseElementCount: number) => {
+        const containerRect = gameRef.current?.getBoundingClientRect();
+        const cardRect = consumeCardRef.current?.getBoundingClientRect();
+        const startRect = elementStartRef.current?.getBoundingClientRect();
+        if (!containerRect || !cardRect) return;
+
+        const template = levelZeroElementsRef.current.find(
+            (e) => e.type1 === elementType || e.type2 === elementType,
+        );
+        if (!template) return;
+
+        const startX = cardRect.left + cardRect.width / 2;
+        const startY = cardRect.top + cardRect.height * 0.35;
+
+        for (let i = 0; i < count; i++) {
+            const spawnIndex = baseElementCount + i;
+            let spawnPos: { x: number; y: number };
+            if (containerRect && startRect) {
+                const step = 44;
+                const padding = 10;
+                const columns = Math.max(1, Math.floor((startRect.width - padding * 2) / step));
+                const row = Math.floor(spawnIndex / columns);
+                spawnPos = {
+                    x: startRect.left - containerRect.left + padding + (spawnIndex % columns) * step,
+                    y: startRect.bottom - containerRect.top - padding - step - row * step,
+                };
+            } else {
+                spawnPos = {
+                    x: (spawnIndex % 3) * 44,
+                    y: Math.floor(spawnIndex / 3) * 44,
+                };
+            }
+
+            const targetX = containerRect.left + spawnPos.x + 16;
+            const targetY = containerRect.top + spawnPos.y + 16;
+            const toX = targetX - startX;
+            const toY = targetY - startY;
+            const delayMs = i * CONSUME_ELEMENT_STAGGER_MS;
+
+            const flightId = elementFlightIdRef.current++;
+            const flightIcon: ElementFlightIcon = {
+                id: flightId,
+                startX,
+                startY,
+                toX,
+                toY,
+                letter: template.letter,
+                delayMs,
+            };
+
+            const launchId = window.setTimeout(() => {
+                setElementFlightIcons((prev) => [...prev, flightIcon]);
+
+                const landId = window.setTimeout(() => {
+                    setElementFlightIcons((prev) => prev.filter((ic) => ic.id !== flightId));
+                    pendingDropSpawnByIdRef.current.set(nextId.current, spawnPos);
+                    addElement({ ...template, initialPosition: spawnPos });
+                }, CONSUME_ELEMENT_FLIGHT_MS);
+
+                consumeFlightTimeoutsRef.current.push(landId);
+            }, delayMs);
+
+            consumeFlightTimeoutsRef.current.push(launchId);
+        }
+    };
+
     const handleConsume = () => {
         if (isConsuming || isDrainShaking || !nextEnemy) return;
 
@@ -3589,6 +3614,14 @@ function Game() {
             setIsDrainShaking(true);
             setConsumeDrainedMeters((prev) => new Set([...prev, meter.key]));
             window.setTimeout(() => setIsDrainShaking(false), 700);
+
+            // Award elements for this stat
+            const elementType = STAT_ELEMENT_TYPE[meter.key];
+            const count = getConsumeElementCount(meter.pct);
+            if (elementType && count > 0) {
+                const baseElementCount = playerProgress.elements.length;
+                launchConsumeElementFlights(elementType, count, baseElementCount);
+            }
         } else {
             // All meters drained — final red shake-and-disappear.
             setDrainShakeColor("#ef4444");
@@ -4431,7 +4464,7 @@ function Game() {
                                             className={`create-slot-drop-zone${createBaseSlotId ? " has-element" : ""}`}
                                             ref={createBaseSlotRef}
                                         >
-                                            {!createBaseSlotId && <span className="create-slot-empty">+</span>}
+                                            {!createBaseSlotId && <img className="create-slot-empty" src={slotIcon} alt="" aria-hidden="true" />}
                                         </div>
                                     </div>
                                     <div
@@ -4463,7 +4496,7 @@ function Game() {
                                                             className={`create-slot-drop-zone${slotId ? " has-element" : ""}`}
                                                             ref={slotRef}
                                                         >
-                                                            {!slotId && <span className="create-slot-empty">+</span>}
+                                                            {!slotId && <img className="create-slot-empty" src={slotIcon} alt="" aria-hidden="true" />}
                                                         </div>
                                                     </div>
                                                 );
@@ -4491,7 +4524,7 @@ function Game() {
                             </div>
                         </div>
                     ) : enemyCardMode === "consume" ? (
-                        <div className={`game-enemy-card game-enemy-card--consume${isConsuming ? " is-consuming" : ""}`}>
+                        <div ref={consumeCardRef} className={`game-enemy-card game-enemy-card--consume${isConsuming ? " is-consuming" : ""}`}>
                             <div className="next-enemy-text">
                                 <span>Consume</span>
                             </div>
@@ -4630,7 +4663,7 @@ function Game() {
                                                 ref={spellSlotRefs.current[slotIndex]}
                                             >
                                                 {!hasElement && (
-                                                    <span className="spell-slot-empty-text">+</span>
+                                                    <img className="spell-slot-empty-text" src={slotIcon} alt="" aria-hidden="true" />
                                                 )}
                                             </div>
                                         </div>
@@ -4701,7 +4734,7 @@ function Game() {
                     elementType2={pendingLevelUps[0].elementType2}
                     elementPreview={pendingLevelUps[0].elementPreview}
                     choices={pendingLevelUps[0].choices}
-                    onConfirm={handleLevelUpConfirm}
+                    onConfirm={() => { /* level-up modal disabled */ }}
                 />
             ) : null}
             {isFeedOverlayOpen ? (
