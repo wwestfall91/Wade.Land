@@ -28,6 +28,7 @@ type EnemyStageProps = {
     weaknesses: string[];
     elements: RewardElement[];
     souls: number;
+    resistances?: Partial<Record<string, number>>;
     className?: string;
     // fight-specific optional props
     spriteRef?: React.Ref<HTMLDivElement>;
@@ -51,6 +52,7 @@ function EnemyStage({
     weaknesses,
     elements,
     souls,
+    resistances,
     className,
     spriteRef,
     isHitFlashing = false,
@@ -231,25 +233,62 @@ function EnemyStage({
                                 <span className="enemy-meta-hp-text">{enemyHealth} / {enemyMaxHp}</span>
                             </div>
                         </div>
-                        <div className="enemy-meta-section">
-                            <span className="enemy-meta-label">Weaknesses</span>
-                            <div className="enemy-meta-icon-list">
-                                {weaknesses.length > 0 ? (
-                                    weaknesses.map((weakness) => (
-                                        <span
-                                            key={weakness}
-                                            className="enemy-meta-icon-chip"
-                                            aria-label={weakness}
-                                            title={weakness}
-                                        >
-                                            <ElementIcon name={weakness} />
-                                        </span>
-                                    ))
-                                ) : (
-                                    <span className="enemy-meta-chip enemy-meta-chip-muted">None</span>
-                                )}
-                            </div>
-                        </div>
+                        {(() => {
+                            const vulnEntries = Object.entries(resistances ?? {})
+                                .filter(([, v]) => (v as number) < 0)
+                                .sort(([, a], [, b]) => (a as number) - (b as number));
+                            const hasAny = weaknesses.length > 0 || vulnEntries.length > 0;
+                            return (
+                                <div className="enemy-meta-section">
+                                    <span className="enemy-meta-label">Weaknesses</span>
+                                    <div className="enemy-meta-chip-list">
+                                        {hasAny ? (
+                                            <>
+                                                {weaknesses.map((w) => (
+                                                    <span key={w} className="enemy-meta-icon-chip" aria-label={w} title={w}>
+                                                        <ElementIcon name={w} />
+                                                    </span>
+                                                ))}
+                                                {vulnEntries.map(([type, rawValue]) => (
+                                                    <span
+                                                        key={type}
+                                                        className="enemy-meta-chip enemy-meta-chip-resist enemy-meta-chip-resist--weak"
+                                                    >
+                                                        <ElementIcon name={type} />
+                                                        <span className="enemy-meta-resist-value">{Math.abs(rawValue as number)}%</span>
+                                                    </span>
+                                                ))}
+                                            </>
+                                        ) : (
+                                            <span className="enemy-meta-chip enemy-meta-chip-muted">None</span>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })()}
+                        {(() => {
+                            const resistEntries = Object.entries(resistances ?? {})
+                                .filter(([, v]) => (v as number) > 0)
+                                .sort(([, a], [, b]) => (b as number) - (a as number));
+                            return (
+                                <div className="enemy-meta-section">
+                                    <span className="enemy-meta-label">Resistances</span>
+                                    <div className="enemy-meta-chip-list">
+                                        {resistEntries.length > 0 ? resistEntries.map(([type, rawValue]) => (
+                                            <span
+                                                key={type}
+                                                className="enemy-meta-chip enemy-meta-chip-resist"
+                                            >
+                                                <ElementIcon name={type} />
+                                                <span className="enemy-meta-resist-value">{rawValue as number}%</span>
+                                            </span>
+                                        )) : (
+                                            <span className="enemy-meta-chip enemy-meta-chip-muted">None</span>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })()}
                         <div className="enemy-meta-section">
                             <span className="enemy-meta-label">Elements</span>
                             <div className="enemy-meta-chip-list">

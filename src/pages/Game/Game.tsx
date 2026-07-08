@@ -130,6 +130,7 @@ type Enemy = {
     sprite: string;
     weaknesses: string[];
     elements: RewardElement[];
+    resistances?: Partial<Record<string, number>>;
 };
 
 type ChestDefinition = {
@@ -183,6 +184,8 @@ const STARTER_LABEL_ANIM_MS = 520;
 const MODE_SHUTTER_CLOSE_MS = 180;
 const MODE_COLLAPSE_ANIMATION_MS = 420;
 const ENABLE_FIRST_BATTLE_OLD_ONE_SCENE = false;
+// Set to true to re-enable the level-up effect-choice modal (see LevelUpModal).
+const ENABLE_LEVEL_UP_MODAL = false;
 const COMBUST_DAMAGE_MULTIPLIER = 2.5;
 const PREVIEW_DRAG_START_THRESHOLD_PX = 6;
 const HOMUNCULUS_CREATE_ANIMATION_MS = 2000;
@@ -1021,6 +1024,19 @@ function Game() {
         });
     }, [upgradeElement]);
 
+    // When the level-up modal is disabled, auto-apply the first available choice
+    // so the queue drains silently and elements still level up.
+    useEffect(() => {
+        if (ENABLE_LEVEL_UP_MODAL || pendingLevelUps.length === 0) return;
+        const first = pendingLevelUps[0];
+        const autoChoice = first.choices[0];
+        if (!autoChoice) {
+            setPendingLevelUps((prev) => prev.slice(1));
+            return;
+        }
+        handleLevelUpConfirm(autoChoice);
+    }, [ENABLE_LEVEL_UP_MODAL, pendingLevelUps, handleLevelUpConfirm]);
+
     const activeDropZoneRefs = zoneOccupants.length === 3
         ? [dropZoneRefA, dropZoneRefB, dropZoneRefC]
         : [dropZoneRefA, dropZoneRefB];
@@ -1615,14 +1631,16 @@ function Game() {
                             description: String(scarecrowRow.extras["Description"] ?? scarecrowRow.extras["description"] ?? ""),
                             sprite: `homunculus/${scarecrowRow.name.replace(/\s+/g, "")}`,
                             weaknesses: [],
+                            resistances: { fire: -25 },
                             elements: [{
-                                letter: "Scarecrow",
+                                letter: "Earth",
                                 damage: scarecrowPwr,
                                 shield: scarecrowDef,
                                 energy: scarecrowSpd,
                                 rank: 1,
                                 level: 1,
                                 description: "Homunculus attack profile",
+                                type1: "earth",
                                 category: "element",
                             }],
                         });
@@ -3472,6 +3490,21 @@ function Game() {
             .filter(Boolean)
             .reduce((sum, elem) => sum + (elem?.energy ?? 0), 0);
 
+        // Compute resistances: same +25/-25 additive formula as player spell-slot resistances.
+        const slottedForResist = createElemSlotIds
+            .map((id) => getDraggableById(id))
+            .filter(Boolean) as NonNullable<ReturnType<typeof getDraggableById>>[];
+        const allCreatedElems = [baseElem, ...slottedForResist].filter((e): e is NonNullable<typeof baseElem> => Boolean(e));
+        const homunculusResistances: Partial<Record<string, number>> = {};
+        for (const elem of allCreatedElems) {
+            const rtype = resolveResistanceElementType(elem.type1, elem.letter);
+            if (rtype) {
+                homunculusResistances[rtype] = (homunculusResistances[rtype] ?? 0) + 25;
+                const counter = RESISTANCE_COUNTER_TYPE[rtype];
+                homunculusResistances[counter] = (homunculusResistances[counter] ?? 0) - 25;
+            }
+        }
+
         const homunculus: Enemy = {
             name: row.name,
             // Homunculus HP/PWR/DEF come directly from the meter stats.
@@ -3481,8 +3514,9 @@ function Game() {
             description: String(row.extras["Description"] ?? row.extras["description"] ?? ""),
             sprite: `homunculus/${row.name.replace(/\s+/g, "")}`,
             weaknesses: [],
+            resistances: homunculusResistances,
             elements: [{
-                letter: row.name,
+                letter: baseElem?.letter ?? row.name,
                 damage: pwrStat,
                 shield: defStat,
                 energy: energyStat,
@@ -4478,6 +4512,7 @@ function Game() {
                                     enemyPower={nextEnemy?.power ?? 0}
                                     weaknesses={nextEnemy?.weaknesses ?? []}
                                     elements={nextEnemy?.elements ?? []}
+                                    resistances={nextEnemy?.resistances}
                                     souls={nextEnemy?.souls ?? 0}
                                 />
                             </div>
@@ -4500,6 +4535,7 @@ function Game() {
                                 enemyPower={nextEnemy?.power ?? 0}
                                 weaknesses={nextEnemy?.weaknesses ?? []}
                                 elements={nextEnemy?.elements ?? []}
+                                resistances={nextEnemy?.resistances}
                                 souls={nextEnemy?.souls ?? 0}
                             />
                             <div className="game-enemy-card-footer">Hover for details</div>
@@ -4658,7 +4694,7 @@ function Game() {
                     onConfirm={() => setPendingUpgradeRewards(null)}
                 />
             ) : null}
-            {pendingLevelUps.length > 0 ? (
+            {ENABLE_LEVEL_UP_MODAL && pendingLevelUps.length > 0 ? (
                 <LevelUpModal
                     elementLetter={pendingLevelUps[0].elementLetter}
                     elementType1={pendingLevelUps[0].elementType1}

@@ -236,6 +236,39 @@
         color: #fff;
     }
 
+    .enemy-resistance-strip {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.25rem;
+        justify-content: center;
+        margin-top: 0.1rem;
+    }
+
+    .enemy-resistance-chip {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.06rem 0.42rem;
+        border-radius: 999px;
+        border: 1px solid rgba(255,255,255,0.28);
+        font-size: 0.6rem;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        background: rgba(80, 120, 200, 0.22);
+        color: #b8d4ff;
+
+        &.is-weak {
+            background: rgba(200, 60, 60, 0.22);
+            border-color: rgba(255, 140, 140, 0.35);
+            color: #ffb8b8;
+        }
+
+        &.type-resist-fire   { background: rgba(200, 80, 20, 0.28); border-color: rgba(255,150,80,0.38); color: #ffcba0; }
+        &.type-resist-water  { background: rgba(20, 80, 200, 0.28); border-color: rgba(80,160,255,0.38); color: #a0d4ff; }
+        &.type-resist-earth  { background: rgba(60, 140, 40, 0.28); border-color: rgba(100,200,80,0.38); color: #b8f0a0; }
+        &.type-resist-air    { background: rgba(140, 120, 200, 0.28); border-color: rgba(200,180,255,0.38); color: #e0d4ff; }
+    }
+
     .enemy-intent-badge {
         grid-column: 3;
         justify-self: start;

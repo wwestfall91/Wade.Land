@@ -236,7 +236,7 @@ export function ExpResultsModal({ entries, onContinue }: ExpResultsModalProps) {
                     disabled={!allDone}
                     onClick={onContinue}
                 >
-                    {hasLevelUps ? "Continue & Choose Upgrades" : "Continue"}
+                    Continue
                 </button>
             </div>
         </div>,

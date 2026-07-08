@@ -90,6 +90,7 @@ type FightEnemy = {
     weaknesses?: string[];
     sprite?: string;
     elements: RewardElement[];
+    resistances?: Partial<Record<string, number>>;
 };
 
 type FightLocationState = {
@@ -385,6 +386,15 @@ function Fight() {
 
         const total = resistanceValues.reduce((sum, value) => sum + value, 0);
         return total / resistanceValues.length;
+    };
+    /** Mirror of getResistancePercentForAttackTypes but for enemy resistances (reduces player outgoing damage). */
+    const getEnemyResistancePercent = (spellTypes: string[]) => {
+        if (!enemy.resistances) return 0;
+        const values = spellTypes
+            .filter((t): t is ElementalResistanceKey => RESISTANCE_ELEMENT_KEYS.has(t as ElementalResistanceKey))
+            .map((t) => ((enemy.resistances as Record<string, number>)[t]) ?? 0);
+        if (values.length === 0) return 0;
+        return values.reduce((sum, v) => sum + v, 0) / values.length;
     };
     const pickEnemyAttack = () => {
         const attack = enemy.elements[Math.floor(Math.random() * enemy.elements.length)] ?? null;
@@ -1522,7 +1532,9 @@ function Fight() {
             const baseHitDamage = Math.max(0, scaledSpellDamage + soakBonus - soakPenalty + freezeBonus - enemyFloatEarthReduction + enemyFloatLightningBonus);
             const burnBonus = isFireSpell ? getBurnFireBonus(enemyBurnStatus?.stacks ?? 0, baseHitDamage) : 0;
             const hitDamageBeforeCrit = baseHitDamage + burnBonus;
-            const hitDamage = isCritical ? hitDamageBeforeCrit * 2 : hitDamageBeforeCrit;
+            const hitDamageAfterCrit = isCritical ? hitDamageBeforeCrit * 2 : hitDamageBeforeCrit;
+            const enemyResistPercent = getEnemyResistancePercent(spellTypes);
+            const hitDamage = Math.round(hitDamageAfterCrit * Math.max(0, 1 - enemyResistPercent / 100));
             hitDamageBreakdown.push(hitDamage);
             totalDamage += hitDamage;
             nextEnemyHealth = Math.max(0, nextEnemyHealth - hitDamage);
@@ -1745,6 +1757,12 @@ function Fight() {
         if (hadCriticalHit) {
             effectMessages.push("Super Effective");
         }
+        const appliedResistPercent = getEnemyResistancePercent(spellTypes);
+        if (appliedResistPercent > 0) {
+            effectMessages.push(`Resisted ${Math.round(appliedResistPercent)}%`);
+        } else if (appliedResistPercent < 0) {
+            effectMessages.push(`Vulnerable ${Math.round(-appliedResistPercent)}%`);
+        }
 
         // One-time self-effects applied once per cast
         if (exhaustEffect && (exhaustEffect.amount ?? 0) > 0) {
@@ -1899,6 +1917,7 @@ function Fight() {
                             enemyPower={enemy.power}
                             weaknesses={enemyWeaknesses}
                             elements={enemy.elements}
+                            resistances={enemy.resistances}
                             souls={enemy.souls}
                             isHitFlashing={isEnemySpriteFlashing}
                             hitFlashColor={enemySpriteFlashColor}
@@ -2035,6 +2054,7 @@ function Fight() {
                                 onTooltipMouseEnter={() => handleSpellTooltipMouseEnter(spell.id)}
                                 onTooltipMouseLeave={() => handleSpellTooltipMouseLeave(spell.id)}
                                 clampHorizontal={false}
+                                placement="below"
                                 typeMultipliers={effectiveTypeMultipliers}
                                 elementDetails={{
                                     letter: spell.letter,

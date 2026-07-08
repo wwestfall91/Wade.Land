@@ -52,6 +52,7 @@ type FloatingTooltipProps = {
     offset?: number;
     viewportPadding?: number;
     clampHorizontal?: boolean;
+    placement?: "above" | "below" | "auto";
 };
 
 const DEFAULT_LAYOUT: TooltipLayout = {
@@ -297,6 +298,7 @@ function FloatingTooltip({
     offset = 8,
     viewportPadding = 8,
     clampHorizontal = true,
+    placement = "auto",
 }: FloatingTooltipProps) {
     const tooltipRef = useRef<HTMLDivElement | null>(null);
     const [layout, setLayout] = useState<TooltipLayout>(DEFAULT_LAYOUT);
@@ -327,7 +329,7 @@ function FloatingTooltip({
         }
 
         const topIfAbove = anchorRect.top - offset - tooltipRect.height;
-        const isBelow = topIfAbove < viewportPadding;
+        const isBelow = placement === "below" ? true : placement === "above" ? false : topIfAbove < viewportPadding;
         const baseTop = isBelow ? anchorRect.bottom + offset : anchorRect.top - offset;
 
         let sideBySideOffsetX = 0;

@@ -2489,6 +2489,39 @@
             text-align: center;
             line-height: 1.1;
         }
+
+        .game-enemy-card-resistances {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.22rem;
+            justify-content: center;
+            margin-top: 0.2rem;
+        }
+
+        .game-enemy-resist-chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.05rem 0.38rem;
+            border-radius: 999px;
+            border: 1px solid rgba(255,255,255,0.24);
+            font-size: 0.55rem;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            background: rgba(80,120,200,0.22);
+            color: #b8d4ff;
+
+            &.is-weak {
+                background: rgba(200,60,60,0.22);
+                border-color: rgba(255,140,140,0.32);
+                color: #ffb8b8;
+            }
+
+            &.game-enemy-resist-chip--fire  { background: rgba(200,80,20,0.28); border-color: rgba(255,150,80,0.35); color: #ffcba0; }
+            &.game-enemy-resist-chip--water { background: rgba(20,80,200,0.28); border-color: rgba(80,160,255,0.35); color: #a0d4ff; }
+            &.game-enemy-resist-chip--earth { background: rgba(60,140,40,0.28); border-color: rgba(100,200,80,0.35); color: #b8f0a0; }
+            &.game-enemy-resist-chip--air   { background: rgba(140,120,200,0.28); border-color: rgba(200,180,255,0.35); color: #e0d4ff; }
+        }
     }
 
     .game-enemy-stage {

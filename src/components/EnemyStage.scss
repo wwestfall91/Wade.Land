@@ -217,6 +217,32 @@
             }
         }
 
+        .enemy-meta-chip-resist {
+            background: rgba(20, 55, 140, 0.68);
+            border-color: rgba(140, 180, 255, 0.72);
+            color: #c8dcff;
+            gap: 0.22rem;
+
+            .element-icon {
+                width: 1.04rem;
+                height: 1.04rem;
+                flex-shrink: 0;
+            }
+
+            .enemy-meta-resist-value {
+                font-weight: 800;
+                font-variant-numeric: tabular-nums;
+                font-size: 0.72rem;
+                line-height: 1;
+            }
+
+            &.enemy-meta-chip-resist--weak {
+                background: rgba(140, 30, 30, 0.68);
+                border-color: rgba(255, 160, 140, 0.72);
+                color: #ffd0c8;
+            }
+        }
+
         .enemy-meta-chip-muted {
             background: rgba(65, 77, 138, 0.62);
             border-color: rgba(223, 230, 255, 0.7);
@@ -570,6 +596,27 @@
     100% {
         opacity: 0;
     }
+}
+
+// ── Fight scene tooltip: fixed-width popup anchored below the sprite ──────────
+// The game card uses inset:0/100% to fill the card. The fight scene has no such
+// container, so we position a constrained popup directly below the sprite card.
+.enemy-zone .enemy-meta-tooltip {
+    inset: auto;
+    bottom: calc(100% + 0.5rem);
+    top: auto;
+    left: 50%;
+    width: 15.5rem;
+    height: auto;
+    min-height: 0;
+    transform: translateX(-50%) translateY(-0.4rem) scale(0.98);
+    transform-origin: bottom center;
+}
+
+// Separate show-state for fight scene (overrides the shared translateY-only rule above it).
+.enemy-zone.is-enemy-stage-hovered .enemy-meta-tooltip,
+.enemy-zone.is-enemy-sub-tooltip-active .enemy-meta-tooltip {
+    transform: translateX(-50%) translateY(0) scale(1);
 }
 
 @keyframes enemyDamageFloat {

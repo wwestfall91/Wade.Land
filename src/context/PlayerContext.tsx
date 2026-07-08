@@ -71,6 +71,7 @@ export type SelectedEnemy = {
     sprite: string;
     weaknesses: string[];
     elements: RewardElement[];
+    resistances?: Partial<Record<string, number>>;
 };
 
 export type PlayerStatuses = {
