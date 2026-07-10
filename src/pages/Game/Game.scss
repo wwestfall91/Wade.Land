@@ -1018,9 +1018,24 @@
         z-index: -1;
     }
 
+    .inventory-start-row {
+        display: flex;
+        flex-direction: row;
+        align-items: flex-end;
+        pointer-events: none;
+    }
+
     .element-start{
         width:20rem;
         height:12rem;
+        pointer-events: none;
+    }
+
+    .fragment-start {
+        // Invisible anchor to the right of .element-start.
+        // Fragments are 50% scale, so a 22px step fits twice as many per row.
+        width: 10rem;
+        height: 8rem;
         pointer-events: none;
     }
 

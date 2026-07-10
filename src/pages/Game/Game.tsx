@@ -346,6 +346,7 @@ function Game() {
     } = usePlayer();
     const gameRef = useRef<HTMLDivElement | null>(null);
     const elementStartRef = useRef<HTMLDivElement | null>(null);
+    const fragmentStartRef = useRef<HTMLDivElement | null>(null);
     const dropZoneRefA = useRef<HTMLDivElement | null>(null);
     const dropZoneRefB = useRef<HTMLDivElement | null>(null);
     const dropZoneRefC = useRef<HTMLDivElement | null>(null);
@@ -1127,6 +1128,29 @@ function Game() {
 
         const step = 44;
         const padding = 10;
+        const columns = Math.max(1, Math.floor((startRect.width - padding * 2) / step));
+        const row = Math.floor(index / columns);
+
+        return {
+            x: startRect.left - containerRect.left + padding + (index % columns) * step,
+            y: startRect.bottom - containerRect.top - padding - step - row * step,
+        };
+    };
+
+    const getFragmentSpawnPosition = (index: number): Position => {
+        const containerRect = gameRef.current?.getBoundingClientRect();
+        const startRect = fragmentStartRef.current?.getBoundingClientRect();
+
+        if (!containerRect || !startRect) {
+            return {
+                x: (index % 6) * 22,
+                y: Math.floor(index / 6) * 22,
+            };
+        }
+
+        // Fragments are rendered at 50% scale (22px effective), so use a 22px grid.
+        const step = 22;
+        const padding = 5;
         const columns = Math.max(1, Math.floor((startRect.width - padding * 2) / step));
         const row = Math.floor(index / columns);
 
@@ -3655,23 +3679,14 @@ function Game() {
     const launchBoostedBaseElementFlight = (template: RewardElement, damageBoost: number, shieldBoost: number) => {
         const containerRect = gameRef.current?.getBoundingClientRect();
         const cardRect = consumeCardRef.current?.getBoundingClientRect();
-        const startRect = elementStartRef.current?.getBoundingClientRect();
         if (!containerRect || !cardRect) return;
 
-        const spawnIndex = playerProgress.elements.length;
-        let spawnPos: { x: number; y: number };
-        if (containerRect && startRect) {
-            const step = 44;
-            const padding = 10;
-            const columns = Math.max(1, Math.floor((startRect.width - padding * 2) / step));
-            const row = Math.floor(spawnIndex / columns);
-            spawnPos = {
-                x: startRect.left - containerRect.left + padding + (spawnIndex % columns) * step,
-                y: startRect.bottom - containerRect.top - padding - step - row * step,
-            };
-        } else {
-            spawnPos = { x: (spawnIndex % 3) * 44, y: Math.floor(spawnIndex / 3) * 44 };
-        }
+        const isFragment = template.category === "fragment";
+        const spawnPos = isFragment
+            ? getFragmentSpawnPosition(
+                playerProgress.elements.filter((e) => e.category === "fragment").length,
+              )
+            : getSpawnPosition(playerProgress.elements.length);
 
         const startX = cardRect.left + cardRect.width / 2;
         const startY = cardRect.top + cardRect.height * 0.35;
@@ -3752,33 +3767,23 @@ function Game() {
     const launchConsumeElementFlights = (elementType: string, count: number, baseElementCount: number) => {
         const containerRect = gameRef.current?.getBoundingClientRect();
         const cardRect = consumeCardRef.current?.getBoundingClientRect();
-        const startRect = elementStartRef.current?.getBoundingClientRect();
         if (!containerRect || !cardRect) return;
 
         const template = buildFragmentRewardTemplate(elementType, nextEnemy?.baseElement ?? null);
         if (!template) return;
 
+        // Count how many fragment-category elements already exist so new ones
+        // stack into their own tighter grid instead of sharing the element-start zone.
+        const existingFragmentCount = playerProgress.elements.filter(
+            (e) => e.category === "fragment",
+        ).length;
+
         const startX = cardRect.left + cardRect.width / 2;
         const startY = cardRect.top + cardRect.height * 0.35;
 
         for (let i = 0; i < count; i++) {
-            const spawnIndex = baseElementCount + i;
-            let spawnPos: { x: number; y: number };
-            if (containerRect && startRect) {
-                const step = 44;
-                const padding = 10;
-                const columns = Math.max(1, Math.floor((startRect.width - padding * 2) / step));
-                const row = Math.floor(spawnIndex / columns);
-                spawnPos = {
-                    x: startRect.left - containerRect.left + padding + (spawnIndex % columns) * step,
-                    y: startRect.bottom - containerRect.top - padding - step - row * step,
-                };
-            } else {
-                spawnPos = {
-                    x: (spawnIndex % 3) * 44,
-                    y: Math.floor(spawnIndex / 3) * 44,
-                };
-            }
+            const spawnIndex = existingFragmentCount + i;
+            const spawnPos = getFragmentSpawnPosition(spawnIndex);
 
             const targetX = containerRect.left + spawnPos.x + 16;
             const targetY = containerRect.top + spawnPos.y + 16;
@@ -4606,7 +4611,10 @@ function Game() {
                     />
                 </>
             ) : null}
-            <div className="element-start" ref={elementStartRef}></div>
+            <div className="inventory-start-row">
+                <div className="element-start" ref={elementStartRef}></div>
+                <div className="fragment-start" ref={fragmentStartRef}></div>
+            </div>
             <div className="game-scene-row">
                 {hasActiveUpgrades ? (
                 <div className="game-scene-col game-scene-col--left">
