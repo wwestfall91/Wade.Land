@@ -107,6 +107,8 @@ describe("Fight energy usage", () => {
             addElement: vi.fn(),
             selectedEnemy: null,
             setSelectedEnemy: vi.fn(),
+            spellSlots: [1, 2, 3],
+            elementalResistances: { fire: 0, water: 0, earth: 0, air: 0 },
         });
 
         renderFight();
@@ -168,6 +170,8 @@ describe("Fight energy usage", () => {
             addElement: vi.fn(),
             selectedEnemy: null,
             setSelectedEnemy: vi.fn(),
+            spellSlots: [1],
+            elementalResistances: { fire: 0, water: 0, earth: 0, air: 0 },
         });
 
         renderFight();
@@ -224,6 +228,8 @@ describe("Fight energy usage", () => {
             addElement: vi.fn(),
             selectedEnemy: null,
             setSelectedEnemy: vi.fn(),
+            spellSlots: [1],
+            elementalResistances: { fire: 0, water: 0, earth: 0, air: 0 },
         });
 
         renderFight();
@@ -253,6 +259,102 @@ describe("Fight energy usage", () => {
         // Energize stacks should be consumed
         await waitFor(() => {
             expect(screen.queryByLabelText("Energize 2")).toBeNull();
+        }, { timeout: 5000 });
+    }, 20000);
+
+    it("expires enemy shield at start of enemy turn so it does not stack", async () => {
+        mockedUsePlayer.mockReturnValue({
+            player: {
+                level: 1,
+                hp: 100,
+                souls: 0,
+                elements: [
+                    {
+                        id: 1,
+                        letter: "Spark",
+                        damage: 1,
+                        energy: 1,
+                        level: 1,
+                        description: "Cheap spell",
+                        type1: "lightning",
+                    },
+                ],
+            },
+            playerName: "Tester",
+            levels: [{ level: 1, hp: 100 }],
+            setPlayerName: vi.fn(),
+            addSouls: vi.fn(),
+            initializeElements: vi.fn(),
+            combineElements: vi.fn(),
+            applyEnemyAttack: vi.fn(),
+            healPlayer: vi.fn(),
+            resetGame: vi.fn(),
+            addElement: vi.fn(),
+            selectedEnemy: null,
+            setSelectedEnemy: vi.fn(),
+            spellSlots: [1],
+            elementalResistances: { fire: 0, water: 0, earth: 0, air: 0 },
+        });
+
+        const router = createMemoryRouter(
+            [
+                {
+                    path: "/fight",
+                    element: <Fight />,
+                },
+            ],
+            {
+                initialEntries: [
+                    {
+                        pathname: "/fight",
+                        state: {
+                            enemy: {
+                                name: "Shield Dummy",
+                                hp: 999,
+                                souls: 0,
+                                sprite: "",
+                                weaknesses: [],
+                                elements: [
+                                    {
+                                        letter: "Guard",
+                                        damage: 0,
+                                        shield: 5,
+                                        energy: 0,
+                                        level: 1,
+                                        description: "Adds enemy shield",
+                                        type1: "earth",
+                                    },
+                                ],
+                            },
+                            elementPool: [],
+                        },
+                    },
+                ],
+            },
+        );
+
+        render(<RouterProvider router={router} />);
+
+        // First enemy turn grants shield.
+        await waitFor(() => {
+            expect((screen.getByRole("button", { name: /end turn/i }) as HTMLButtonElement).disabled).toBe(false);
+        }, { timeout: 5000 });
+        fireEvent.click(screen.getByRole("button", { name: /end turn/i }));
+
+        await waitFor(() => {
+            expect(screen.getByLabelText(/enemy shield 5/i)).toBeTruthy();
+        }, { timeout: 5000 });
+
+        // Second enemy turn should expire old shield before applying the new one,
+        // so shield remains 5 (not 10).
+        await waitFor(() => {
+            expect((screen.getByRole("button", { name: /end turn/i }) as HTMLButtonElement).disabled).toBe(false);
+        }, { timeout: 5000 });
+        fireEvent.click(screen.getByRole("button", { name: /end turn/i }));
+
+        await waitFor(() => {
+            expect(screen.getByLabelText(/enemy shield 5/i)).toBeTruthy();
+            expect(screen.queryByLabelText(/enemy shield 10/i)).toBeNull();
         }, { timeout: 5000 });
     }, 20000);
 });

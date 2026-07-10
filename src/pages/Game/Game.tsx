@@ -45,6 +45,7 @@ import {
     ELEMENT_SPELL_COLORS,
     STARTER_BUTTON_THEME_DEFAULT,
 } from "../../styles/elementThemes";
+import { buildCombinedTripleFragmentElement } from "./consumeRewards";
 import MonsterUpgradeModal from "./MonsterUpgradeModal";
 import { LevelUpModal } from "../Fight/LevelUpModal";
 import soulIcon from "../../assets/icons/Soul.png";
@@ -136,6 +137,7 @@ type Enemy = {
     elements: RewardElement[];
     resistances?: Partial<Record<string, number>>;
     baseElement?: RewardElement;
+    homunculusFragments?: RewardElement[];
 };
 
 type ChestDefinition = {
@@ -445,8 +447,8 @@ function Game() {
     const [consumeFinaleTemplate, setConsumeFinaleTemplate] = useState<RewardElement | null>(null);
     const [statBoostToasts, setStatBoostToasts] = useState<Array<{ id: number; x: number; y: number; damageBoost: number; shieldBoost: number }>>([]); 
     const [createBaseSlotId, setCreateBaseSlotId] = useState<number | null>(null);
-    const [elemSlotCount, setElemSlotCount] = useState(1);
-    const [createElemSlotIds, setCreateElemSlotIds] = useState<(number | null)[]>([null]);
+    const [elemSlotCount, setElemSlotCount] = useState(3);
+    const [createElemSlotIds, setCreateElemSlotIds] = useState<(number | null)[]>([null, null, null]);
     const [unlockSlotOccupants, setUnlockSlotOccupants] = useState<[number | null, number | null, number | null]>([null, null, null]);
     const [homunculusWorkbook, setHomunculusWorkbook] = useState<HomunculusWorkbook | null>(null);
     const [isSoulCounterPopping] = useState(false);
@@ -3451,6 +3453,38 @@ function Game() {
     }, [createBaseSlotId, createElemSlotIds, homunculusWorkbook, getDraggableById]);
 
     /** Stat meters shown to the right of the enemy card. */
+    const homunculusFragmentBonuses = useMemo(() => {
+        const bonuses = { hp: 0, def: 0, pwr: 0, spd: 0 };
+        const slottedElems = createElemSlotIds
+            .map((id) => getDraggableById(id))
+            .filter(Boolean) as NonNullable<ReturnType<typeof getDraggableById>>[];
+
+        slottedElems.forEach((elem) => {
+            if (elem.category !== "fragment") {
+                return;
+            }
+
+            const fragmentType = normalizeType(elem.type1 || elem.letter);
+            if (fragmentType === "fire") {
+                bonuses.pwr += Math.max(5, elem.damage ?? 0);
+                return;
+            }
+            if (fragmentType === "water") {
+                bonuses.def += Math.max(5, elem.shield ?? 0);
+                return;
+            }
+            if (fragmentType === "earth") {
+                bonuses.hp += Math.max(5, elem.shield ?? 0);
+                return;
+            }
+            if (fragmentType === "air") {
+                bonuses.spd += Math.max(5, elem.damage ?? 0);
+            }
+        });
+
+        return bonuses;
+    }, [createElemSlotIds, getDraggableById]);
+
     const homunculusMeters = useMemo(() => {
         // Fight / Consume mode: derive from the enemy's first element; fall back to 5% floor
         // for enemies that have no elements (e.g. Scarecrow).
@@ -3467,21 +3501,22 @@ function Game() {
                 exp: Math.min(100, e * 3),
             };
         }
-        // Create mode: combine base element + all slotted elements.
+        // Create mode: start from base element stats, then apply fragment-specific bonuses.
         const base = getDraggableById(createBaseSlotId);
-        const slottedElems = createElemSlotIds
-            .map((id) => getDraggableById(id))
-            .filter(Boolean) as NonNullable<ReturnType<typeof getDraggableById>>[];
-        const damage = (base?.damage ?? 0) + slottedElems.reduce((s, e) => s + (e.damage ?? 0), 0);
-        const shield = (base?.shield ?? 0) + slottedElems.reduce((s, e) => s + (e.shield ?? 0), 0);
-        const energy = (base?.energy ?? 0) + slottedElems.reduce((s, e) => s + (e.energy ?? 0), 0);
+        const damage = base?.damage ?? 0;
+        const shield = base?.shield ?? 0;
+        const energy = base?.energy ?? 0;
+        const hp = shield + damage + homunculusFragmentBonuses.hp;
+        const def = shield + homunculusFragmentBonuses.def;
+        const pwr = damage + homunculusFragmentBonuses.pwr;
+        const spd = (energy * 3) + homunculusFragmentBonuses.spd;
         return {
-            hp:  Math.min(100, shield + damage),
-            def: Math.min(100, shield),
-            pwr: Math.min(100, damage),
-            exp: Math.min(100, energy * 3),
+            hp:  Math.min(100, hp),
+            def: Math.min(100, def),
+            pwr: Math.min(100, pwr),
+            exp: Math.min(100, spd),
         };
-    }, [createBaseSlotId, createElemSlotIds, getDraggableById, enemyCardMode, nextEnemy]);
+    }, [createBaseSlotId, createElemSlotIds, getDraggableById, enemyCardMode, nextEnemy, homunculusFragmentBonuses]);
 
     const handleCreate = () => {
         if (!matchedHomunculusRow || isCreatingHomunculus) return;
@@ -3494,10 +3529,7 @@ function Game() {
         const pwrStat = homunculusMeters.pwr;
         const defStat = homunculusMeters.def;
         const baseElem = getDraggableById(createBaseSlotId);
-        const energyStat = (baseElem?.energy ?? 0) + createElemSlotIds
-            .map((id) => getDraggableById(id))
-            .filter(Boolean)
-            .reduce((sum, elem) => sum + (elem?.energy ?? 0), 0);
+        const energyStat = Math.max(0, Math.round(homunculusMeters.exp / 3));
 
         // Compute resistances: same +25/-25 additive formula as player spell-slot resistances.
         const slottedForResist = createElemSlotIds
@@ -3513,6 +3545,23 @@ function Game() {
                 homunculusResistances[counter] = (homunculusResistances[counter] ?? 0) - 25;
             }
         }
+
+        const homunculusFragments: RewardElement[] = slottedForResist
+            .filter((elem) => elem.category === "fragment")
+            .map((elem) => ({
+                letter: elem.letter,
+                damage: elem.damage,
+                shield: elem.shield,
+                energy: elem.energy,
+                enhancements: elem.enhancements,
+                rank: elem.rank,
+                level: elem.level,
+                description: elem.description,
+                type1: elem.type1,
+                type2: elem.type2,
+                effects: elem.effects,
+                category: elem.category,
+            }));
 
         const homunculus: Enemy = {
             name: row.name,
@@ -3548,6 +3597,7 @@ function Game() {
                 effects: baseElem.effects,
                 category: baseElem.category,
             } : undefined,
+            homunculusFragments,
         };
 
         setPendingCreatedEnemy(homunculus);
@@ -3662,17 +3712,50 @@ function Game() {
         air: "Air Fragment",
     };
 
+    const buildFragmentRewardTemplate = (
+        elementType: string,
+        baseElement: RewardElement | null,
+    ): RewardElement | null => {
+        const fragmentName = FRAGMENT_NAME_BY_TYPE[elementType];
+        if (!fragmentName) {
+            return null;
+        }
+
+        const catalogEntry = allElementOptionsRef.current.find((e) => e.letter === fragmentName);
+        const fallbackTemplate: RewardElement = {
+            letter: fragmentName,
+            damage: 0,
+            shield: 0,
+            energy: 1,
+            rank: 1,
+            level: 1,
+            description: fragmentName,
+            type1: elementType,
+            category: "fragment",
+        };
+
+        const source = catalogEntry ?? fallbackTemplate;
+        const sourceDamage = Number(baseElement?.damage ?? source.damage ?? 0) || 0;
+        const sourceShield = Number(baseElement?.shield ?? source.shield ?? 0) || 0;
+
+        return {
+            ...source,
+            letter: fragmentName,
+            type1: elementType,
+            category: "fragment",
+            damage: Math.max(0, Math.round(sourceDamage * 0.5)),
+            shield: Math.max(0, Math.round(sourceShield * 0.5)),
+            energy: 1,
+        };
+    };
+
     const launchConsumeElementFlights = (elementType: string, count: number, baseElementCount: number) => {
         const containerRect = gameRef.current?.getBoundingClientRect();
         const cardRect = consumeCardRef.current?.getBoundingClientRect();
         const startRect = elementStartRef.current?.getBoundingClientRect();
         if (!containerRect || !cardRect) return;
 
-        const fragmentName = FRAGMENT_NAME_BY_TYPE[elementType];
-        const template: import("../../context/PlayerContext").RewardElement = fragmentName
-            ? (allElementOptionsRef.current.find((e) => e.letter === fragmentName)
-                ?? { letter: fragmentName, damage: 0, energy: 0, rank: 1, level: 1, description: fragmentName, type1: elementType, category: "fragment" })
-            : (levelZeroElementsRef.current.find((e) => e.type1 === elementType || e.type2 === elementType) ?? null)!;
+        const template = buildFragmentRewardTemplate(elementType, nextEnemy?.baseElement ?? null);
         if (!template) return;
 
         const startX = cardRect.left + cardRect.width / 2;
@@ -3757,7 +3840,17 @@ function Game() {
             const count = getConsumeElementCount(meter.pct);
             if (elementType && count > 0) {
                 const baseElementCount = playerProgress.elements.length;
-                launchConsumeElementFlights(elementType, count, baseElementCount);
+                const combinedTripleReward = buildCombinedTripleFragmentElement(
+                    elementType,
+                    nextEnemy.homunculusFragments ?? [],
+                    allElementOptionsRef.current,
+                );
+
+                if (combinedTripleReward) {
+                    launchBoostedBaseElementFlight(combinedTripleReward, 0, 0);
+                } else {
+                    launchConsumeElementFlights(elementType, count, baseElementCount);
+                }
             }
         } else {
             // Compute the reward element
@@ -3776,10 +3869,8 @@ function Game() {
                     ? playerProgress.elements.find((e) => e.id === firstSlotId)
                     : null;
                 const slotType = firstSlotElem?.type1 ? normalizeElementName(firstSlotElem.type1) : null;
-                const fragmentName = slotType ? FRAGMENT_NAME_BY_TYPE[slotType] : null;
-                if (fragmentName && slotType) {
-                    rewardTemplate = allElementOptionsRef.current.find((e) => e.letter === fragmentName)
-                        ?? { letter: fragmentName, damage: 0, energy: 0, rank: 1, level: 1, description: fragmentName, type1: slotType, category: "fragment" };
+                if (slotType) {
+                    rewardTemplate = buildFragmentRewardTemplate(slotType, null);
                 }
                 // else rewardTemplate stays null — no reward given
             }
@@ -4690,12 +4781,6 @@ function Game() {
                                     />
                                     {/* Variable element slots */}
                                     <div className={`create-elem-section${elemSlotCount === 3 ? " create-elem-section--count-3" : ""}`}>
-                                        <button
-                                            className={`create-elem-btn${elemSlotCount <= 0 ? " is-hidden" : ""}`}
-                                            onClick={handleRemoveElemSlot}
-                                            disabled={elemSlotCount <= 0 || isCreatingHomunculus}
-                                            aria-label="Remove element slot"
-                                        >−</button>
                                         <div className={`create-elem-slots${elemSlotCount === 0 ? " is-empty" : ""}`}>
                                             {elemSlotCount === 0 ? (
                                                 <div className="create-elem-slot-entry" aria-hidden="true">
@@ -4720,15 +4805,6 @@ function Game() {
                                                 );
                                             })}
                                         </div>
-                                        <button
-                                            className={`create-elem-btn${elemSlotCount >= 3 ? " is-hidden" : ""}`}
-                                            onClick={handleAddElemSlot}
-                                            disabled={elemSlotCount >= 3 || isCreatingHomunculus}
-                                            aria-label="Add element slot"
-                                            aria-hidden={elemSlotCount >= 3}
-                                            tabIndex={elemSlotCount >= 3 ? -1 : 0}
-                                        >+
-                                        </button>
                                     </div>
                                     <span className="create-slot-label">Element</span>
                                 </div>

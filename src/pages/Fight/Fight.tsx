@@ -782,15 +782,17 @@ function Fight() {
             }
 
             // Store nav state for when player clicks Continue
+            const isHomunculusEnemy = (enemy.sprite ?? "").toLowerCase().startsWith("homunculus/");
+
             pendingNavStateRef.current = {
                 battleEnded: true,
-                fightReward: { soulsGained: enemy.souls, rewardElements: chosen },
+                fightReward: { soulsGained: isHomunculusEnemy ? 0 : enemy.souls, rewardElements: chosen },
                 elementUseCounts: { ...useCounts },
                 defeatedEnemy: enemy,
             };
             setExpResultsEntries(entries);
         }
-    }, [elementPool, enemy.souls, enemyHealth, levels, navigate, player.elements, playerBurnStatus, playerSoakStatus, playerFreezeStatus, playerEnergizeStatus, playerThornsStatus, playerFloatStatus, setBattleEnergyCarryover, setPlayerStatuses]);
+    }, [elementPool, enemy.souls, enemy.sprite, enemyHealth, levels, navigate, player.elements, playerBurnStatus, playerSoakStatus, playerFreezeStatus, playerEnergizeStatus, playerThornsStatus, playerFloatStatus, setBattleEnergyCarryover, setPlayerStatuses]);
 
     useEffect(() => {
         if (levels.length === 0 || enemyHealth <= 0 || player.hp > 0) {
@@ -1206,6 +1208,12 @@ function Fight() {
 
         setIsResolvingTurn(true);
         setIsEnemyTurnActive(true);
+
+        // Enemy shield is turn-limited and should not persist into a new enemy turn.
+        if (enemyShield > 0) {
+            setEnemyShield(0);
+            pushEventLog("Enemy shield expired", "status", { isDetail: true });
+        }
 
         const burnAtTurnEnd = enemyBurnStatus;
         const energizeAtTurnEnd = playerEnergizeStatus;

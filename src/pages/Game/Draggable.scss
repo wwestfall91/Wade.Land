@@ -187,8 +187,24 @@
             height: 0.75rem;
         }
 
+        &.is-fragment--fire {
+            border-color: #ff7a63;
+        }
+
+        &.is-fragment--water {
+            border-color: #60a5fa;
+        }
+
+        &.is-fragment--earth {
+            border-color: #b78c5f;
+        }
+
+        &.is-fragment--air {
+            border-color: #8ec1d4;
+        }
+
         &:hover {
-            border-color: #dce8ff;
+            filter: brightness(1.06);
         }
 
         &.is-dragging {
