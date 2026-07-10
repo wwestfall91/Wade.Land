@@ -170,6 +170,37 @@
         animation: invalid-drop-shake 0.35s ease-in-out;
     }
 
+    // ── Fragment draggables (50% scale) ────────────────────────────────────────
+
+    .drag.is-fragment {
+        width: 1.15rem;
+        height: 1.15rem;
+        border-radius: 14px;
+        border: 1.5px solid #c4d0ff;
+        background: linear-gradient(180deg, #3a52cc 0%, #1e2f8a 100%);
+        box-shadow:
+            inset 0 0 0 1px rgba(180, 200, 255, 0.3),
+            inset 0 0 0 2px #0c1554;
+
+        .element-icon {
+            width: 0.75rem;
+            height: 0.75rem;
+        }
+
+        &:hover {
+            border-color: #dce8ff;
+        }
+
+        &.is-dragging {
+            transform: translateY(-1px) scale(1.1);
+        }
+
+        &.is-invalid-drop {
+            animation: invalid-drop-shake 0.35s ease-in-out;
+            border-color: #ff6060 !important;
+        }
+    }
+
     // ── Spell draggables ────────────────────────────────────────────────────────
 
     .drag.is-spell {

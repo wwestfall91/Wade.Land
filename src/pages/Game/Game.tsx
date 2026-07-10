@@ -50,6 +50,9 @@ import { LevelUpModal } from "../Fight/LevelUpModal";
 import soulIcon from "../../assets/icons/Soul.png";
 import chestIcon from "../../assets/icons/Chest.png";
 import slotIcon from "../../assets/icons/Slot.png";
+import fragmentSlotIcon from "../../assets/icons/Fragment Slot.png";
+import powerIcon from "../../assets/icons/Power.png";
+import shieldIcon from "../../assets/icons/Shield.png";
 import "./Game.scss";
 import "./SpellSlots.scss";
 
@@ -132,6 +135,7 @@ type Enemy = {
     weaknesses: string[];
     elements: RewardElement[];
     resistances?: Partial<Record<string, number>>;
+    baseElement?: RewardElement;
 };
 
 type ChestDefinition = {
@@ -335,6 +339,8 @@ function Game() {
         setSpellSlotElement,
         addSpellSlot,
         setElementalResistance,
+        lockedModes,
+        unlockMode,
     } = usePlayer();
     const gameRef = useRef<HTMLDivElement | null>(null);
     const elementStartRef = useRef<HTMLDivElement | null>(null);
@@ -352,6 +358,9 @@ function Game() {
     const createElemSlotRef0 = useRef<HTMLDivElement | null>(null);
     const createElemSlotRef1 = useRef<HTMLDivElement | null>(null);
     const createElemSlotRef2 = useRef<HTMLDivElement | null>(null);
+    const unlockSlotRef0 = useRef<HTMLDivElement | null>(null);
+    const unlockSlotRef1 = useRef<HTMLDivElement | null>(null);
+    const unlockSlotRef2 = useRef<HTMLDivElement | null>(null);
     const createHomunculusTimeoutRef = useRef<number | null>(null);
 
     const [draggables, setDraggables] = useState<DraggableItem[]>([]);
@@ -432,9 +441,13 @@ function Game() {
     const [isDrainShaking, setIsDrainShaking] = useState(false);
     const [drainShakeColor, setDrainShakeColor] = useState("");
     const [consumeDrainedMeters, setConsumeDrainedMeters] = useState<Set<string>>(new Set());
+    const [consumeFinalePhase, setConsumeFinalePhase] = useState<1 | 2 | null>(null);
+    const [consumeFinaleTemplate, setConsumeFinaleTemplate] = useState<RewardElement | null>(null);
+    const [statBoostToasts, setStatBoostToasts] = useState<Array<{ id: number; x: number; y: number; damageBoost: number; shieldBoost: number }>>([]); 
     const [createBaseSlotId, setCreateBaseSlotId] = useState<number | null>(null);
     const [elemSlotCount, setElemSlotCount] = useState(1);
     const [createElemSlotIds, setCreateElemSlotIds] = useState<(number | null)[]>([null]);
+    const [unlockSlotOccupants, setUnlockSlotOccupants] = useState<[number | null, number | null, number | null]>([null, null, null]);
     const [homunculusWorkbook, setHomunculusWorkbook] = useState<HomunculusWorkbook | null>(null);
     const [isSoulCounterPopping] = useState(false);
     const [isSoulPanelErrorFeedback, setIsSoulPanelErrorFeedback] = useState(false);
@@ -998,12 +1011,19 @@ function Game() {
         ...spellSlotRefs.current,
     ];
     const createSlotStartIndex = allDropZoneRefsWithSpellSlots.length;
-    const allDropZoneRefsAll = [
+    const allDropZoneRefsCreate = [
         ...allDropZoneRefsWithSpellSlots,
         createBaseSlotRef,
         createElemSlotRef0,
         createElemSlotRef1,
         createElemSlotRef2,
+    ];
+    const unlockSlotStartIndex = allDropZoneRefsCreate.length;
+    const allDropZoneRefsAll = [
+        ...allDropZoneRefsCreate,
+        unlockSlotRef0,
+        unlockSlotRef1,
+        unlockSlotRef2,
     ];
 
     const getDraggableById = useCallback((draggableId: number | null) => {
@@ -1842,7 +1862,6 @@ function Game() {
         if (slotZeroOccupantId === null) {
             return;
         }
-
         const slotZeroDraggable = getDraggableById(slotZeroOccupantId);
         const slotZeroElementKey = normalizeElementName(slotZeroDraggable?.letter);
         if (
@@ -1892,6 +1911,28 @@ function Game() {
             modeInsertConsumeTimeoutRef.current = null;
         }, MODE_SHUTTER_CLOSE_MS);
     }, [consumeElements, getDraggableById, normalizeZoneOccupants, sealCombinationMode, selectedModeTabElementKey, zoneOccupants]);
+
+    const getUnlockSlotLetter = useCallback((id: number): string | undefined => {
+        return draggables.find((d) => d.id === id)?.letter;
+    }, [draggables]);
+
+    const handleUnlock = useCallback(() => {
+        const modeKey = activeModeElementKeyRef.current;
+        if (!modeKey || !lockedModes.has(modeKey)) return;
+        unlockMode(modeKey as import("./CombinationModePanel").ModeTabElementKey);
+        // Return all three slot occupants to their home positions
+        setUnlockSlotOccupants((prev) => {
+            const ids = prev.filter((id): id is number => id !== null);
+            if (ids.length > 0) {
+                setReturnHomeVersions((v) => {
+                    const next = { ...v };
+                    for (const id of ids) next[id] = (next[id] ?? 0) + 1;
+                    return next;
+                });
+            }
+            return [null, null, null];
+        });
+    }, [lockedModes, unlockMode]);
 
     const handleModeTabSelect = useCallback((elementKey: ModeTabElementKey) => {
         setSelectedModeTabElementKey((current) => (current === elementKey ? null : elementKey));
@@ -2044,6 +2085,15 @@ function Game() {
     const insertedModeElementKey = normalizeElementName(insertedModeDraggable?.letter);
     const activeModeElementKey = selectedModeTabElementKey ?? (isModeTabElementKey(insertedModeElementKey) ? insertedModeElementKey : null);
     const isActiveModeSealed = activeModeElementKey !== null && sealedCombinationModes.has(activeModeElementKey);
+    const isCurrentModeLocked = activeModeElementKey !== null && lockedModes.has(activeModeElementKey);
+    const unlockTargetModeKey = selectedModeTabElementKey;
+    const isUnlockReady = isCurrentModeLocked
+        && unlockTargetModeKey !== null
+        && unlockSlotOccupants.every((id) => {
+            if (id === null) return false;
+            const slotItem = getDraggableById(id);
+            return normalizeElementName(slotItem?.letter) === unlockTargetModeKey;
+        });
     const slotZeroOccupantId = zoneOccupants[0] ?? null;
     const slotZeroDraggable = getDraggableById(slotZeroOccupantId);
     const slotZeroElementKey = normalizeElementName(slotZeroDraggable?.letter);
@@ -3078,6 +3128,24 @@ function Game() {
         // Clear from create slots whenever this element moves
         setCreateBaseSlotId((prev) => (prev === draggableId ? null : prev));
         setCreateElemSlotIds((prev) => prev.map((id) => (id === draggableId ? null : id)));
+        // Clear from unlock slots whenever this element moves
+        setUnlockSlotOccupants((prev) => prev.map((id) => (id === draggableId ? null : id)) as [number | null, number | null, number | null]);
+
+        // If dropping onto an unlock slot
+        if (zoneIndex !== null && zoneIndex >= unlockSlotStartIndex) {
+            const localIndex = zoneIndex - unlockSlotStartIndex;
+            setUnlockSlotOccupants((prev) => {
+                const next: [number | null, number | null, number | null] = [...prev] as [number | null, number | null, number | null];
+                next[localIndex] = draggableId;
+                return next;
+            });
+            setZoneOccupants((previous) => normalizeZoneOccupants(
+                previous.map((occupantId) => (occupantId === draggableId ? null : occupantId)),
+            ));
+            setEnhanceSlotOccupantId((previous) => (previous === draggableId ? null : previous));
+            setMachineSlotOccupantId((previous) => (previous === draggableId ? null : previous));
+            return;
+        }
 
         // If dropping onto a create slot
         if (zoneIndex !== null && zoneIndex >= createSlotStartIndex) {
@@ -3205,40 +3273,51 @@ function Game() {
             return false;
         }
 
-        // Spell slots: any element can snap to a spell slot
+        // Fragment slots: create elem slots (localIndex > 0) only accept fragments;
+        // base element slot (localIndex === 0) rejects fragments.
+        if (zoneIndex >= createSlotStartIndex && zoneIndex < unlockSlotStartIndex) {
+            if (enemyCardMode !== "create" || isCreatingHomunculus) return false;
+            const localIndex = zoneIndex - createSlotStartIndex;
+            if (localIndex === 0) {
+                if (draggable.category === "fragment" || draggable.category === "spell" || draggable.category === "soul") return false;
+                return createBaseSlotId === null || createBaseSlotId === draggableId;
+            }
+            const elemIndex = localIndex - 1;
+            if (elemIndex >= elemSlotCount) return false;
+            if (draggable.category !== "fragment") return false;
+            const occupant = createElemSlotIds[elemIndex] ?? null;
+            return occupant === null || occupant === draggableId;
+        }
+
+        // Fragments may only snap to elem slots (handled above) — reject everywhere else
+        if (draggable.category === "fragment") return false;
+
+        // Spell slots: any non-fragment element can snap to a spell slot
         if (zoneIndex >= spellSlotStartIndex && zoneIndex < createSlotStartIndex) {
             const slotLocalIndex = zoneIndex - spellSlotStartIndex;
             if (slotLocalIndex >= spellSlots.length) return false;
-            // Allow if the slot is empty or already holds this element
             return spellSlots[slotLocalIndex] === null || spellSlots[slotLocalIndex] === draggableId;
         }
 
-        // Create slots: accept any draggable element (not soul, not spell) when in create mode
-        if (zoneIndex >= createSlotStartIndex) {
-            if (enemyCardMode !== "create" || isCreatingHomunculus) return false;
+        // Unlock slots: accept non-spell, non-soul, non-fragment elements
+        if (zoneIndex >= unlockSlotStartIndex) {
+            const localIndex = zoneIndex - unlockSlotStartIndex;
+            if (localIndex >= 3) return false;
+            if (!isCurrentModeLocked) return false;
             if (draggable.category === "spell" || draggable.category === "soul") return false;
-            const localIndex = zoneIndex - createSlotStartIndex;
-            if (localIndex === 0) return createBaseSlotId === null || createBaseSlotId === draggableId;
-            const elemIndex = localIndex - 1;
-            if (elemIndex >= elemSlotCount) return false;
-            const occupant = createElemSlotIds[elemIndex] ?? null;
+            const occupant = unlockSlotOccupants[localIndex];
             return occupant === null || occupant === draggableId;
+        }
+
+        // While a mode is locked, block normal combination-slot snapping (including
+        // hidden phantom layout slots) so only unlock slots can accept drops there.
+        if (isCurrentModeLocked && zoneIndex < zoneOccupants.length) {
+            return false;
         }
 
         // Block the logic panel slot while a deferred job is processing for this mode.
         if (zoneIndex === 1 && activeDeferredJob !== null) {
             return false;
-        }
-
-        if (zoneIndex === 0 && selectedModeTabElementKey !== null) {
-            if (isActiveModeSealed) {
-                return false;
-            }
-
-            const draggableElementKey = normalizeElementName(draggable.letter);
-            if (draggableElementKey !== selectedModeTabElementKey) {
-                return false;
-            }
         }
 
         const enhanceZoneIndex = zoneOccupants.length;
@@ -3255,24 +3334,7 @@ function Game() {
             return machineSlotOccupantId === null || machineSlotOccupantId === draggableId;
         }
 
-        // Spells cannot be combined â€” block snapping entirely
-        if (draggable.category === "spell") {
-            return false;
-        }
-
-        const isPlasma = isPlasmaName(draggable.letter);
-        const hasThreeSlots = zoneOccupants.length === 3;
-
-        if (hasThreeSlots && insertedModeStateKey !== "mix") {
-            if (isPlasma && zoneIndex !== 1) {
-                return false;
-            }
-            if (!isPlasma && zoneIndex === 1) {
-                return false;
-            }
-        }
-
-        const occupantId = zoneOccupants[zoneIndex];
+                const occupantId = zoneOccupants[zoneIndex];
         return occupantId === null || occupantId === draggableId;
     };
 
@@ -3473,6 +3535,19 @@ function Game() {
                 type1: normalizeType(baseElem?.type1 || baseElem?.letter),
                 category: "element",
             }],
+            baseElement: baseElem ? {
+                letter: baseElem.letter,
+                damage: baseElem.damage,
+                shield: baseElem.shield ?? 0,
+                energy: baseElem.energy ?? 0,
+                rank: baseElem.rank,
+                level: baseElem.level,
+                description: baseElem.description,
+                type1: baseElem.type1,
+                type2: baseElem.type2,
+                effects: baseElem.effects,
+                category: baseElem.category,
+            } : undefined,
         };
 
         setPendingCreatedEnemy(homunculus);
@@ -3527,15 +3602,77 @@ function Game() {
     const CONSUME_ELEMENT_STAGGER_MS = 500;
     const CONSUME_ELEMENT_FLIGHT_MS = ELEMENT_FLIGHT_TRAVEL_MS;
 
+    const launchBoostedBaseElementFlight = (template: RewardElement, damageBoost: number, shieldBoost: number) => {
+        const containerRect = gameRef.current?.getBoundingClientRect();
+        const cardRect = consumeCardRef.current?.getBoundingClientRect();
+        const startRect = elementStartRef.current?.getBoundingClientRect();
+        if (!containerRect || !cardRect) return;
+
+        const spawnIndex = playerProgress.elements.length;
+        let spawnPos: { x: number; y: number };
+        if (containerRect && startRect) {
+            const step = 44;
+            const padding = 10;
+            const columns = Math.max(1, Math.floor((startRect.width - padding * 2) / step));
+            const row = Math.floor(spawnIndex / columns);
+            spawnPos = {
+                x: startRect.left - containerRect.left + padding + (spawnIndex % columns) * step,
+                y: startRect.bottom - containerRect.top - padding - step - row * step,
+            };
+        } else {
+            spawnPos = { x: (spawnIndex % 3) * 44, y: Math.floor(spawnIndex / 3) * 44 };
+        }
+
+        const startX = cardRect.left + cardRect.width / 2;
+        const startY = cardRect.top + cardRect.height * 0.35;
+        const targetX = containerRect.left + spawnPos.x + 16;
+        const targetY = containerRect.top + spawnPos.y + 16;
+
+        const flightId = elementFlightIdRef.current++;
+        setElementFlightIcons((prev) => [...prev, {
+            id: flightId,
+            startX,
+            startY,
+            toX: targetX - startX,
+            toY: targetY - startY,
+            letter: template.letter,
+            delayMs: 0,
+        }]);
+
+        const landId = window.setTimeout(() => {
+            setElementFlightIcons((prev) => prev.filter((ic) => ic.id !== flightId));
+            addElement({ ...template, initialPosition: spawnPos });
+
+            if (damageBoost > 0 || shieldBoost > 0) {
+                const toastId = newElementToastIdRef.current++;
+                setStatBoostToasts((prev) => [...prev, { id: toastId, x: spawnPos.x, y: spawnPos.y, damageBoost, shieldBoost }]);
+                window.setTimeout(() => {
+                    setStatBoostToasts((prev) => prev.filter((t) => t.id !== toastId));
+                }, 2600);
+            }
+        }, ELEMENT_FLIGHT_TRAVEL_MS);
+
+        consumeFlightTimeoutsRef.current.push(landId);
+    };
+
+    const FRAGMENT_NAME_BY_TYPE: Record<string, string> = {
+        fire: "Fire Fragment",
+        water: "Water Fragment",
+        earth: "Earth Fragment",
+        air: "Air Fragment",
+    };
+
     const launchConsumeElementFlights = (elementType: string, count: number, baseElementCount: number) => {
         const containerRect = gameRef.current?.getBoundingClientRect();
         const cardRect = consumeCardRef.current?.getBoundingClientRect();
         const startRect = elementStartRef.current?.getBoundingClientRect();
         if (!containerRect || !cardRect) return;
 
-        const template = levelZeroElementsRef.current.find(
-            (e) => e.type1 === elementType || e.type2 === elementType,
-        );
+        const fragmentName = FRAGMENT_NAME_BY_TYPE[elementType];
+        const template: import("../../context/PlayerContext").RewardElement = fragmentName
+            ? (allElementOptionsRef.current.find((e) => e.letter === fragmentName)
+                ?? { letter: fragmentName, damage: 0, energy: 0, rank: 1, level: 1, description: fragmentName, type1: elementType, category: "fragment" })
+            : (levelZeroElementsRef.current.find((e) => e.type1 === elementType || e.type2 === elementType) ?? null)!;
         if (!template) return;
 
         const startX = cardRect.left + cardRect.width / 2;
@@ -3623,14 +3760,67 @@ function Game() {
                 launchConsumeElementFlights(elementType, count, baseElementCount);
             }
         } else {
-            // All meters drained — final red shake-and-disappear.
-            setDrainShakeColor("#ef4444");
-            setIsConsuming(true);
-            window.setTimeout(() => {
-                setIsConsuming(false);
-                setConsumeDrainedMeters(new Set());
-                setEnemyCardMode("create");
-            }, 2000);
+            // Compute the reward element
+            const savedBase = nextEnemy?.baseElement ?? null;
+            let rewardTemplate: RewardElement | null = null;
+            let damageBoost = 0;
+            let shieldBoost = 0;
+            if (savedBase) {
+                damageBoost = Math.round((savedBase.damage ?? 0) * (homunculusMeters.pwr + homunculusMeters.exp) / 100);
+                shieldBoost = Math.round((savedBase.shield ?? 0) * (homunculusMeters.def + homunculusMeters.hp) / 100);
+                rewardTemplate = { ...savedBase, damage: (savedBase.damage ?? 0) + damageBoost, shield: (savedBase.shield ?? 0) + shieldBoost };
+            } else {
+                // No base element — derive fragment type from first spell slot
+                const firstSlotId = spellSlots[0] ?? null;
+                const firstSlotElem = firstSlotId !== null
+                    ? playerProgress.elements.find((e) => e.id === firstSlotId)
+                    : null;
+                const slotType = firstSlotElem?.type1 ? normalizeElementName(firstSlotElem.type1) : null;
+                const fragmentName = slotType ? FRAGMENT_NAME_BY_TYPE[slotType] : null;
+                if (fragmentName && slotType) {
+                    rewardTemplate = allElementOptionsRef.current.find((e) => e.letter === fragmentName)
+                        ?? { letter: fragmentName, damage: 0, energy: 0, rank: 1, level: 1, description: fragmentName, type1: slotType, category: "fragment" };
+                }
+                // else rewardTemplate stays null — no reward given
+            }
+            const finalRewardTemplate = rewardTemplate;
+            const finalDamageBoost = damageBoost;
+            const finalShieldBoost = shieldBoost;
+
+            if (finalRewardTemplate) {
+                // Phase 1 (0–1s): sprite shakes + burns white
+                setIsConsuming(true);
+                setConsumeFinaleTemplate(finalRewardTemplate);
+                setConsumeFinalePhase(1);
+
+                // Phase 2 (1–2s): sprite hides, element icon appears and shrinks to draggable size
+                const phase2Id = window.setTimeout(() => {
+                    setConsumeFinalePhase(2);
+                }, 1000);
+
+                // Phase 3 (2s+): clear icon, launch element flight, switch mode when it lands
+                const phase3Id = window.setTimeout(() => {
+                    setConsumeFinaleTemplate(null);
+                    launchBoostedBaseElementFlight(finalRewardTemplate, finalDamageBoost, finalShieldBoost);
+                    window.setTimeout(() => {
+                        setIsConsuming(false);
+                        setConsumeFinalePhase(null);
+                        setConsumeDrainedMeters(new Set());
+                        setEnemyCardMode("create");
+                    }, ELEMENT_FLIGHT_TRAVEL_MS + 100);
+                }, 2000);
+
+                consumeFlightTimeoutsRef.current.push(phase2Id, phase3Id);
+            } else {
+                // No reward — simple shake-and-disappear then switch mode
+                setDrainShakeColor("#ef4444");
+                setIsConsuming(true);
+                window.setTimeout(() => {
+                    setIsConsuming(false);
+                    setConsumeDrainedMeters(new Set());
+                    setEnemyCardMode("create");
+                }, 2000);
+            }
         }
     };
 
@@ -4020,6 +4210,27 @@ function Game() {
                     New {toast.category}!
                 </div>
             ))}
+            {statBoostToasts.map((toast) => (
+                <div
+                    key={toast.id}
+                    className="stat-boost-toast"
+                    style={{ left: toast.x + 16, top: toast.y }}
+                    aria-hidden="true"
+                >
+                    {toast.damageBoost > 0 && (
+                        <span className="stat-boost-toast-row">
+                            <img src={powerIcon} className="stat-boost-toast-icon" alt="" />
+                            <span>+{toast.damageBoost}</span>
+                        </span>
+                    )}
+                    {toast.shieldBoost > 0 && (
+                        <span className="stat-boost-toast-row">
+                            <img src={shieldIcon} className="stat-boost-toast-icon" alt="" />
+                            <span>+{toast.shieldBoost}</span>
+                        </span>
+                    )}
+                </div>
+            ))}
             {soulFlightIcons.length > 0 ? (
                 <div className="soul-collection-layer" aria-hidden="true">
                     {soulFlightIcons.map((icon) => (
@@ -4200,6 +4411,7 @@ function Game() {
                                 : isPlasmaName(draggable.letter) ? plasmaForcedSnap : null)
                     }
                     returnHomeVersion={returnHomeVersions[draggable.id] ?? 0}
+                    zIndexOverride={draggable.category === "fragment" ? 9100 : undefined}
                 />
             ))}
 
@@ -4388,6 +4600,12 @@ function Game() {
                             isOutputSlotClosed={isDeferredSlotClosed}
                             isOutputSlotAnimatingClose={isDeferredShutterAnimating && isDeferredSlotClosed}
                             isOutputSlotAnimatingOpen={isDeferredShutterOpening && isDeferredModeActive && !isDeferredSlotClosed}
+                            lockedModes={lockedModes}
+                            unlockSlotRefs={[unlockSlotRef0, unlockSlotRef1, unlockSlotRef2]}
+                            unlockSlotOccupants={unlockSlotOccupants}
+                            getUnlockSlotLetter={getUnlockSlotLetter}
+                            isUnlockReady={isUnlockReady}
+                            onUnlock={handleUnlock}
                         />
                     ) : null}
 
@@ -4493,10 +4711,10 @@ function Game() {
                                                             <div className={`create-slot-connector create-slot-connector--h${prevSlotId && slotId ? " is-lit" : ""}`} />
                                                         )}
                                                         <div
-                                                            className={`create-slot-drop-zone${slotId ? " has-element" : ""}`}
+                                                            className={`create-fragment-slot${slotId ? " has-element" : ""}`}
                                                             ref={slotRef}
                                                         >
-                                                            {!slotId && <img className="create-slot-empty" src={slotIcon} alt="" aria-hidden="true" />}
+                                                            {!slotId && <img className="create-fragment-slot-empty" src={fragmentSlotIcon} alt="" aria-hidden="true" />}
                                                         </div>
                                                     </div>
                                                 );
@@ -4532,9 +4750,20 @@ function Game() {
                                 <div className="game-enemy-card-name">{nextEnemy?.name ?? "Unknown Enemy"}</div>
                             </div>
                             <div
-                                className={`consume-stage-wrapper${isConsuming ? " is-consuming" : ""}${isDrainShaking ? " is-drain-shaking" : ""}`}
+                                className={[
+                                    "consume-stage-wrapper",
+                                    isConsuming && !consumeFinalePhase ? "is-consuming" : "",
+                                    isDrainShaking && !consumeFinalePhase ? "is-drain-shaking" : "",
+                                    consumeFinalePhase === 1 ? "is-consume-finale-1" : "",
+                                    consumeFinalePhase === 2 ? "is-consume-finale-2" : "",
+                                ].filter(Boolean).join(" ")}
                                 style={{ "--consume-glow-color": drainShakeColor } as React.CSSProperties}
                             >
+                                {consumeFinalePhase === 2 && consumeFinaleTemplate && (
+                                    <div className="consume-finale-icon" aria-hidden="true">
+                                        <ElementIcon name={consumeFinaleTemplate.letter} />
+                                    </div>
+                                )}
                                 <EnemyStage
                                     className="game-enemy-stage consume-mode-stage"
                                     frozen

@@ -2336,6 +2336,41 @@
     }
 }
 
+.stat-boost-toast {
+    position: absolute;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.18rem;
+    transform: translateX(-50%);
+    z-index: 9500;
+    animation: new-element-float 2.6s ease-out forwards;
+    user-select: none;
+}
+
+.stat-boost-toast-row {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.8rem;
+    font-weight: 900;
+    letter-spacing: 0.06em;
+    color: #ffffff;
+    text-shadow:
+        0 0 6px rgba(255, 255, 255, 0.6),
+        0 1px 4px rgba(0, 0, 0, 0.9);
+    white-space: nowrap;
+}
+
+.stat-boost-toast-icon {
+    width: 0.85rem;
+    height: 0.85rem;
+    object-fit: contain;
+    display: block;
+    flex-shrink: 0;
+}
+
 .new-element-toast {
     position: absolute;
     pointer-events: none;
@@ -2488,6 +2523,7 @@
             text-transform: uppercase;
             text-align: center;
             line-height: 1.1;
+            flex: 1 1 auto;
         }
 
         .game-enemy-card-resistances {
@@ -2665,6 +2701,14 @@
 .consume-stage-wrapper {
     display: contents;
 
+    &.is-consume-finale-1,
+    &.is-consume-finale-2 {
+        display: block;
+        position: relative;
+        flex: 1 1 auto;
+        min-height: 0;
+    }
+
     // Per-meter drain: shake tinted with the meter's glow color
     &.is-drain-shaking .consume-mode-stage {
         animation: consume-shake 0.09s linear infinite;
@@ -2681,6 +2725,46 @@
         .enemy-sprite-image {
             filter: grayscale(0) brightness(1.4) drop-shadow(0 0 10px var(--consume-glow-color, #ef4444)) !important;
             animation: none !important;
+        }
+    }
+
+    // Phase 1: sprite shakes and burns white over 1 second
+    &.is-consume-finale-1 .consume-mode-stage {
+        animation: consume-shake 0.09s linear infinite;
+
+        .enemy-sprite-image {
+            animation: consume-finale-whiteburn 1s ease-in forwards !important;
+        }
+    }
+
+    // Phase 2: sprite hides; the icon overlay handles its own animation
+    &.is-consume-finale-2 .consume-mode-stage {
+        animation: none;
+
+        .enemy-sprite-image {
+            opacity: 0 !important;
+            filter: none !important;
+            animation: none !important;
+        }
+    }
+
+    // Finale icon overlay — centres inside the stage, shrinks from large+white to draggable size+normal
+    .consume-finale-icon {
+        position: absolute;
+        z-index: 10;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+
+        .element-icon {
+            display: block;
+            width: 2.3rem;
+            height: 2.3rem;
+            object-fit: contain;
+            transform-origin: center center;
+            animation: consume-finale-icon-shrink 1s ease-out forwards;
         }
     }
 }
@@ -2710,6 +2794,34 @@
 @keyframes consume-fade {
     0%, 55% { opacity: 1; }
     100%    { opacity: 0; }
+}
+
+@keyframes consume-finale-whiteburn {
+    0%   { filter: grayscale(0) brightness(1); }
+    25%  { filter: brightness(2.5) drop-shadow(0 0 8px rgba(255,255,255,0.5)); }
+    60%  { filter: brightness(6) drop-shadow(0 0 22px rgba(255,255,255,0.88)) saturate(0.4); }
+    100% { filter: brightness(18) drop-shadow(0 0 50px white) saturate(0); }
+}
+
+@keyframes consume-finale-icon-shrink {
+    0% {
+        transform: scale(4);
+        filter: brightness(12) drop-shadow(0 0 40px white) saturate(0);
+        opacity: 1;
+    }
+    35% {
+        transform: scale(2.2);
+        filter: brightness(4) drop-shadow(0 0 18px rgba(255,255,255,0.85)) saturate(0.3);
+    }
+    80% {
+        transform: scale(1.1);
+        filter: brightness(1.6) drop-shadow(0 0 6px rgba(255,255,255,0.4)) saturate(0.85);
+    }
+    100% {
+        transform: scale(1);
+        filter: brightness(1) drop-shadow(0 0 0px rgba(255,255,255,0)) saturate(1);
+        opacity: 1;
+    }
 }
 
 // ── Consume button ────────────────────────────────────────────────────────────
@@ -2764,6 +2876,57 @@
     align-items: center;
     gap: 0.5rem;
     background: radial-gradient(circle at 38% 30%, rgba(82, 188, 255, 0.18), rgba(8, 24, 72, 0.94)) !important;
+    position: relative;
+}
+
+.create-fragment-slot-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.2rem;
+    flex-shrink: 0;
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 5;
+}
+
+.create-fragment-slot {
+    width: 1.6rem;
+    height: 1.6rem;
+    border: 1.5px solid #4ab9f5;
+    border-radius: 245px;
+    background:
+        radial-gradient(circle at 34% 30%, rgba(82, 188, 255, 0.2), rgba(14, 44, 102, 0.24) 38%, rgba(8, 22, 72, 0.88) 78%),
+        radial-gradient(circle at 50% 62%, rgba(6, 16, 60, 1), rgba(5, 12, 44, 0.78));
+    box-shadow:
+        inset 0 1px 0 rgba(140, 200, 255, 0.28),
+        inset 0 0 0 1px #2d8cd6,
+        inset 0 0 0 2px #081c52,
+        0 3px 0 rgba(0, 0, 0, 0.3);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: default;
+    position: relative;
+
+    &.has-element {
+        border-color: #7adbff;
+        box-shadow:
+            inset 0 0 0 1px #3ab4f0,
+            inset 0 0 0 2px #061830,
+            0 0 8px rgba(80, 190, 255, 0.35),
+            0 3px 0 rgba(0, 0, 0, 0.3);
+    }
+}
+
+.create-fragment-slot-empty {
+    width: 0.9rem;
+    height: 0.9rem;
+    opacity: 0.55;
+    user-select: none;
+    pointer-events: none;
+    display: block;
 }
 
 .create-slot-layout {
@@ -2771,6 +2934,7 @@
     flex-direction: column;
     align-items: center;
     gap: 0;
+    position: relative;
 }
 
 .create-slot-group {

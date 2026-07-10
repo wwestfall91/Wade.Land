@@ -1,6 +1,6 @@
 ﻿@import url("https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap");
 
-#Fight{
+#Fight {
     display: flex;
     position: relative;
     flex-direction: column;
@@ -20,18 +20,16 @@
         position: absolute;
         inset: 0;
         pointer-events: none;
-        background: repeating-linear-gradient(
-            0deg,
-            rgba(255, 255, 255, 0.045) 0,
-            rgba(255, 255, 255, 0.045) 1px,
-            transparent 1px,
-            transparent 4px
-        );
+        background: repeating-linear-gradient(0deg,
+                rgba(255, 255, 255, 0.045) 0,
+                rgba(255, 255, 255, 0.045) 1px,
+                transparent 1px,
+                transparent 4px);
         opacity: 0.35;
         z-index: 0;
     }
 
-    > * {
+    >* {
         position: relative;
         z-index: 1;
     }
@@ -227,12 +225,12 @@
         align-items: center;
         padding: 0.08rem 0.45rem;
         border-radius: 999px;
-        border: 1px solid rgba(255,255,255,0.3);
+        border: 1px solid rgba(255, 255, 255, 0.3);
         font-size: 0.68rem;
         font-weight: 800;
         letter-spacing: 0.04em;
         text-transform: uppercase;
-        background: rgba(255,255,255,0.12);
+        background: rgba(255, 255, 255, 0.12);
         color: #fff;
     }
 
@@ -249,7 +247,7 @@
         align-items: center;
         padding: 0.06rem 0.42rem;
         border-radius: 999px;
-        border: 1px solid rgba(255,255,255,0.28);
+        border: 1px solid rgba(255, 255, 255, 0.28);
         font-size: 0.6rem;
         font-weight: 800;
         letter-spacing: 0.04em;
@@ -263,10 +261,29 @@
             color: #ffb8b8;
         }
 
-        &.type-resist-fire   { background: rgba(200, 80, 20, 0.28); border-color: rgba(255,150,80,0.38); color: #ffcba0; }
-        &.type-resist-water  { background: rgba(20, 80, 200, 0.28); border-color: rgba(80,160,255,0.38); color: #a0d4ff; }
-        &.type-resist-earth  { background: rgba(60, 140, 40, 0.28); border-color: rgba(100,200,80,0.38); color: #b8f0a0; }
-        &.type-resist-air    { background: rgba(140, 120, 200, 0.28); border-color: rgba(200,180,255,0.38); color: #e0d4ff; }
+        &.type-resist-fire {
+            background: rgba(200, 80, 20, 0.28);
+            border-color: rgba(255, 150, 80, 0.38);
+            color: #ffcba0;
+        }
+
+        &.type-resist-water {
+            background: rgba(20, 80, 200, 0.28);
+            border-color: rgba(80, 160, 255, 0.38);
+            color: #a0d4ff;
+        }
+
+        &.type-resist-earth {
+            background: rgba(60, 140, 40, 0.28);
+            border-color: rgba(100, 200, 80, 0.38);
+            color: #b8f0a0;
+        }
+
+        &.type-resist-air {
+            background: rgba(140, 120, 200, 0.28);
+            border-color: rgba(200, 180, 255, 0.38);
+            color: #e0d4ff;
+        }
     }
 
     .enemy-intent-badge {
@@ -393,7 +410,7 @@
         align-items: center;
         gap: 0.45rem;
         background: rgba(0, 0, 0, 0.582);
-        padding:.35rem .75rem;
+        padding: .35rem .75rem;
         border-radius: 10px;
     }
 
@@ -565,12 +582,13 @@
         justify-content: center;
         flex-shrink: 0;
 
-        img, .element-icon {
+        img,
+        .element-icon {
             width: 100%;
             height: 100%;
             object-fit: contain;
             image-rendering: auto;
-            filter: drop-shadow(0 1px 2px rgba(0,0,0,0.45));
+            filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.45));
         }
     }
 
@@ -592,7 +610,7 @@
         align-items: stretch;
         gap: 0.3rem;
         width: 100%;
-        margin-top:5px;
+        margin-top: 5px;
     }
 
     .spell-card-damage {
@@ -1092,12 +1110,15 @@
             opacity: 0;
             pointer-events: none;
         }
+
         padding: 0.2rem 0.35rem 0.24rem;
         border-radius: 4px;
         border: 1px solid rgba(255, 255, 255, 0.28);
         font-size: 0.72rem;
         font-weight: 800;
-        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        font-family: "Trebuchet MS",
+        "Segoe UI",
+        sans-serif;
         font-variant-numeric: tabular-nums;
         color: #fff;
         box-shadow: 0 5px 12px rgba(13, 58, 51, 0.22);
@@ -1331,19 +1352,19 @@
         align-items: center;
         gap: 0.9rem;
 
-        > h2 {
+        >h2 {
             margin: 0;
             font-size: 1.9rem;
             font-family: "Trebuchet MS", "Segoe UI", sans-serif;
             color: #fff69c;
         }
 
-        > p {
+        >p {
             margin: 0;
             opacity: 0.85;
         }
 
-        > button {
+        >button {
             border-radius: 0px !important;
             margin-top: 0.3rem;
             height: 2.6rem;
@@ -1356,7 +1377,7 @@
             font-weight: 700;
             cursor: pointer;
 
-            :focus{
+            :focus {
                 outline: unset;
             }
         }
@@ -1364,15 +1385,33 @@
 }
 
 @keyframes pipActivate {
-    0% { transform: scale(0.7); opacity: 0.5; }
-    60% { transform: scale(1.25); }
-    100% { transform: scale(1); opacity: 1; }
+    0% {
+        transform: scale(0.7);
+        opacity: 0.5;
+    }
+
+    60% {
+        transform: scale(1.25);
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
 }
 
 @keyframes pipSpend {
-    0% { transform: scale(1); }
-    40% { transform: scale(0.8); }
-    100% { transform: scale(1); }
+    0% {
+        transform: scale(1);
+    }
+
+    40% {
+        transform: scale(0.8);
+    }
+
+    100% {
+        transform: scale(1);
+    }
 }
 
 @keyframes projectileFly {
@@ -1380,10 +1419,12 @@
         transform: translate(-50%, -50%) scale(1.15);
         opacity: 1;
     }
+
     75% {
         transform: translate(calc(-50% + var(--proj-dx)), calc(-50% + var(--proj-dy))) scale(0.85);
         opacity: 1;
     }
+
     100% {
         transform: translate(calc(-50% + var(--proj-dx)), calc(-50% + var(--proj-dy))) scale(0.4);
         opacity: 0;
@@ -1443,6 +1484,7 @@
         object-fit: contain;
     }
 }
+
 @keyframes flashYellow {
     0% {
         box-shadow: 0 0 0 rgba(255, 234, 97, 0);

@@ -1,0 +1,159 @@
+#Game {
+    .mode-unlock-panel {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.85rem;
+        padding: 0.75rem 0.5rem 0.65rem;
+        width: 100%;
+        box-sizing: border-box;
+
+        // Per-element slot colours (mirrors the drop-zone element variants)
+        --unlock-border: #e6ecff;
+        --unlock-inset: #6f84ff;
+        --unlock-inset2: #101a64;
+        --unlock-bg-top: rgba(154, 176, 255, 0.22);
+        --unlock-bg-mid: rgba(44, 61, 156, 0.24);
+        --unlock-bg-bot: rgba(20, 31, 104, 0.88);
+        --unlock-shadow: rgba(8, 14, 56, 0.34);
+        --unlock-glow: rgba(110, 130, 255, 0.0);
+        --unlock-btn-top: var(--combination-station-bg-top, #3245ce);
+        --unlock-btn-bot: var(--combination-station-bg-bottom, #1a2b8d);
+        --unlock-btn-border: #e6ecff;
+        --unlock-btn-inset1: rgba(168, 186, 255, 0.28);
+        --unlock-btn-inset2: #101a64;
+    }
+
+    .mode-unlock-slots {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        gap: 0.85rem;
+    }
+
+    .mode-unlock-slot {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 3.2rem;
+        height: 3.2rem;
+        border-radius: 245px;
+        border: 2px solid var(--unlock-border);
+        background:
+            radial-gradient(circle at 34% 30%, var(--unlock-bg-top), var(--unlock-bg-mid) 38%, var(--unlock-bg-bot) 78%),
+            radial-gradient(circle at 50% 62%, rgba(14, 23, 76, 1), rgba(10, 16, 56, 0.78));
+        box-shadow:
+            inset 0 1px 0 rgba(201, 213, 255, 0.18),
+            inset 0 0 0 1px var(--unlock-inset),
+            inset 0 0 0 2px var(--unlock-inset2),
+            inset 0 4px 6px var(--unlock-shadow),
+            inset 0 -3px 4px rgba(0, 0, 0, 0.22),
+            0 5px 0 rgba(0, 0, 0, 0.3);
+        cursor: default;
+        position: relative;
+        transition:
+            border-color 180ms ease,
+            box-shadow 180ms ease;
+
+        &.has-element {
+            box-shadow:
+                inset 0 1px 0 rgba(201, 213, 255, 0.28),
+                inset 0 0 0 1px var(--unlock-inset),
+                inset 0 0 0 2px var(--unlock-inset2),
+                inset 0 4px 6px var(--unlock-shadow),
+                inset 0 -3px 4px rgba(0, 0, 0, 0.22),
+                0 5px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        .mode-unlock-slot-mode-icon {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1;
+
+            .element-icon {
+                width: 1.5rem;
+                height: 1.5rem;
+                object-fit: contain;
+                pointer-events: none;
+                user-select: none;
+                opacity: 0.34;
+                filter: grayscale(0.65);
+            }
+        }
+
+        .mode-unlock-slot-occupant {
+            position: relative;
+            z-index: 2;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+
+            .element-icon {
+                width: 2rem;
+                height: 2rem;
+                object-fit: contain;
+                pointer-events: none;
+                user-select: none;
+            }
+        }
+    }
+
+    .mode-unlock-button {
+        all: unset;
+        box-sizing: border-box;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.3rem 1.4rem;
+        border: 2px solid var(--unlock-btn-border);
+        border-radius: 4px;
+        background: linear-gradient(180deg, var(--unlock-btn-top) 0%, var(--unlock-btn-bot) 100%);
+        box-shadow:
+            inset 0 0 0 1px var(--unlock-btn-inset1),
+            inset 0 0 0 2px var(--unlock-btn-inset2),
+            0 4px 0 rgba(0, 0, 0, 0.32);
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        font-size: 0.8rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: #ffffff;
+        text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.55);
+        cursor: pointer;
+        transition:
+            opacity 120ms ease,
+            transform 120ms ease,
+            filter 120ms ease;
+
+        &:disabled {
+            opacity: 0.38;
+            cursor: default;
+        }
+
+        &:not(:disabled):hover {
+            transform: translateY(-1px);
+            filter: brightness(1.12);
+        }
+
+        &:not(:disabled):active {
+            transform: translateY(1px);
+            box-shadow:
+                inset 0 0 0 1px var(--unlock-btn-inset1),
+                inset 0 0 0 2px var(--unlock-btn-inset2),
+                0 2px 0 rgba(0, 0, 0, 0.32);
+        }
+
+        &:focus-visible {
+            box-shadow:
+                inset 0 0 0 1px var(--unlock-btn-inset1),
+                inset 0 0 0 2px var(--unlock-btn-inset2),
+                0 4px 0 rgba(0, 0, 0, 0.32),
+                0 0 0 3px rgba(210, 226, 255, 0.55);
+        }
+    }
+}

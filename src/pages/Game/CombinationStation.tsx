@@ -4,6 +4,7 @@ import ElementIcon from "../../components/ElementIcon";
 import CombinationModePanel, { MODE_TAB_ORDER, type ModeTabElementKey } from "./CombinationModePanel";
 import CombinationLogicPanel from "./CombinationLogicPanel";
 import CombinationResultPanel from "./CombinationResultPanel";
+import ModeUnlockPanel from "./ModeUnlockPanel";
 import { combinationStationRulesEngine } from "./CombinationStationRulesEngine";
 import "./CombinationStation.scss";
 
@@ -97,6 +98,12 @@ type CombinationStationProps = {
     isOutputSlotClosed: boolean;
     isOutputSlotAnimatingClose: boolean;
     isOutputSlotAnimatingOpen: boolean;
+    lockedModes: Set<string>;
+    unlockSlotRefs: [RefObject<HTMLDivElement>, RefObject<HTMLDivElement>, RefObject<HTMLDivElement>];
+    unlockSlotOccupants: [number | null, number | null, number | null];
+    getUnlockSlotLetter: (id: number) => string | undefined;
+    isUnlockReady: boolean;
+    onUnlock: () => void;
 };
 
 function CombinationStation({
@@ -144,6 +151,12 @@ function CombinationStation({
     isOutputSlotClosed,
     isOutputSlotAnimatingClose,
     isOutputSlotAnimatingOpen,
+    lockedModes,
+    unlockSlotRefs,
+    unlockSlotOccupants,
+    getUnlockSlotLetter,
+    isUnlockReady,
+    onUnlock,
 }: CombinationStationProps) {
     const combineButtonElementClass = hasActiveCombinationState && combinationStationState.elementKey
         ? `combine-button--${combinationStationState.elementKey}`
@@ -225,6 +238,9 @@ function CombinationStation({
         ? combinationStationRulesEngine.getActiveLabel(modeKey) ?? combinationStationState.actionLabel
         : combinationStationState.actionLabel;
     const activeModeLabel = combinationStationRulesEngine.getActiveLabel(modeKey) ?? "";
+    const isCurrentModeLocked = combinationStationState.elementKey
+        ? lockedModes.has(combinationStationState.elementKey)
+        : false;
 
     return (
         <div className={combinationStationClassName}>
@@ -255,7 +271,7 @@ function CombinationStation({
                             <div className="combination-equation-mode-label" aria-live="polite">
                                 {activeModeLabel}
                             </div>
-                            {isModeInserted && modeKey !== "idle" && (
+                            {!isCurrentModeLocked && isModeInserted && modeKey !== "idle" && (
                                 <div className="mode-charge-pips" aria-label={`${modeUsesRemaining} uses remaining`}>
                                     {[0, 1, 2].map((i) => (
                                         <span
@@ -267,23 +283,51 @@ function CombinationStation({
                                 </div>
                             )}
                         </div>
-                        <div className="combination-equation">
-                            <CombinationModePanel
-                                className={panelModifierClass}
-                                dropZoneClassName={modeDropZoneClassName}
-                                dropZoneRefA={dropZoneRefA}
-                                onHoverInsertSlot={onHoverInsertSlot}
-                                shouldShowSlotOneInsertPrompt={shouldShowSlotOneInsertPrompt}
-                                isInsertEnabled={isInsertEnabled}
-                                isModeInserted={isModeInserted}
-                                shouldAnimateModeShutter={shouldAnimateModeShutter}
-                                modeInsertedElementLetter={modeInsertedElementLetter}
-                                modeInsertedElementCategory={modeInsertedElementCategory}
-                                showModeInsertedElementOverlay={showModeInsertedElementOverlay}
-                                hasSelectedModeTab={selectedModeTabElementKey !== null}
-                                activeModeTabElementKey={combinationStationState.elementKey}
-                                onInsertMode={onInsertMode}
-                            />
+                        <div className="combination-equation-container">
+                            {isCurrentModeLocked && (
+                                <ModeUnlockPanel
+                                    elementKey={combinationStationState.elementKey ?? "default"}
+                                    slotRefs={unlockSlotRefs}
+                                    slotOccupants={unlockSlotOccupants}
+                                    getSlotLetter={getUnlockSlotLetter}
+                                    isUnlockReady={isUnlockReady}
+                                    onUnlock={onUnlock}
+                                />
+                            )}
+                            <div className={`combination-equation${isCurrentModeLocked ? " combination-equation--phantom" : ""}`}>
+                            {isCurrentModeLocked ? (
+                                <div className="combination-mode-panel-outer" aria-hidden="true">
+                                    <div className="mode-component-anchor">
+                                        <div className={`combination-mode-panel ${panelModifierClass} combination-mode-panel--spacer`}>
+                                            <div className="mode-panel-body">
+                                                <div className="drop-zone-area">
+                                                    <span className="combination-mode-slot-spacer" />
+                                                </div>
+                                            </div>
+                                            <div className="insert-mode-button-wrap">
+                                                <span className="insert-mode-button-spacer" />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <CombinationModePanel
+                                    className={panelModifierClass}
+                                    dropZoneClassName={modeDropZoneClassName}
+                                    dropZoneRefA={dropZoneRefA}
+                                    onHoverInsertSlot={onHoverInsertSlot}
+                                    shouldShowSlotOneInsertPrompt={shouldShowSlotOneInsertPrompt}
+                                    isInsertEnabled={isInsertEnabled}
+                                    isModeInserted={isModeInserted}
+                                    shouldAnimateModeShutter={shouldAnimateModeShutter}
+                                    modeInsertedElementLetter={modeInsertedElementLetter}
+                                    modeInsertedElementCategory={modeInsertedElementCategory}
+                                    showModeInsertedElementOverlay={showModeInsertedElementOverlay}
+                                    hasSelectedModeTab={selectedModeTabElementKey !== null}
+                                    activeModeTabElementKey={combinationStationState.elementKey}
+                                    onInsertMode={onInsertMode}
+                                />
+                            )}
                             <div className={[
                                 "combination-logic-result-group",
                                 !isModeInserted ? "is-hidden" : "",
@@ -330,6 +374,7 @@ function CombinationStation({
                                     />
                                 </div>
                             </div>
+                        </div>
                         </div>
                     </div>
                 </div>

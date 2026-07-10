@@ -148,6 +148,9 @@ type PlayerContextValue = {
     sealedCombinationModes: Set<CombinationModeKey>;
     sealCombinationMode: (mode: CombinationModeKey) => void;
     unsealCombinationMode: (mode: CombinationModeKey) => void;
+    lockedModes: Set<CombinationModeKey>;
+    lockMode: (mode: CombinationModeKey) => void;
+    unlockMode: (mode: CombinationModeKey) => void;
     recordElementUses: (counts: Record<number, number>) => void;
     upgradeElement: (elementId: number, newLevel: number, effect: SpellEffectConfig) => void;
     levelUpElementOnly: (elementId: number, newLevel: number) => void;
@@ -245,6 +248,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
     const [battleEnergyCarryover, setBattleEnergyCarryoverState] = useState(0);
     const [permanentMaxHpReduction, setPermanentMaxHpReduction] = useState(0);
     const [sealedCombinationModes, setSealedCombinationModes] = useState<Set<CombinationModeKey>>(new Set());
+    const [lockedModes, setLockedModes] = useState<Set<CombinationModeKey>>(new Set(["water", "fire", "earth", "air", "soul"] as const));
     const [spellSlots, setSpellSlots] = useState<(number | null)[]>([null, null, null]);
     const [elementalResistances, setElementalResistances] = useState<ElementalResistances>(DEFAULT_ELEMENTAL_RESISTANCES);
 
@@ -406,6 +410,24 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
         });
     }, []);
 
+    const lockMode = useCallback((mode: CombinationModeKey) => {
+        setLockedModes((previous) => {
+            if (previous.has(mode)) return previous;
+            const next = new Set(previous);
+            next.add(mode);
+            return next;
+        });
+    }, []);
+
+    const unlockMode = useCallback((mode: CombinationModeKey) => {
+        setLockedModes((previous) => {
+            if (!previous.has(mode)) return previous;
+            const next = new Set(previous);
+            next.delete(mode);
+            return next;
+        });
+    }, []);
+
     const resetGame = useCallback(() => {
         setSouls(0);
         setElements([]);
@@ -538,6 +560,9 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             sealedCombinationModes,
             sealCombinationMode,
             unsealCombinationMode,
+            lockedModes,
+            lockMode,
+            unlockMode,
             discoveredCraftedLetters,
             addDiscoveredCraftedLetter,
             recordElementUses,
@@ -586,6 +611,9 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             sealedCombinationModes,
             sealCombinationMode,
             unsealCombinationMode,
+            lockedModes,
+            lockMode,
+            unlockMode,
             discoveredCraftedLetters,
             addDiscoveredCraftedLetter,
             recordElementUses,

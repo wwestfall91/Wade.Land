@@ -290,11 +290,12 @@ function Draggable({
 			const dragHeight = draggableRef.current?.offsetHeight ?? dragRect?.height ?? 0;
 
 			if (dragRect) {
-				const intersectingZoneIndex = dropZoneRefs.findIndex((zoneRef) => {
-					const dropZoneRect = zoneRef.current?.getBoundingClientRect();
-					if (!dropZoneRect) {
-						return false;
-					}
+				let snapZoneIndex = -1;
+				let anyIntersection = false;
+
+				for (let zi = 0; zi < dropZoneRefs.length; zi++) {
+					const dropZoneRect = dropZoneRefs[zi].current?.getBoundingClientRect();
+					if (!dropZoneRect) continue;
 
 					const intersects = !(
 						dragRect.right < dropZoneRect.left ||
@@ -303,13 +304,14 @@ function Draggable({
 						dragRect.top > dropZoneRect.bottom
 					);
 
-					return intersects;
-				});
-
-				const snapZoneIndex =
-					intersectingZoneIndex !== -1 && canSnapToZone(id, intersectingZoneIndex)
-						? intersectingZoneIndex
-						: -1;
+					if (intersects) {
+						anyIntersection = true;
+						if (canSnapToZone(id, zi)) {
+							snapZoneIndex = zi;
+							break;
+						}
+					}
+				}
 
 				if (snapZoneIndex !== -1) {
 					const dropZoneRect = dropZoneRefs[snapZoneIndex].current?.getBoundingClientRect();
@@ -319,7 +321,7 @@ function Draggable({
 						onSnapChange(id, snapZoneIndex);
 					}
 				} else {
-					if (intersectingZoneIndex !== -1) {
+					if (anyIntersection) {
 						setIsInvalidDrop(true);
 					}
 					onSnapChange(id, null);
@@ -533,7 +535,7 @@ function Draggable({
 				"drag",
 				category === "spell" ? "is-spell" : "",
 				category === "spell" ? `is-spell--${(type1 || type2 || "none")}` : "",
-				category === "weapon" ? "is-weapon" : "",			category === "soul" ? "is-soul" : "",				isInvalidDrop ? "is-invalid-drop" : "",
+				category === "weapon" ? "is-weapon" : "",			category === "soul" ? "is-soul" : "",				category === "fragment" ? "is-fragment" : "",			isInvalidDrop ? "is-invalid-drop" : "",
 				isDragging ? "is-dragging" : "",
 				isReturningHome ? "is-returning-home" : "",
 				isTooltipPinned ? "is-tooltip-pinned" : "",

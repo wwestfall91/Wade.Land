@@ -290,7 +290,7 @@ function EnemyStage({
                             );
                         })()}
                         <div className="enemy-meta-section">
-                            <span className="enemy-meta-label">Elements</span>
+                            <span className="enemy-meta-label">Abilities</span>
                             <div className="enemy-meta-chip-list">
                                 {elements.length > 0 ? (
                                     elements.map((element, index) => (

@@ -4,7 +4,8 @@ const normalizeIconKey = (value: string): string => value.trim().toLowerCase().r
 
 const spellImageMap = new Map<string, string>(
     Object.entries(spellImages).flatMap(([path, url]) => {
-        const filename = path.split("/").pop()!.replace(/\.png$/i, "");
+        const rawFilename = path.split("/").pop()!.replace(/\.png$/i, "");
+        const filename = decodeURIComponent(rawFilename);
         return [
             [filename.toLowerCase(), url],
             [normalizeIconKey(filename), url],
