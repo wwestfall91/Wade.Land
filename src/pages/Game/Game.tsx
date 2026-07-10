@@ -197,6 +197,91 @@ const COMBUST_DAMAGE_MULTIPLIER = 2.5;
 const PREVIEW_DRAG_START_THRESHOLD_PX = 6;
 const HOMUNCULUS_CREATE_ANIMATION_MS = 2000;
 
+// ── Draggable overlap separation ─────────────────────────────────────────────
+// Elements are 32×32 px. Fragments are CSS-scaled to 50% (16×16 visual) but
+// their layout box is still 32×32; the visual area is centred with an 8px
+// offset on each side.
+const ELEMENT_VISUAL_SIZE = 32;
+const FRAGMENT_VISUAL_SIZE = 16;
+const FRAGMENT_VISUAL_OFFSET = (ELEMENT_VISUAL_SIZE - FRAGMENT_VISUAL_SIZE) / 2; // 8
+
+function separateOverlappingDraggables(
+    items: DraggableItem[],
+    slottedIds: ReadonlySet<number>,
+): { draggables: DraggableItem[]; movedIds: Set<number> } {
+    const free = items.filter((d) => !slottedIds.has(d.id));
+    if (free.length < 2) {
+        return { draggables: items, movedIds: new Set() };
+    }
+
+    const positions = new Map<number, Position>(
+        free.map((d) => [d.id, { ...d.initialPosition }]),
+    );
+
+    const MAX_ITERATIONS = 24;
+    for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
+        let hadOverlap = false;
+
+        for (let i = 0; i < free.length; i++) {
+            for (let j = i + 1; j < free.length; j++) {
+                const a = free[i];
+                const b = free[j];
+                const pa = positions.get(a.id)!;
+                const pb = positions.get(b.id)!;
+
+                const sA = a.category === "fragment" ? FRAGMENT_VISUAL_SIZE : ELEMENT_VISUAL_SIZE;
+                const oA = a.category === "fragment" ? FRAGMENT_VISUAL_OFFSET : 0;
+                const sB = b.category === "fragment" ? FRAGMENT_VISUAL_SIZE : ELEMENT_VISUAL_SIZE;
+                const oB = b.category === "fragment" ? FRAGMENT_VISUAL_OFFSET : 0;
+
+                const ax1 = pa.x + oA; const ay1 = pa.y + oA;
+                const ax2 = ax1 + sA; const ay2 = ay1 + sA;
+                const bx1 = pb.x + oB; const by1 = pb.y + oB;
+                const bx2 = bx1 + sB; const by2 = by1 + sB;
+
+                const penX = Math.min(ax2, bx2) - Math.max(ax1, bx1);
+                const penY = Math.min(ay2, by2) - Math.max(ay1, by1);
+                if (penX <= 0 || penY <= 0) continue;
+
+                hadOverlap = true;
+                const pushX = Math.ceil(penX / 2);
+                const pushY = Math.ceil(penY / 2);
+
+                if (penX <= penY) {
+                    if (ax1 <= bx1) {
+                        positions.set(a.id, { ...pa, x: pa.x - pushX });
+                        positions.set(b.id, { ...pb, x: pb.x + pushX });
+                    } else {
+                        positions.set(a.id, { ...pa, x: pa.x + pushX });
+                        positions.set(b.id, { ...pb, x: pb.x - pushX });
+                    }
+                } else {
+                    if (ay1 <= by1) {
+                        positions.set(a.id, { ...pa, y: pa.y - pushY });
+                        positions.set(b.id, { ...pb, y: pb.y + pushY });
+                    } else {
+                        positions.set(a.id, { ...pa, y: pa.y + pushY });
+                        positions.set(b.id, { ...pb, y: pb.y - pushY });
+                    }
+                }
+            }
+        }
+
+        if (!hadOverlap) break;
+    }
+
+    const movedIds = new Set<number>();
+    const updated = items.map((d) => {
+        const newPos = positions.get(d.id);
+        if (!newPos) return d;
+        if (newPos.x === d.initialPosition.x && newPos.y === d.initialPosition.y) return d;
+        movedIds.add(d.id);
+        return { ...d, initialPosition: newPos };
+    });
+
+    return { draggables: updated, movedIds };
+}
+
 type SoulFlightIcon = {
     id: number;
     startX: number;
@@ -1703,6 +1788,18 @@ function Game() {
     }, [discoveredCraftedLetters]);
 
     useEffect(() => {
+        // Capture slot state at this render so the separation pass inside
+        // setDraggables knows which elements are anchored in fixed slots.
+        const slottedIds = new Set<number>([
+            ...zoneOccupants.filter((x): x is number => x !== null),
+            ...spellSlots.filter((x): x is number => x !== null),
+            ...(createBaseSlotId !== null ? [createBaseSlotId] : []),
+            ...createElemSlotIds.filter((x): x is number => x !== null),
+            ...unlockSlotOccupants.filter((x): x is number => x !== null),
+            ...(enhanceSlotOccupantId !== null ? [enhanceSlotOccupantId] : []),
+            ...(machineSlotOccupantId !== null ? [machineSlotOccupantId] : []),
+        ]);
+
         setDraggables((previous) => {
             const previousById = new Map(previous.map((item) => [item.id, item]));
 
@@ -1743,6 +1840,12 @@ function Game() {
             }
 
             return next;
+        });
+
+        // Run separation so newly spawned elements don’t land on top of existing ones.
+        setDraggables((prev) => {
+            const { draggables: separated } = separateOverlappingDraggables(prev, slottedIds);
+            return separated;
         });
 
         pendingDropSpawnByIdRef.current.clear();
@@ -3142,6 +3245,35 @@ function Game() {
         isPreviewAltStickyOpen
     );
 
+    const handleFreeDropped = (draggableId: number, pos: Position) => {
+        const slottedIds = new Set<number>([
+            ...zoneOccupants.filter((x): x is number => x !== null),
+            ...spellSlots.filter((x): x is number => x !== null),
+            ...(createBaseSlotId !== null ? [createBaseSlotId] : []),
+            ...createElemSlotIds.filter((x): x is number => x !== null),
+            ...unlockSlotOccupants.filter((x): x is number => x !== null),
+            ...(enhanceSlotOccupantId !== null ? [enhanceSlotOccupantId] : []),
+            ...(machineSlotOccupantId !== null ? [machineSlotOccupantId] : []),
+        ]);
+
+        const withDrop = draggables.map((d) =>
+            d.id === draggableId ? { ...d, initialPosition: pos } : d,
+        );
+        const { draggables: separated, movedIds } = separateOverlappingDraggables(withDrop, slottedIds);
+
+        setDraggables(separated);
+
+        // Animate bystanders that were nudged away (not the dropped element itself).
+        const pushedIds = [...movedIds].filter((id) => id !== draggableId);
+        if (pushedIds.length > 0) {
+            setReturnHomeVersions((prev) => {
+                const next = { ...prev };
+                for (const id of pushedIds) next[id] = (next[id] ?? 0) + 1;
+                return next;
+            });
+        }
+    };
+
     const handleSnapChange = (draggableId: number, zoneIndex: number | null) => {
         // Clear from spell slots whenever this element moves
         for (let i = 0; i < spellSlots.length; i++) {
@@ -4498,6 +4630,7 @@ function Game() {
                     dropZoneRefs={allDropZoneRefsAll}
                     initialPosition={draggable.initialPosition}
                     onSnapChange={handleSnapChange}
+                    onFreeDropped={handleFreeDropped}
                     canSnapToZone={canSnapToZone}
                     isNewFromChest={newChestElementIds.has(draggable.id)}
                     forcedSnapZone={

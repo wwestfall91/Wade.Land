@@ -31,6 +31,7 @@ type Props = {
 	dropZoneRefs: Array<React.RefObject<HTMLDivElement | null>>;
 	initialPosition: Position;
 	onSnapChange: (draggableId: number, zoneIndex: number | null) => void;
+	onFreeDropped?: (draggableId: number, pos: Position) => void;
 	canSnapToZone: (draggableId: number, zoneIndex: number) => boolean;
 	isNewFromChest?: boolean;
 	forcedSnapZone?: { zone: number; version: number } | null;
@@ -58,6 +59,7 @@ function Draggable({
 	dropZoneRefs,
 	initialPosition,
 	onSnapChange,
+	onFreeDropped,
 	canSnapToZone,
 	isNewFromChest = false,
 	forcedSnapZone = null,
@@ -323,6 +325,16 @@ function Draggable({
 				} else {
 					if (anyIntersection) {
 						setIsInvalidDrop(true);
+					} else {
+						// Settled in open space — report container-relative position
+						// so Game.tsx can run overlap separation.
+						const containerRect = containerRef.current?.getBoundingClientRect();
+						if (containerRect) {
+							onFreeDropped?.(id, {
+								x: Math.round(dragRect.left - containerRect.left),
+								y: Math.round(dragRect.top - containerRect.top),
+							});
+						}
 					}
 					onSnapChange(id, null);
 				}
@@ -348,6 +360,7 @@ function Draggable({
 		mouseOffset.x,
 		mouseOffset.y,
 		onDismissTutorialCue,
+		onFreeDropped,
 		onSnapChange,
 		showTutorialCue,
 	]);
