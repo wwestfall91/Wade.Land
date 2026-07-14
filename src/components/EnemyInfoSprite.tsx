@@ -16,7 +16,7 @@ const spriteEntries = [
     ...Object.entries(homunculusModules),
 ];
 
-const resolveSpritePath = (inputPath: string): string => {
+export const resolveSpritePath = (inputPath: string): string => {
     if (spriteEntries.length === 0) {
         return "";
     }

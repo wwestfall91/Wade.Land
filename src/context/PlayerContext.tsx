@@ -72,6 +72,10 @@ export type SelectedEnemy = {
     weaknesses: string[];
     elements: RewardElement[];
     resistances?: Partial<Record<string, number>>;
+    /** Present on homunculus enemies — carries the original base element. */
+    baseElement?: RewardElement;
+    /** Present on homunculus enemies — carries the fragments inserted at creation. */
+    homunculusFragments?: RewardElement[];
 };
 
 export type PlayerStatuses = {

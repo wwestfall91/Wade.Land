@@ -46,6 +46,7 @@ import {
     STARTER_BUTTON_THEME_DEFAULT,
 } from "../../styles/elementThemes";
 import { buildCombinedTripleFragmentElement } from "./consumeRewards";
+import BossCountdown from "./BossCountdown";
 import MonsterUpgradeModal from "./MonsterUpgradeModal";
 import { LevelUpModal } from "../Fight/LevelUpModal";
 import soulIcon from "../../assets/icons/Soul.png";
@@ -196,6 +197,9 @@ const ENABLE_LEVEL_UP_MODAL = false;
 const COMBUST_DAMAGE_MULTIPLIER = 2.5;
 const PREVIEW_DRAG_START_THRESHOLD_PX = 6;
 const HOMUNCULUS_CREATE_ANIMATION_MS = 2000;
+const BOSS_COUNTDOWN_KEY = "game.bossCountdown";
+/** Number of regular battles before the first boss fight. */
+const BOSS_BATTLE_THRESHOLD = 10;
 
 // ── Draggable overlap separation ─────────────────────────────────────────────
 // Elements are 32×32 px. Fragments are CSS-scaled to 50% (16×16 visual) but
@@ -520,8 +524,34 @@ function Game() {
     const [isFightVictoryCueVisible, setIsFightVictoryCueVisible] = useState(false);
     const [isSoulPulseVisible, setIsSoulPulseVisible] = useState(false);
     const [soulPulseAmount, setSoulPulseAmount] = useState(0);
+    const [battlesCompleted, setBattlesCompleted] = useState(() => {
+        try {
+            return Math.max(0, parseInt(window.localStorage.getItem(BOSS_COUNTDOWN_KEY) ?? "0", 10) || 0);
+        } catch {
+            return 0;
+        }
+    });
+    const [warriorAnimateVersion, setWarriorAnimateVersion] = useState(0);
+    const [bossIndex, setBossIndex] = useState(0);
+    const [bossTransitionVersion, setBossTransitionVersion] = useState(0);
     // ── Homunculus / enemy-card mode ──────────────────────────────────────────
-    const [enemyCardMode, setEnemyCardMode] = useState<"create" | "fight" | "consume">("fight");
+    const [enemyCardMode, setEnemyCardMode] = useState<"create" | "fight" | "consume" | "boss">(() => {
+        try {
+            const b = parseInt(window.localStorage.getItem(BOSS_COUNTDOWN_KEY) ?? "0", 10) || 0;
+            return b >= BOSS_BATTLE_THRESHOLD ? "boss" : "fight";
+        } catch {
+            return "fight";
+        }
+    });
+    // Derived: non-null as soon as enemies.xlsx is loaded and battlesCompleted >= threshold.
+    // Using useMemo avoids a separate state update cycle that caused "Unknown Boss" while
+    // enemies were still loading after a post-battle navigation.
+    const bossEnemy: Enemy | null = useMemo(() => {
+        if (battlesCompleted < BOSS_BATTLE_THRESHOLD || enemies.length === 0) return null;
+        const boss = enemies[bossIndex];
+        if (!boss) return null;
+        return { ...boss }; // soul reward comes directly from the enemies sheet
+    }, [battlesCompleted, enemies, bossIndex]);
     const [isCreatingHomunculus, setIsCreatingHomunculus] = useState(false);
     const [pendingCreatedEnemy, setPendingCreatedEnemy] = useState<Enemy | null>(null);
     const [pendingBaseElemLetter, setPendingBaseElemLetter] = useState<string | null>(null);
@@ -1003,6 +1033,14 @@ function Game() {
                 battlesWon: job.battlesWon + 1,
             })));
 
+            // Advance the boss countdown and trigger the warrior slide animation.
+            setBattlesCompleted((prev) => {
+                const next = prev + 1;
+                try { window.localStorage.setItem(BOSS_COUNTDOWN_KEY, String(next)); } catch { /* ignore */ }
+                return next;
+            });
+            setWarriorAnimateVersion((v) => v + 1);
+
             setFightReward(null);
             setIsFightVictoryCueVisible(true);
             rewardCueTimeoutRef.current = window.setTimeout(() => {
@@ -1031,11 +1069,20 @@ function Game() {
                 });
 
                 setIsFightVictoryCueVisible(false);
-                if (state.defeatedEnemy) {
-                    setNextEnemy(state.defeatedEnemy);
+                // When the 10th battle is won the countdown hits 0 and the boss
+                // fight should be queued. `battlesCompleted` in this closure is
+                // the pre-increment value, so check against threshold - 1.
+                const isBossTransition = battlesCompleted === BOSS_BATTLE_THRESHOLD - 1;
+                if (isBossTransition) {
+                    // Boss mode is activated by the boss useEffect after remount.
+                    // Do not enter consume mode for this transition.
+                } else {
+                    if (state.defeatedEnemy) {
+                        setNextEnemy(state.defeatedEnemy);
+                    }
+                    setEnemyCardMode("consume");
+                    setConsumeDrainedMeters(new Set());
                 }
-                setEnemyCardMode("consume");
-                setConsumeDrainedMeters(new Set());
 
                 // Re-snap any spell-slot elements back to their slots.
                 // Game remounts after navigation so Draggables start at their
@@ -1245,6 +1292,9 @@ function Game() {
         };
     };
 
+    const getElementStartCount = (): number =>
+        playerProgress.elements.filter((element) => element.category !== "fragment").length;
+
     // Complete any deferred jobs (Incubate/Refine) whose battle count has been met.
     useEffect(() => {
         const completedJobs = deferredJobs.filter((job) => job.battlesWon >= job.counter);
@@ -1261,7 +1311,7 @@ function Game() {
                     x: outputRect.left - containerRect.left + (outputRect.width - 32) / 2,
                     y: outputRect.top - containerRect.top + (outputRect.height - 32) / 2,
                 }
-                : getSpawnPosition(playerProgress.elements.length);
+                : getSpawnPosition(getElementStartCount());
 
             if (job.modeKey === "incubate") {
                 const incubateOutput = combinationStationRulesEngine.applyDeferred("incubate", job.inputElement, job.counter);
@@ -1701,27 +1751,33 @@ function Game() {
                             ?? scarecrowRow.extras["energy"]
                             ?? 0,
                         );
-                        setNextEnemy({
-                            name: scarecrowRow.name,
-                            hp: scarecrowHp,
-                            power: scarecrowPwr,
-                            souls: Number(scarecrowRow.extras["Souls"] ?? scarecrowRow.extras["souls"] ?? 0),
-                            description: String(scarecrowRow.extras["Description"] ?? scarecrowRow.extras["description"] ?? ""),
-                            sprite: `homunculus/${scarecrowRow.name.replace(/\s+/g, "")}`,
-                            weaknesses: [],
-                            resistances: { fire: -25 },
-                            elements: [{
-                                letter: "Earth",
-                                damage: scarecrowPwr,
-                                shield: scarecrowDef,
-                                energy: scarecrowSpd,
-                                rank: 1,
-                                level: 1,
-                                description: "Homunculus attack profile",
-                                type1: "earth",
-                                category: "element",
-                            }],
-                        });
+                        // Only set the opening (Scarecrow) enemy when the boss
+                        // fight is not yet due; otherwise the boss useEffect
+                        // will populate bossEnemy from enemies.xlsx instead.
+                        const storedBattles = parseInt(window.localStorage.getItem(BOSS_COUNTDOWN_KEY) ?? "0", 10) || 0;
+                        if (storedBattles < BOSS_BATTLE_THRESHOLD) {
+                            setNextEnemy({
+                                name: scarecrowRow.name,
+                                hp: scarecrowHp,
+                                power: scarecrowPwr,
+                                souls: Number(scarecrowRow.extras["Souls"] ?? scarecrowRow.extras["souls"] ?? 0),
+                                description: String(scarecrowRow.extras["Description"] ?? scarecrowRow.extras["description"] ?? ""),
+                                sprite: `homunculus/${scarecrowRow.name.replace(/\s+/g, "")}`,
+                                weaknesses: [],
+                                resistances: { fire: -25 },
+                                elements: [{
+                                    letter: "Earth",
+                                    damage: scarecrowPwr,
+                                    shield: scarecrowDef,
+                                    energy: scarecrowSpd,
+                                    rank: 1,
+                                    level: 1,
+                                    description: "Homunculus attack profile",
+                                    type1: "earth",
+                                    category: "element",
+                                }],
+                            });
+                        }
                     }
                 }
             } catch {
@@ -1902,6 +1958,14 @@ function Game() {
         // Start with the first enemy row from the sheet.
         setNextEnemy(enemies[0]);
     }, [enemies, nextEnemy, setNextEnemy]);
+
+    // When the boss countdown reaches 0, switch to the boss card mode.
+    // bossEnemy is derived via useMemo above — no need to set state here.
+    useEffect(() => {
+        if (battlesCompleted !== BOSS_BATTLE_THRESHOLD || enemies.length === 0) return;
+        setEnemyCardMode("boss");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [battlesCompleted, enemies]);
 
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
@@ -2146,7 +2210,7 @@ function Game() {
 
         const catalogEntry = elementCatalogRef.current.get(normalizeElementName(transformedName));
         const newId = nextId.current++;
-        const spawnPos = getSpawnPosition(playerProgress.elements.length);
+        const spawnPos = getSpawnPosition(getElementStartCount());
         const newElement = {
             id: newId,
             letter: transformedName,
@@ -3532,6 +3596,24 @@ function Game() {
         }
     }, [hasSeenDragTutorial]);
 
+    const handleBossTransitionComplete = useCallback(() => {
+        setBossIndex((prev) => prev + 1);
+        setBattlesCompleted(0);
+        setWarriorAnimateVersion(0); // reset so visualIndex in BossCountdown syncs to dot 0
+        try { window.localStorage.setItem(BOSS_COUNTDOWN_KEY, "0"); } catch { /* ignore */ }
+    }, []);
+
+    const handleBossFight = () => {
+        if (!bossEnemy) return;
+        setNewChestElementIds(new Set());
+        navigate("/fight", {
+            state: {
+                enemy: bossEnemy,
+                elementPool: allElementOptions,
+            },
+        });
+    };
+
     const handleFight = () => {
         if (!nextEnemy) return;
 
@@ -3818,7 +3900,7 @@ function Game() {
             ? getFragmentSpawnPosition(
                 playerProgress.elements.filter((e) => e.category === "fragment").length,
               )
-            : getSpawnPosition(playerProgress.elements.length);
+                        : getSpawnPosition(getElementStartCount());
 
         const startX = cardRect.left + cardRect.width / 2;
         const startY = cardRect.top + cardRect.height * 0.35;
@@ -4035,6 +4117,13 @@ function Game() {
                         setConsumeFinalePhase(null);
                         setConsumeDrainedMeters(new Set());
                         setEnemyCardMode("create");
+                        // If a boss was just consumed, trigger the skull transition.
+                        const wasBoss = battlesCompleted > BOSS_BATTLE_THRESHOLD
+                            && nextEnemy !== null
+                            && enemies.some((e) => e.name === nextEnemy.name);
+                        if (wasBoss) {
+                            setBossTransitionVersion((v) => v + 1);
+                        }
                     }, ELEMENT_FLIGHT_TRAVEL_MS + 100);
                 }, 2000);
 
@@ -4047,6 +4136,12 @@ function Game() {
                     setIsConsuming(false);
                     setConsumeDrainedMeters(new Set());
                     setEnemyCardMode("create");
+                    const wasBoss = battlesCompleted > BOSS_BATTLE_THRESHOLD
+                        && nextEnemy !== null
+                        && enemies.some((e) => e.name === nextEnemy.name);
+                    if (wasBoss) {
+                        setBossTransitionVersion((v) => v + 1);
+                    }
                 }, 2000);
             }
         }
@@ -4229,7 +4324,7 @@ function Game() {
 
         const sourceRect = starterChoiceButtonRefs.current[selectedStarterChoiceIndex]?.getBoundingClientRect();
         const containerRect = gameRef.current?.getBoundingClientRect();
-        const spawnPosition = getSpawnPosition(playerProgress.elements.length);
+        const spawnPosition = getSpawnPosition(getElementStartCount());
         const targetX = (containerRect?.left ?? 0) + spawnPosition.x + 16;
         const targetY = (containerRect?.top ?? 0) + spawnPosition.y + 16;
         const startX = sourceRect ? sourceRect.left + sourceRect.width / 2 : window.innerWidth / 2;
@@ -4997,6 +5092,28 @@ function Game() {
                             </div>
                             <div className="game-enemy-card-footer">Absorb this enemy's essence</div>
                         </div>
+                    ) : enemyCardMode === "boss" ? (
+                        <div className="game-enemy-card game-enemy-card--boss">
+                            <div className="next-enemy-text">
+                                <span>Boss Battle</span>
+                            </div>
+                            <div className="game-enemy-card-header">
+                                <div className="game-enemy-card-name">{bossEnemy?.name ?? "Unknown Boss"}</div>
+                            </div>
+                            <EnemyStage
+                                className="game-enemy-stage"
+                                enemyName={bossEnemy?.name ?? "Unknown Boss"}
+                                spritePath={bossEnemy?.sprite ?? ""}
+                                enemyHealth={bossEnemy?.hp ?? 0}
+                                enemyMaxHp={bossEnemy?.hp ?? 0}
+                                enemyPower={bossEnemy?.power ?? 0}
+                                weaknesses={bossEnemy?.weaknesses ?? []}
+                                elements={bossEnemy?.elements ?? []}
+                                resistances={bossEnemy?.resistances}
+                                souls={bossEnemy?.souls ?? 0}
+                            />
+                            <div className="game-enemy-card-footer">Hover for details</div>
+                        </div>
                     ) : (
                         <div className="game-enemy-card">
                             <div className="next-enemy-text">
@@ -5020,7 +5137,8 @@ function Game() {
                             <div className="game-enemy-card-footer">Hover for details</div>
                         </div>
                     )}
-                    {/* ── Stat meters ──────────────────────────────────────── */}
+                    {/* ── Stat meters (hidden in boss mode) ───────────────── */}
+                    {enemyCardMode !== "boss" ? (
                     <div className="homunculus-meters">
                         {([
                             { id: "hp",  label: "HP",  pct: homunculusMeters.hp  },
@@ -5045,6 +5163,7 @@ function Game() {
                             </div>
                         ))}
                     </div>
+                    ) : null}
                     </div>{/* end .enemy-card-with-meters */}
                     <div className="game-enemy-actions">
                         {enemyCardMode === "create" ? (
@@ -5063,6 +5182,19 @@ function Game() {
                             >
                                 CONSUME
                             </button>
+                        ) : enemyCardMode === "boss" ? (
+                            <div
+                                className="fight-btn-wrap"
+                                data-tip={!spellSlots.some((id) => id !== null) ? "Please insert at least one element into the spell slots below" : undefined}
+                            >
+                                <button
+                                    className="fight-button"
+                                    onClick={handleBossFight}
+                                    disabled={!bossEnemy || !spellSlots.some((id) => id !== null)}
+                                >
+                                    BATTLE!
+                                </button>
+                            </div>
                         ) : (
                             <div
                                 className="fight-btn-wrap"
@@ -5242,6 +5374,14 @@ function Game() {
                     </div>
                 </div>
             ) : null}
+            <BossCountdown
+                battlesCompleted={battlesCompleted}
+                animateVersion={warriorAnimateVersion}
+                spritePath={enemies[bossIndex]?.sprite ?? ""}
+                transitionToSprite={enemies[bossIndex + 1]?.sprite ?? ""}
+                transitionVersion={bossTransitionVersion}
+                onTransitionComplete={handleBossTransitionComplete}
+            />
         </div>
     );
 }
