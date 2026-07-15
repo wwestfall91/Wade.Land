@@ -6,6 +6,8 @@ import CombinationLogicPanel from "./CombinationLogicPanel";
 import CombinationResultPanel from "./CombinationResultPanel";
 import ModeUnlockPanel from "./ModeUnlockPanel";
 import { combinationStationRulesEngine } from "./CombinationStationRulesEngine";
+import fragmentSlotIcon from "../../assets/icons/Fragment Slot.png";
+import slotIcon from "../../assets/icons/Slot.png";
 import "./CombinationStation.scss";
 
 export type { ModeTabElementKey } from "./CombinationModePanel";
@@ -104,6 +106,18 @@ type CombinationStationProps = {
     getUnlockSlotLetter: (id: number) => string | undefined;
     isUnlockReady: boolean;
     onUnlock: () => void;
+    // Fragment-enhancing panel
+    isEnhancingTabSelected: boolean;
+    onEnhancingTabSelect: () => void;
+    enhancingCenterSlotRef: RefObject<HTMLDivElement>;
+    enhancingFragSlotRefs: [RefObject<HTMLDivElement>, RefObject<HTMLDivElement>, RefObject<HTMLDivElement>, RefObject<HTMLDivElement>, RefObject<HTMLDivElement>];
+    enhancingCenterSlotId: number | null;
+    enhancingFragSlotIds: [number|null, number|null, number|null, number|null, number|null];
+    getEnhancingSlotLetter: (id: number | null) => string | undefined;
+    canFragmentEnhance: boolean;
+    onFragmentEnhance: () => void;
+    isEnhancingFragShaking: boolean;
+    isEnhancingCenterFlashing: boolean;
 };
 
 function CombinationStation({
@@ -157,6 +171,17 @@ function CombinationStation({
     getUnlockSlotLetter,
     isUnlockReady,
     onUnlock,
+    isEnhancingTabSelected,
+    onEnhancingTabSelect,
+    enhancingCenterSlotRef,
+    enhancingFragSlotRefs,
+    enhancingCenterSlotId,
+    enhancingFragSlotIds,
+    getEnhancingSlotLetter,
+    canFragmentEnhance,
+    onFragmentEnhance,
+    isEnhancingFragShaking,
+    isEnhancingCenterFlashing,
 }: CombinationStationProps) {
     const combineButtonElementClass = hasActiveCombinationState && combinationStationState.elementKey
         ? `combine-button--${combinationStationState.elementKey}`
@@ -246,7 +271,7 @@ function CombinationStation({
         <div className={combinationStationClassName}>
             <div className="combination-equation-shell">
                 <div className="combination-shell-body">
-                    <div className="mode-tabs-bar" role="tablist" aria-label="Mode elements">
+                    <div className="mode-tabs-bar" role="tablist" aria-label="Mode elements" style={{ display: "none" }}>
                         {MODE_TAB_ORDER.map((elementKey) => {
                             const isActive = combinationStationState.elementKey === elementKey;
                             const isInserted = sealedModeElementKeys.includes(elementKey)
@@ -260,30 +285,91 @@ function CombinationStation({
                                     role="tab"
                                     aria-selected={isActive}
                                     onClick={() => onModeTabSelect(elementKey)}
+                                    style={{ display: "none" }}
                                 >
                                     <ElementIcon name={elementKey} />
                                 </button>
                             );
                         })}
+                        <button
+                            type="button"
+                            className={`mode-tab mode-tab--enhancing${isEnhancingTabSelected ? " is-active" : ""}`.trim()}
+                            role="tab"
+                            aria-selected={isEnhancingTabSelected}
+                            aria-label="Enhancing"
+                            onClick={onEnhancingTabSelect}
+                        >
+                            <img src={fragmentSlotIcon} alt="" aria-hidden="true" className="mode-tab-fragment-icon" />
+                        </button>
                     </div>
                     <div className="combination-shell-main">
-                        <div className="combination-header-row combination-row-header">
-                            <div className="combination-equation-mode-label" aria-live="polite">
-                                {activeModeLabel}
-                            </div>
-                            {!isCurrentModeLocked && isModeInserted && modeKey !== "idle" && (
-                                <div className="mode-charge-pips" aria-label={`${modeUsesRemaining} uses remaining`}>
-                                    {[0, 1, 2].map((i) => (
-                                        <span
-                                            key={i}
-                                            className={`mode-charge-pip mode-charge-pip--${combinationStationState.elementKey ?? "default"} ${i < modeUsesRemaining ? "is-lit" : "is-spent"}`}
-                                            aria-hidden="true"
-                                        />
-                                    ))}
+                        {isEnhancingTabSelected ? (
+                            <div className="enhancing-panel">
+                                <div className="combination-header-row combination-row-header">
+                                    <div className="combination-equation-mode-label">Enhancing</div>
                                 </div>
-                            )}
-                        </div>
-                        <div className="combination-equation-container">
+                                <div className="enhancing-hex-layout">
+                                    {/* Top row */}
+                                    <div className="enhancing-hex-row">
+                                        <div ref={enhancingFragSlotRefs[0]} className={["enhancing-frag-slot", enhancingFragSlotIds[0] ? "has-element" : "", isEnhancingFragShaking && enhancingFragSlotIds[0] ? "is-shaking" : ""].filter(Boolean).join(" ")}>
+                                            {enhancingFragSlotIds[0] ? <ElementIcon name={getEnhancingSlotLetter(enhancingFragSlotIds[0]) ?? ""} className="enhancing-slot-icon" /> : <img src={fragmentSlotIcon} alt="" aria-hidden="true" className="enhancing-slot-empty" />}
+                                        </div>
+                                    </div>
+                                    {/* Middle row: frag-left, center-element, frag-right */}
+                                    <div className="enhancing-hex-row">
+                                        <div ref={enhancingFragSlotRefs[4]} className={["enhancing-frag-slot", enhancingFragSlotIds[4] ? "has-element" : "", isEnhancingFragShaking && enhancingFragSlotIds[4] ? "is-shaking" : ""].filter(Boolean).join(" ")}>
+                                            {enhancingFragSlotIds[4] ? <ElementIcon name={getEnhancingSlotLetter(enhancingFragSlotIds[4]) ?? ""} className="enhancing-slot-icon" /> : <img src={fragmentSlotIcon} alt="" aria-hidden="true" className="enhancing-slot-empty" />}
+                                        </div>
+                                        <div
+                                            ref={enhancingCenterSlotRef}
+                                            className={["enhancing-center-slot", enhancingCenterSlotId ? "has-element" : "", isEnhancingCenterFlashing ? "is-flashing" : ""].filter(Boolean).join(" ")}
+                                        >
+                                            {enhancingCenterSlotId
+                                                ? <ElementIcon name={getEnhancingSlotLetter(enhancingCenterSlotId) ?? ""} className="enhancing-slot-icon" />
+                                                : <img src={slotIcon} alt="" aria-hidden="true" className="enhancing-center-empty" />}
+                                        </div>
+                                        <div ref={enhancingFragSlotRefs[1]} className={["enhancing-frag-slot", enhancingFragSlotIds[1] ? "has-element" : "", isEnhancingFragShaking && enhancingFragSlotIds[1] ? "is-shaking" : ""].filter(Boolean).join(" ")}>
+                                            {enhancingFragSlotIds[1] ? <ElementIcon name={getEnhancingSlotLetter(enhancingFragSlotIds[1]) ?? ""} className="enhancing-slot-icon" /> : <img src={fragmentSlotIcon} alt="" aria-hidden="true" className="enhancing-slot-empty" />}
+                                        </div>
+                                    </div>
+                                    {/* Bottom row */}
+                                    <div className="enhancing-hex-row">
+                                        <div ref={enhancingFragSlotRefs[3]} className={["enhancing-frag-slot", enhancingFragSlotIds[3] ? "has-element" : "", isEnhancingFragShaking && enhancingFragSlotIds[3] ? "is-shaking" : ""].filter(Boolean).join(" ")}>
+                                            {enhancingFragSlotIds[3] ? <ElementIcon name={getEnhancingSlotLetter(enhancingFragSlotIds[3]) ?? ""} className="enhancing-slot-icon" /> : <img src={fragmentSlotIcon} alt="" aria-hidden="true" className="enhancing-slot-empty" />}
+                                        </div>
+                                        <div ref={enhancingFragSlotRefs[2]} className={["enhancing-frag-slot", enhancingFragSlotIds[2] ? "has-element" : "", isEnhancingFragShaking && enhancingFragSlotIds[2] ? "is-shaking" : ""].filter(Boolean).join(" ")}>
+                                            {enhancingFragSlotIds[2] ? <ElementIcon name={getEnhancingSlotLetter(enhancingFragSlotIds[2]) ?? ""} className="enhancing-slot-icon" /> : <img src={fragmentSlotIcon} alt="" aria-hidden="true" className="enhancing-slot-empty" />}
+                                        </div>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    className="enhance-frag-button"
+                                    disabled={!canFragmentEnhance}
+                                    onClick={onFragmentEnhance}
+                                >
+                                    ENHANCE
+                                </button>
+                            </div>
+                        ) : (
+                            <>
+                            <div className="combination-header-row combination-row-header">
+                                <div className="combination-equation-mode-label" aria-live="polite">
+                                    {activeModeLabel}
+                                </div>
+                                {!isCurrentModeLocked && isModeInserted && modeKey !== "idle" && (
+                                    <div className="mode-charge-pips" aria-label={`${modeUsesRemaining} uses remaining`}>
+                                        {[0, 1, 2].map((i) => (
+                                            <span
+                                                key={i}
+                                                className={`mode-charge-pip mode-charge-pip--${combinationStationState.elementKey ?? "default"} ${i < modeUsesRemaining ? "is-lit" : "is-spent"}`}
+                                                aria-hidden="true"
+                                            />
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            <div className="combination-equation-container">
                             {isCurrentModeLocked && (
                                 <ModeUnlockPanel
                                     elementKey={combinationStationState.elementKey ?? "default"}
@@ -376,6 +462,8 @@ function CombinationStation({
                             </div>
                         </div>
                         </div>
+                        </>
+                        )}
                     </div>
                 </div>
             </div>

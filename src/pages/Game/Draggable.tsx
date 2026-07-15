@@ -38,6 +38,8 @@ type Props = {
 	/** Increment this to trigger an animated slide back to initialPosition. */
 	returnHomeVersion?: number;
 	zIndexOverride?: number;
+	/** When true the draggable plays a shake animation in-place. */
+	isShaking?: boolean;
 };
 
 function Draggable({
@@ -65,6 +67,7 @@ function Draggable({
 	forcedSnapZone = null,
 	returnHomeVersion = 0,
 	zIndexOverride,
+	isShaking = false,
 }: Props) {
 	const { typeMultipliers } = usePlayer();
 	const [isDragging, setIsDragging] = useState(false);
@@ -549,6 +552,7 @@ function Draggable({
 				category === "spell" ? "is-spell" : "",
 				category === "spell" ? `is-spell--${(type1 || type2 || "none")}` : "",
 				category === "weapon" ? "is-weapon" : "",			category === "soul" ? "is-soul" : "",				category === "fragment" ? "is-fragment" : "",			isInvalidDrop ? "is-invalid-drop" : "",
+				isShaking ? "is-shaking" : "",
 				isDragging ? "is-dragging" : "",
 				isReturningHome ? "is-returning-home" : "",
 				isTooltipPinned ? "is-tooltip-pinned" : "",

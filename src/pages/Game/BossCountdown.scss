@@ -56,6 +56,17 @@
         }
     }
 
+    // Warrior sprite wrapper — enables pointer events for hover dialogue
+    .boss-countdown-warrior-shell {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 63px;
+        height: 63px;
+        pointer-events: auto;
+        cursor: default;
+    }
+
     // Warrior sprite
     .boss-countdown-warrior {
         position: absolute;
@@ -116,5 +127,56 @@
         text-transform: uppercase;
         color: rgba(255, 255, 255, 0.6);
         text-shadow: 0 1px 4px rgba(0, 0, 0, 0.9);
+    }
+
+    // Speech bubble above the warrior sprite
+    .boss-countdown-bubble {
+        position: absolute;
+        bottom: calc(100% + 8px);
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(255, 255, 255, 0.97);
+        color: #1a1a2e;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        font-size: 0.68rem;
+        font-weight: 600;
+        line-height: 1.4;
+        padding: 0.38rem 0.58rem;
+        border-radius: 8px;
+        border: 1.5px solid rgba(0, 0, 0, 0.13);
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.38);
+        white-space: normal;
+        text-align: center;
+        width: max-content;
+        max-width: 190px;
+        pointer-events: none;
+        z-index: 10;
+        opacity: 1;
+        transition: opacity 400ms ease;
+
+        // Arrow pointing down toward the sprite
+        &::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: rgba(0, 0, 0, 0.13);
+        }
+
+        &::before {
+            content: "";
+            position: absolute;
+            top: calc(100% - 1px);
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: rgba(255, 255, 255, 0.97);
+        }
+
+        &.is-fading {
+            opacity: 0;
+        }
     }
 }

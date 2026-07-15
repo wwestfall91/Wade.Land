@@ -11,6 +11,12 @@ const WARRIOR_FADE_MS  = 600;
 const SKULL_HOLD_MS    = 1200;
 const NEW_SPRITE_MS    = 600;
 
+// Dialogue bubble timings
+const BUBBLE_VISIBLE_MS   = 3000;
+const BUBBLE_FADE_MS      = 400;
+const BUBBLE_DELAY_MIN_MS = 5000;
+const BUBBLE_DELAY_MAX_MS = 15000;
+
 type SkullPhase = "idle" | "warrior-fade" | "skull" | "new-sprite-in";
 
 type Props = {
@@ -25,6 +31,10 @@ type Props = {
     transitionVersion?: number;
     /** Called when the skull fades and the new boss sprite begins to appear. */
     onTransitionComplete?: () => void;
+    /** Pre-chosen dialogue line for this visit — shown by the auto-timer and on hover. */
+    dialogueLine?: string | null;
+    /** Increment each time the player returns from battle to schedule a random line. */
+    dialogueTriggerVersion?: number;
 };
 
 function BossCountdown({
@@ -34,6 +44,8 @@ function BossCountdown({
     transitionToSprite,
     transitionVersion = 0,
     onTransitionComplete,
+    dialogueLine = null,
+    dialogueTriggerVersion = 0,
 }: Props) {
     const currentIndex = Math.min(battlesCompleted, TOTAL_DOTS - 1);
     const daysRemaining = Math.max(0, TOTAL_DOTS - battlesCompleted);
@@ -41,6 +53,8 @@ function BossCountdown({
     const [visualIndex, setVisualIndex] = useState(currentIndex);
     const [isTransitioning, setIsTransitioning] = useState(false);
     const [skullPhase, setSkullPhase] = useState<SkullPhase>("idle");
+    const [bubbleText, setBubbleText] = useState<string | null>(null);
+    const [isBubbleFading, setIsBubbleFading] = useState(false);
 
     // Locked position and sprite captured when the skull transition begins.
     const lockPosRef = useRef(0);
@@ -53,6 +67,37 @@ function BossCountdown({
     const skullT2Ref = useRef<number | null>(null);
     const skullT3Ref = useRef<number | null>(null);
 
+    // Dialogue bubble refs
+    const bubbleDelayRef   = useRef<number | null>(null);
+    const bubbleShowRef    = useRef<number | null>(null);
+    const bubbleFadeRef    = useRef<number | null>(null);
+    const dialogueLineRef = useRef(dialogueLine);
+    useEffect(() => { dialogueLineRef.current = dialogueLine; }, [dialogueLine]);
+
+    const clearBubbleTimers = () => {
+        if (bubbleDelayRef.current !== null) { window.clearTimeout(bubbleDelayRef.current); bubbleDelayRef.current = null; }
+        if (bubbleShowRef.current  !== null) { window.clearTimeout(bubbleShowRef.current);  bubbleShowRef.current  = null; }
+        if (bubbleFadeRef.current  !== null) { window.clearTimeout(bubbleFadeRef.current);  bubbleFadeRef.current  = null; }
+    };
+
+    const dismissBubble = () => {
+        clearBubbleTimers();
+        setIsBubbleFading(true);
+        bubbleFadeRef.current = window.setTimeout(() => {
+            setBubbleText(null);
+            setIsBubbleFading(false);
+        }, BUBBLE_FADE_MS);
+    };
+
+    const showBubbleLine = (line: string, autoDismiss: boolean) => {
+        clearBubbleTimers();
+        setBubbleText(line);
+        setIsBubbleFading(false);
+        if (autoDismiss) {
+            bubbleShowRef.current = window.setTimeout(dismissBubble, BUBBLE_VISIBLE_MS);
+        }
+    };
+
     useEffect(() => {
         return () => {
             if (timerRef.current   !== null) window.clearTimeout(timerRef.current);
@@ -61,8 +106,34 @@ function BossCountdown({
             if (skullT1Ref.current !== null) window.clearTimeout(skullT1Ref.current);
             if (skullT2Ref.current !== null) window.clearTimeout(skullT2Ref.current);
             if (skullT3Ref.current !== null) window.clearTimeout(skullT3Ref.current);
+            clearBubbleTimers();
         };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    // Schedule the chosen dialogue line 5–15 s after each battle return.
+    // Re-runs when dialogueLine arrives (it may come after dialogueTriggerVersion
+    // if enemies were still loading when the player returned from battle).
+    useEffect(() => {
+        if (dialogueTriggerVersion === 0) return;
+        if (!dialogueLine) return;
+        clearBubbleTimers();
+        const delay = BUBBLE_DELAY_MIN_MS + Math.random() * (BUBBLE_DELAY_MAX_MS - BUBBLE_DELAY_MIN_MS);
+        bubbleDelayRef.current = window.setTimeout(() => {
+            const line = dialogueLineRef.current;
+            if (!line) return;
+            showBubbleLine(line, true);
+        }, delay);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [dialogueTriggerVersion, dialogueLine]);
+
+    const handleWarriorMouseEnter = () => {
+        const line = dialogueLineRef.current;
+        if (!line) return;
+        showBubbleLine(line, false);
+    };
+
+    const handleWarriorMouseLeave = dismissBubble;
 
     useEffect(() => {
         if (animateVersion > 0) return;
@@ -146,18 +217,29 @@ function BossCountdown({
                 ))}
 
                 {skullPhase !== "skull" ? (
-                    <img
-                        src={activeSprite}
-                        alt=""
-                        aria-hidden="true"
-                        className={warriorClass}
+                    <div
+                        className="boss-countdown-warrior-shell"
                         style={{
                             transform: `translateX(${activeSpriteX * DOT_STEP_PX}px)`,
                             transition: (!inTransition && isTransitioning)
                                 ? `transform ${SLIDE_DURATION_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`
                                 : "none",
                         }}
-                    />
+                        onMouseEnter={handleWarriorMouseEnter}
+                        onMouseLeave={handleWarriorMouseLeave}
+                    >
+                        <img
+                            src={activeSprite}
+                            alt=""
+                            aria-hidden="true"
+                            className={warriorClass}
+                        />
+                        {bubbleText !== null && (
+                            <div className={`boss-countdown-bubble${isBubbleFading ? " is-fading" : ""}`}>
+                                {bubbleText}
+                            </div>
+                        )}
+                    </div>
                 ) : null}
 
                 {skullPhase === "skull" ? (

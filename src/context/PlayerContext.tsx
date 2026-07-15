@@ -158,6 +158,7 @@ type PlayerContextValue = {
     recordElementUses: (counts: Record<number, number>) => void;
     upgradeElement: (elementId: number, newLevel: number, effect: SpellEffectConfig) => void;
     levelUpElementOnly: (elementId: number, newLevel: number) => void;
+    boostElementStats: (elementId: number, damageBoost: number, shieldBoost: number) => void;
     spellSlots: (number | null)[];
     setSpellSlotElement: (slotIndex: number, elementId: number | null) => void;
     addSpellSlot: () => void;
@@ -491,6 +492,20 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
         );
     }, []);
 
+    const boostElementStats = useCallback((elementId: number, damageBoost: number, shieldBoost: number) => {
+        setElements((previous) =>
+            previous.map((element) =>
+                element.id === elementId
+                    ? {
+                        ...element,
+                        damage: element.damage + damageBoost,
+                        shield: (element.shield ?? 0) + shieldBoost,
+                    }
+                    : element,
+            ),
+        );
+    }, []);
+
     const levelUpElementOnly = useCallback((elementId: number, newLevel: number) => {
         setElements((previous) =>
             previous.map((element) =>
@@ -572,6 +587,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             recordElementUses,
             upgradeElement,
             levelUpElementOnly,
+            boostElementStats,
             spellSlots,
             setSpellSlotElement,
             addSpellSlot,
@@ -623,6 +639,7 @@ export function PlayerProvider({ children }: PlayerProviderProps) {
             recordElementUses,
             upgradeElement,
             levelUpElementOnly,
+            boostElementStats,
             spellSlots,
             setSpellSlotElement,
             addSpellSlot,

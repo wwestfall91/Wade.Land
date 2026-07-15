@@ -99,6 +99,8 @@ type EnemyRow = {
     souls?: number | string;
     Description?: string;
     description?: string;
+    Dialogue?: string;
+    dialogue?: string;
     Sprite?: string;
     sprite?: string;
     Element1?: string;
@@ -133,6 +135,7 @@ type Enemy = {
     power: number;
     souls: number;
     description: string;
+    dialogue?: string;
     sprite: string;
     weaknesses: string[];
     elements: RewardElement[];
@@ -200,6 +203,26 @@ const HOMUNCULUS_CREATE_ANIMATION_MS = 1000;
 const BOSS_COUNTDOWN_KEY = "game.bossCountdown";
 /** Number of regular battles before the first boss fight. */
 const BOSS_BATTLE_THRESHOLD = 10;
+const DIALOGUE_USED_KEY = "dialogue.used";
+
+// ── Dialogue file loader ──────────────────────────────────────────────────────
+const _dialogueModules = import.meta.glob<string>(
+    "../../assets/dialogue/*.txt",
+    { query: "?raw", import: "default", eager: true },
+);
+function resolveDialogueLines(dialoguePath: string): string[] {
+    if (!dialoguePath) return [];
+    const filename = dialoguePath.split(/[\\/]/).pop() ?? "";
+    if (!filename) return [];
+    // Match by filename suffix — robust against different Vite path formats
+    const key = Object.keys(_dialogueModules).find(
+        (k) => k === filename || k.endsWith(`/${filename}`) || k.endsWith(`\\${filename}`),
+    );
+    if (!key) return [];
+    const raw = _dialogueModules[key];
+    if (!raw) return [];
+    return raw.split("\n").map((l) => l.trim()).filter(Boolean);
+}
 
 // Reset boss countdown to 0 on every page load. Module-level code runs once
 // per page load (including F5 refresh) so this guarantees the first boss always
@@ -431,6 +454,7 @@ function Game() {
         recordElementUses,
         upgradeElement,
         levelUpElementOnly,
+        boostElementStats,
         spellSlots,
         setSpellSlotElement,
         addSpellSlot,
@@ -458,6 +482,13 @@ function Game() {
     const unlockSlotRef0 = useRef<HTMLDivElement | null>(null);
     const unlockSlotRef1 = useRef<HTMLDivElement | null>(null);
     const unlockSlotRef2 = useRef<HTMLDivElement | null>(null);
+    // Fragment-enhancing station slots
+    const enhancingCenterSlotRef = useRef<HTMLDivElement | null>(null);
+    const enhancingFragSlotRef0   = useRef<HTMLDivElement | null>(null);
+    const enhancingFragSlotRef1   = useRef<HTMLDivElement | null>(null);
+    const enhancingFragSlotRef2   = useRef<HTMLDivElement | null>(null);
+    const enhancingFragSlotRef3   = useRef<HTMLDivElement | null>(null);
+    const enhancingFragSlotRef4   = useRef<HTMLDivElement | null>(null);
     const createHomunculusTimeoutRef = useRef<number | null>(null);
 
     const [draggables, setDraggables] = useState<DraggableItem[]>([]);
@@ -478,6 +509,16 @@ function Game() {
     const [isEnhanceStationUnlocked, setIsEnhanceStationUnlocked] = useState(false);
     const [enhanceSlotOccupantId, setEnhanceSlotOccupantId] = useState<number | null>(null);
     const [machineSlotOccupantId, setMachineSlotOccupantId] = useState<number | null>(null);
+    // Fragment-enhancing state
+    const [isEnhancingTabSelected, setIsEnhancingTabSelected] = useState(true);
+    const [enhancingCenterSlotId, setEnhancingCenterSlotId] = useState<number | null>(null);
+    const [enhancingFragSlotIds, setEnhancingFragSlotIds] = useState<[number|null, number|null, number|null, number|null, number|null]>([null, null, null, null, null]);
+    const [isEnhancingFragShaking, setIsEnhancingFragShaking] = useState(false);
+    const [isEnhancingCenterFlashing, setIsEnhancingCenterFlashing] = useState(false);
+    const enhancingTimersRef = useRef<number[]>([]);
+    type EnhancingFlight = { id: number; letter: string; type1?: string; x: number; y: number; dx: number; dy: number; };
+    const [enhancingFlights, setEnhancingFlights] = useState<EnhancingFlight[]>([]);
+    const enhancingFlightIdRef = useRef(0);
     const [eyesFlashRevision] = useState(0);
     const [, setMonsterThresholds] = useState<MonsterRewardThreshold[]>([]);
     const [rewardGlowRevision] = useState(0);
@@ -539,6 +580,7 @@ function Game() {
     const [warriorAnimateVersion, setWarriorAnimateVersion] = useState(0);
     const [bossIndex, setBossIndex] = useState(0);
     const [bossTransitionVersion, setBossTransitionVersion] = useState(0);
+    const [pickedDialogueLine, setPickedDialogueLine] = useState<string | null>(null);
     // ── Homunculus / enemy-card mode ──────────────────────────────────────────
     const [enemyCardMode, setEnemyCardMode] = useState<"create" | "fight" | "consume" | "boss">(() => {
         try {
@@ -1027,6 +1069,12 @@ function Game() {
             setPendingElementUseCounts(state.elementUseCounts);
         }
 
+        // Game over (loss) — clear dialogue history so lines repeat from the start
+        if (state?.battleEnded && !state?.fightReward) {
+            try { window.localStorage.removeItem(DIALOGUE_USED_KEY); } catch { /* ignore */ }
+            setPickedDialogueLine(null);
+        }
+
         if (state?.fightReward) {
             if (rewardCueTimeoutRef.current !== null) {
                 window.clearTimeout(rewardCueTimeoutRef.current);
@@ -1159,11 +1207,19 @@ function Game() {
         createElemSlotRef2,
     ];
     const unlockSlotStartIndex = allDropZoneRefsCreate.length;
+    const enhancingCenterSlotIndex = unlockSlotStartIndex + 3;
+    const enhancingFragSlotStartIndex = enhancingCenterSlotIndex + 1;
     const allDropZoneRefsAll = [
         ...allDropZoneRefsCreate,
         unlockSlotRef0,
         unlockSlotRef1,
         unlockSlotRef2,
+        enhancingCenterSlotRef,
+        enhancingFragSlotRef0,
+        enhancingFragSlotRef1,
+        enhancingFragSlotRef2,
+        enhancingFragSlotRef3,
+        enhancingFragSlotRef4,
     ];
 
     const getDraggableById = useCallback((draggableId: number | null) => {
@@ -1705,6 +1761,7 @@ function Game() {
                         power: Number(row.Power ?? row.power ?? 0) || 0,
                         souls: Number(row.Souls ?? row.souls ?? 0) || 0,
                         description: String(row.Description ?? row.description ?? "").trim(),
+                        dialogue: String(row.Dialogue ?? row.dialogue ?? "").trim() || undefined,
                         sprite: String(row.Sprite ?? row.sprite ?? "").trim(),
                         weaknesses: [row.Weak1, row["Weak 1"], row.Weak2, row["Weak 2"]]
                             .flatMap((value) => String(value ?? "").split(/[;,/]/g))
@@ -2133,6 +2190,7 @@ function Game() {
     }, [lockedModes, unlockMode]);
 
     const handleModeTabSelect = useCallback((elementKey: ModeTabElementKey) => {
+        setIsEnhancingTabSelected(false);
         setSelectedModeTabElementKey((current) => (current === elementKey ? null : elementKey));
 
         // Evict formula input slots (1+) and animate elements back to their home position.
@@ -3359,7 +3417,7 @@ function Game() {
         setUnlockSlotOccupants((prev) => prev.map((id) => (id === draggableId ? null : id)) as [number | null, number | null, number | null]);
 
         // If dropping onto an unlock slot
-        if (zoneIndex !== null && zoneIndex >= unlockSlotStartIndex) {
+        if (zoneIndex !== null && zoneIndex >= unlockSlotStartIndex && zoneIndex < unlockSlotStartIndex + 3) {
             const localIndex = zoneIndex - unlockSlotStartIndex;
             setUnlockSlotOccupants((prev) => {
                 const next: [number | null, number | null, number | null] = [...prev] as [number | null, number | null, number | null];
@@ -3375,7 +3433,7 @@ function Game() {
         }
 
         // If dropping onto a create slot
-        if (zoneIndex !== null && zoneIndex >= createSlotStartIndex) {
+        if (zoneIndex !== null && zoneIndex >= createSlotStartIndex && zoneIndex < unlockSlotStartIndex) {
             const localIndex = zoneIndex - createSlotStartIndex;
             if (localIndex === 0) {
                 setCreateBaseSlotId(draggableId);
@@ -3397,7 +3455,7 @@ function Game() {
         }
 
         // If dropping onto a spell slot, assign it and stop
-        if (zoneIndex !== null && zoneIndex >= spellSlotStartIndex) {
+        if (zoneIndex !== null && zoneIndex >= spellSlotStartIndex && zoneIndex < createSlotStartIndex) {
             const slotLocalIndex = zoneIndex - spellSlotStartIndex;
             setSpellSlotElement(slotLocalIndex, draggableId);
             // Also clear from combination zones
@@ -3450,6 +3508,8 @@ function Game() {
         if (zoneIndex === enhanceZoneIndex && isEnhanceStationUnlocked) {
             setEnhanceSlotOccupantId(draggableId);
             setMachineSlotOccupantId((previous) => (previous === draggableId ? null : previous));
+            setEnhancingCenterSlotId((prev) => (prev === draggableId ? null : prev));
+            setEnhancingFragSlotIds((prev) => prev.map((id) => id === draggableId ? null : id) as typeof prev);
             setZoneOccupants((previous) => normalizeZoneOccupants(
                 previous.map((occupantId) => (occupantId === draggableId ? null : occupantId)),
             ));
@@ -3459,14 +3519,41 @@ function Game() {
         if (zoneIndex === machineZoneIndex) {
             setMachineSlotOccupantId(draggableId);
             setEnhanceSlotOccupantId((previous) => (previous === draggableId ? null : previous));
+            setEnhancingCenterSlotId((prev) => (prev === draggableId ? null : prev));
+            setEnhancingFragSlotIds((prev) => prev.map((id) => id === draggableId ? null : id) as typeof prev);
             setZoneOccupants((previous) => normalizeZoneOccupants(
                 previous.map((occupantId) => (occupantId === draggableId ? null : occupantId)),
             ));
             return;
         }
 
+        if (zoneIndex === enhancingCenterSlotIndex) {
+            setEnhancingCenterSlotId(draggableId);
+            setEnhancingFragSlotIds((prev) => prev.map((id) => id === draggableId ? null : id) as typeof prev);
+            setEnhanceSlotOccupantId((prev) => (prev === draggableId ? null : prev));
+            setMachineSlotOccupantId((prev) => (prev === draggableId ? null : prev));
+            setCreateBaseSlotId((prev) => (prev === draggableId ? null : prev));
+            setCreateElemSlotIds((prev) => prev.map((id) => id === draggableId ? null : id));
+            setZoneOccupants((prev) => normalizeZoneOccupants(prev.map((id) => id === draggableId ? null : id)));
+            return;
+        }
+
+        if (zoneIndex !== null && zoneIndex >= enhancingFragSlotStartIndex && zoneIndex < enhancingFragSlotStartIndex + 5) {
+            const localIdx = zoneIndex - enhancingFragSlotStartIndex;
+            setEnhancingFragSlotIds((prev) => {
+                const next = [...prev] as typeof prev;
+                for (let i = 0; i < 5; i++) if (next[i] === draggableId) next[i] = null;
+                next[localIdx] = draggableId;
+                return next;
+            });
+            setCreateElemSlotIds((prev) => prev.map((id) => id === draggableId ? null : id));
+            return;
+        }
+
         setEnhanceSlotOccupantId((previous) => (previous === draggableId ? null : previous));
         setMachineSlotOccupantId((previous) => (previous === draggableId ? null : previous));
+        setEnhancingCenterSlotId((prev) => (prev === draggableId ? null : prev));
+        setEnhancingFragSlotIds((prev) => prev.map((id) => id === draggableId ? null : id) as typeof prev);
 
         setZoneOccupants((previous) => {
             const next = previous.map((occupantId) =>
@@ -3516,6 +3603,13 @@ function Game() {
             return occupant === null || occupant === draggableId;
         }
 
+        // Enhancing fragment slots — must be checked BEFORE the fragment block so fragments can reach here
+        if (zoneIndex >= enhancingFragSlotStartIndex && zoneIndex < enhancingFragSlotStartIndex + 5) {
+            if (draggable.category !== "fragment") return false;
+            const localIdx = zoneIndex - enhancingFragSlotStartIndex;
+            return enhancingFragSlotIds[localIdx] === null || enhancingFragSlotIds[localIdx] === draggableId;
+        }
+
         // Fragments may only snap to elem slots (handled above) — reject everywhere else
         if (draggable.category === "fragment") return false;
 
@@ -3526,14 +3620,19 @@ function Game() {
             return spellSlots[slotLocalIndex] === null || spellSlots[slotLocalIndex] === draggableId;
         }
 
-        // Unlock slots: accept non-spell, non-soul, non-fragment elements
-        if (zoneIndex >= unlockSlotStartIndex) {
+        // Unlock slots: accept non-spell, non-soul, non-fragment elements (first 3 only)
+        if (zoneIndex >= unlockSlotStartIndex && zoneIndex < unlockSlotStartIndex + 3) {
             const localIndex = zoneIndex - unlockSlotStartIndex;
-            if (localIndex >= 3) return false;
             if (!isCurrentModeLocked) return false;
             if (draggable.category === "spell" || draggable.category === "soul") return false;
             const occupant = unlockSlotOccupants[localIndex];
             return occupant === null || occupant === draggableId;
+        }
+
+        // Enhancing center slot: accepts any non-fragment, non-spell, non-soul element
+        if (zoneIndex === enhancingCenterSlotIndex) {
+            if (draggable.category === "spell" || draggable.category === "soul") return false;
+            return enhancingCenterSlotId === null || enhancingCenterSlotId === draggableId;
         }
 
         // While a mode is locked, block normal combination-slot snapping (including
@@ -3601,12 +3700,128 @@ function Game() {
         }
     }, [hasSeenDragTutorial]);
 
+    const handleEnhancingTabSelect = useCallback(() => {
+        setIsEnhancingTabSelected((prev) => !prev);
+        setSelectedModeTabElementKey(null);
+    }, []);
+
+    const handleFragmentEnhance = useCallback(() => {
+        const centerDraggable = getDraggableById(enhancingCenterSlotId);
+        if (!centerDraggable) return;
+        const filledFrags = enhancingFragSlotIds
+            .map((id, idx) => ({ id, idx }))
+            .filter(({ id }) => id !== null && getDraggableById(id) !== null) as { id: number; idx: number }[];
+        if (!filledFrags.length) return;
+
+        let damageBoost = 0;
+        let shieldBoost = 0;
+        filledFrags.forEach(({ id }) => {
+            const frag = getDraggableById(id);
+            if (!frag) return;
+            const type = (frag.type1 ?? "").toLowerCase();
+            if (type === "fire" || type === "air") damageBoost++;
+            else if (type === "water" || type === "earth") shieldBoost++;
+        });
+
+        setIsEnhancingFragShaking(true);
+        const fragIds = filledFrags.map((f) => f.id);
+        const fragRefList = [enhancingFragSlotRef0, enhancingFragSlotRef1, enhancingFragSlotRef2, enhancingFragSlotRef3, enhancingFragSlotRef4];
+
+        const t1 = window.setTimeout(() => {
+            setIsEnhancingFragShaking(false);
+            const centerRect = enhancingCenterSlotRef.current?.getBoundingClientRect();
+            if (!centerRect) return;
+            const centerCX = centerRect.left + centerRect.width / 2;
+            const centerCY = centerRect.top + centerRect.height / 2;
+
+            const flights: EnhancingFlight[] = [];
+            filledFrags.forEach(({ id, idx }) => {
+                const frag = getDraggableById(id);
+                if (!frag) return;
+                const fragRect = fragRefList[idx].current?.getBoundingClientRect();
+                if (!fragRect) return;
+                const sx = fragRect.left + fragRect.width / 2;
+                const sy = fragRect.top + fragRect.height / 2;
+                flights.push({ id: enhancingFlightIdRef.current++, letter: frag.letter, type1: frag.type1, x: sx, y: sy, dx: centerCX - sx, dy: centerCY - sy });
+            });
+
+            setEnhancingFragSlotIds([null, null, null, null, null]);
+            consumeElements(fragIds);
+            setDraggables((prev) => prev.filter((d) => !fragIds.includes(d.id)));
+
+            if (flights.length > 0) {
+                setEnhancingFlights(flights);
+                const t2 = window.setTimeout(() => {
+                    setEnhancingFlights([]);
+                    boostElementStats(centerDraggable.id, damageBoost, shieldBoost);
+                    setDraggables((prev) => prev.map((d) =>
+                        d.id === centerDraggable.id
+                            ? { ...d, damage: d.damage + damageBoost, shield: (d.shield ?? 0) + shieldBoost }
+                            : d,
+                    ));
+                    // Stat boost toast over the center element
+                    if (damageBoost > 0 || shieldBoost > 0) {
+                        const gameRect = gameRef.current?.getBoundingClientRect();
+                        if (gameRect) {
+                            const toastId = newElementToastIdRef.current++;
+                            setStatBoostToasts((prev) => [...prev, {
+                                id: toastId,
+                                x: centerCX - gameRect.left,
+                                y: centerCY - gameRect.top,
+                                damageBoost,
+                                shieldBoost,
+                            }]);
+                            window.setTimeout(() => {
+                                setStatBoostToasts((prev) => prev.filter((t) => t.id !== toastId));
+                            }, 2600);
+                        }
+                    }
+                    setIsEnhancingCenterFlashing(true);
+                    const t3 = window.setTimeout(() => setIsEnhancingCenterFlashing(false), 500);
+                    enhancingTimersRef.current.push(t3);
+                }, 500);
+                enhancingTimersRef.current.push(t2);
+            }
+        }, 500);
+        enhancingTimersRef.current.push(t1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [enhancingCenterSlotId, enhancingFragSlotIds, getDraggableById, consumeElements, boostElementStats]);
+
     const handleBossTransitionComplete = useCallback(() => {
         setBossIndex((prev) => prev + 1);
         setBattlesCompleted(0);
         setWarriorAnimateVersion(0); // reset so visualIndex in BossCountdown syncs to dot 0
         try { window.localStorage.setItem(BOSS_COUNTDOWN_KEY, "0"); } catch { /* ignore */ }
     }, []);
+
+    // Boss dialogue lines for the current boss — resolved once enemies/bossIndex are known
+    const bossDialogueLines = useMemo(
+        () => resolveDialogueLines(enemies[bossIndex]?.dialogue ?? ""),
+        [enemies, bossIndex],
+    );
+
+    // Pick one unused dialogue line once BOTH a battle win AND enemies have loaded.
+    // Uses a ref guard so the effect re-running on bossDialogueLines changes doesn't re-pick.
+    const hasPickedDialogueRef = useRef(false);
+    useEffect(() => {
+        if (warriorAnimateVersion === 0) {
+            hasPickedDialogueRef.current = false;
+            return;
+        }
+        if (!bossDialogueLines.length) return; // enemies still loading
+        if (hasPickedDialogueRef.current) return; // already picked for this visit
+        hasPickedDialogueRef.current = true;
+        let usedLines: string[];
+        try { usedLines = JSON.parse(window.localStorage.getItem(DIALOGUE_USED_KEY) ?? "[]") as string[]; }
+        catch { usedLines = []; }
+        let available = bossDialogueLines.filter((l) => !usedLines.includes(l));
+        if (available.length === 0) { usedLines = []; available = [...bossDialogueLines]; }
+        const chosen = available[Math.floor(Math.random() * available.length)];
+        try { window.localStorage.setItem(DIALOGUE_USED_KEY, JSON.stringify([...usedLines, chosen])); }
+        catch { /* ignore */ }
+        setPickedDialogueLine(chosen);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [warriorAnimateVersion, bossDialogueLines]);
 
     const handleBossFight = () => {
         if (!bossEnemy) return;
@@ -4528,6 +4743,24 @@ function Game() {
                     ))}
                 </div>
             ) : null}
+            {enhancingFlights.length > 0 ? (
+                <div className="element-flight-layer" aria-hidden="true">
+                    {enhancingFlights.map((f) => (
+                        <span
+                            key={f.id}
+                            className="enhancing-frag-flight"
+                            style={{
+                                left: `${f.x}px`,
+                                top: `${f.y}px`,
+                                ["--fly-dx" as string]: `${f.dx}px`,
+                                ["--fly-dy" as string]: `${f.dy}px`,
+                            }}
+                        >
+                            <ElementIcon name={f.letter} />
+                        </span>
+                    ))}
+                </div>
+            ) : null}
             {newElementToasts.map((toast) => (
                 <div
                     key={toast.id}
@@ -4741,6 +4974,7 @@ function Game() {
                     }
                     returnHomeVersion={returnHomeVersions[draggable.id] ?? 0}
                     zIndexOverride={draggable.category === "fragment" ? 9100 : undefined}
+                    isShaking={isEnhancingFragShaking && enhancingFragSlotIds.includes(draggable.id)}
                 />
             ))}
 
@@ -4938,6 +5172,17 @@ function Game() {
                             getUnlockSlotLetter={getUnlockSlotLetter}
                             isUnlockReady={isUnlockReady}
                             onUnlock={handleUnlock}
+                            isEnhancingTabSelected={isEnhancingTabSelected}
+                            onEnhancingTabSelect={handleEnhancingTabSelect}
+                            enhancingCenterSlotRef={enhancingCenterSlotRef}
+                            enhancingFragSlotRefs={[enhancingFragSlotRef0, enhancingFragSlotRef1, enhancingFragSlotRef2, enhancingFragSlotRef3, enhancingFragSlotRef4]}
+                            enhancingCenterSlotId={enhancingCenterSlotId}
+                            enhancingFragSlotIds={enhancingFragSlotIds}
+                            getEnhancingSlotLetter={(id) => getDraggableById(id)?.letter}
+                            canFragmentEnhance={enhancingCenterSlotId !== null && enhancingFragSlotIds.some((id) => id !== null)}
+                            onFragmentEnhance={handleFragmentEnhance}
+                            isEnhancingFragShaking={isEnhancingFragShaking}
+                            isEnhancingCenterFlashing={isEnhancingCenterFlashing}
                         />
                     ) : null}
 
@@ -5368,6 +5613,8 @@ function Game() {
                 transitionToSprite={enemies[bossIndex + 1]?.sprite ?? ""}
                 transitionVersion={bossTransitionVersion}
                 onTransitionComplete={handleBossTransitionComplete}
+                dialogueLine={pickedDialogueLine}
+                dialogueTriggerVersion={warriorAnimateVersion}
             />
         </div>
     );
