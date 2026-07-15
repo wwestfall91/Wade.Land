@@ -170,11 +170,11 @@
         animation: invalid-drop-shake 0.35s ease-in-out;
     }
 
-    // ── Fragment draggables (50% scale) ────────────────────────────────────────
+    // ── Fragment draggables (60% scale) ────────────────────────────────────────
 
     .drag.is-fragment {
-        width: 1.15rem;
-        height: 1.15rem;
+        width: calc(2.3rem * 0.6);
+        height: calc(2.3rem * 0.6);
         border-radius: 14px;
         border: 1.5px solid #c4d0ff;
         background: linear-gradient(180deg, #3a52cc 0%, #1e2f8a 100%);
@@ -183,8 +183,8 @@
             inset 0 0 0 2px #0c1554;
 
         .element-icon {
-            width: 0.75rem;
-            height: 0.75rem;
+            width: calc(1.5rem * 0.6);
+            height: calc(1.5rem * 0.6);
         }
 
         &.is-fragment--fire {

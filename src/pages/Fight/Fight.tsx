@@ -1499,6 +1499,7 @@ function Fight() {
         let burnDuration = 0;
         let hadCriticalHit = false;
         let nextEnemyHealth = enemyHealth;
+        let nextEnemyShield = enemyShield;
         const hitDamageBreakdown: number[] = [];
         let burnedWasExtinguished = false;
         let totalSoakApplied = 0;
@@ -1545,7 +1546,15 @@ function Fight() {
             const hitDamage = Math.round(hitDamageAfterCrit * Math.max(0, 1 - enemyResistPercent / 100));
             hitDamageBreakdown.push(hitDamage);
             totalDamage += hitDamage;
-            nextEnemyHealth = Math.max(0, nextEnemyHealth - hitDamage);
+            const shieldAbsorbed = Math.min(nextEnemyShield, hitDamage);
+            const hitDamageAfterShield = hitDamage - shieldAbsorbed;
+            if (shieldAbsorbed > 0) {
+                nextEnemyShield = Math.max(0, nextEnemyShield - shieldAbsorbed);
+                setEnemyShield(nextEnemyShield);
+                pushEventLog(`Shield blocks ${shieldAbsorbed}`, "status", { isDetail: true });
+                await wait(EFFECT_STEP_DELAY_MS);
+            }
+            nextEnemyHealth = Math.max(0, nextEnemyHealth - hitDamageAfterShield);
             setEnemyHealth(nextEnemyHealth);
             triggerEnemyHitFeedback(hitDamage, hitFlashColor);
 

@@ -196,18 +196,23 @@ const ENABLE_FIRST_BATTLE_OLD_ONE_SCENE = false;
 const ENABLE_LEVEL_UP_MODAL = false;
 const COMBUST_DAMAGE_MULTIPLIER = 2.5;
 const PREVIEW_DRAG_START_THRESHOLD_PX = 6;
-const HOMUNCULUS_CREATE_ANIMATION_MS = 2000;
+const HOMUNCULUS_CREATE_ANIMATION_MS = 1000;
 const BOSS_COUNTDOWN_KEY = "game.bossCountdown";
 /** Number of regular battles before the first boss fight. */
 const BOSS_BATTLE_THRESHOLD = 10;
 
+// Reset boss countdown to 0 on every page load. Module-level code runs once
+// per page load (including F5 refresh) so this guarantees the first boss always
+// starts fresh regardless of which enemy occupies that slot.
+try { window.localStorage.setItem(BOSS_COUNTDOWN_KEY, "0"); } catch { /* ignore */ }
+
 // ── Draggable overlap separation ─────────────────────────────────────────────
-// Elements are 32×32 px. Fragments are CSS-scaled to 50% (16×16 visual) but
-// their layout box is still 32×32; the visual area is centred with an 8px
+// Elements are 32×32 px. Fragments are CSS-scaled to 60% (19.2×19.2 visual) but
+// their layout box is still 32×32; the visual area is centred with a 6.4px
 // offset on each side.
 const ELEMENT_VISUAL_SIZE = 32;
-const FRAGMENT_VISUAL_SIZE = 16;
-const FRAGMENT_VISUAL_OFFSET = (ELEMENT_VISUAL_SIZE - FRAGMENT_VISUAL_SIZE) / 2; // 8
+const FRAGMENT_VISUAL_SIZE = 19.2;
+const FRAGMENT_VISUAL_OFFSET = (ELEMENT_VISUAL_SIZE - FRAGMENT_VISUAL_SIZE) / 2; // 6.4
 
 function separateOverlappingDraggables(
     items: DraggableItem[],
@@ -537,7 +542,7 @@ function Game() {
     // ── Homunculus / enemy-card mode ──────────────────────────────────────────
     const [enemyCardMode, setEnemyCardMode] = useState<"create" | "fight" | "consume" | "boss">(() => {
         try {
-            const b = parseInt(window.localStorage.getItem(BOSS_COUNTDOWN_KEY) ?? "0", 10) || 0;
+            const b = Math.max(0, parseInt(window.localStorage.getItem(BOSS_COUNTDOWN_KEY) ?? "0", 10) || 0);
             return b >= BOSS_BATTLE_THRESHOLD ? "boss" : "fight";
         } catch {
             return "fight";
@@ -1280,8 +1285,8 @@ function Game() {
             };
         }
 
-        // Fragments are rendered at 50% scale (22px effective), so use a 22px grid.
-        const step = 22;
+        // Fragments are rendered at 60% scale (~19.2px effective), so use a 20px grid.
+        const step = 20;
         const padding = 5;
         const columns = Math.max(1, Math.floor((startRect.width - padding * 2) / step));
         const row = Math.floor(index / columns);
@@ -4052,7 +4057,7 @@ function Game() {
             setDrainShakeColor(meter.color);
             setIsDrainShaking(true);
             setConsumeDrainedMeters((prev) => new Set([...prev, meter.key]));
-            window.setTimeout(() => setIsDrainShaking(false), 700);
+            window.setTimeout(() => setIsDrainShaking(false), 350);
 
             // Award elements for this stat
             const elementType = STAT_ELEMENT_TYPE[meter.key];
@@ -4103,12 +4108,12 @@ function Game() {
                 setConsumeFinaleTemplate(finalRewardTemplate);
                 setConsumeFinalePhase(1);
 
-                // Phase 2 (1–2s): sprite hides, element icon appears and shrinks to draggable size
+                // Phase 2 (0.5–1s): sprite hides, element icon appears and shrinks to draggable size
                 const phase2Id = window.setTimeout(() => {
                     setConsumeFinalePhase(2);
-                }, 1000);
+                }, 500);
 
-                // Phase 3 (2s+): clear icon, launch element flight, switch mode when it lands
+                // Phase 3 (1s+): clear icon, launch element flight, switch mode when it lands
                 const phase3Id = window.setTimeout(() => {
                     setConsumeFinaleTemplate(null);
                     launchBoostedBaseElementFlight(finalRewardTemplate, finalDamageBoost, finalShieldBoost);
@@ -4125,7 +4130,7 @@ function Game() {
                             setBossTransitionVersion((v) => v + 1);
                         }
                     }, ELEMENT_FLIGHT_TRAVEL_MS + 100);
-                }, 2000);
+                }, 1000);
 
                 consumeFlightTimeoutsRef.current.push(phase2Id, phase3Id);
             } else {
@@ -4142,7 +4147,7 @@ function Game() {
                     if (wasBoss) {
                         setBossTransitionVersion((v) => v + 1);
                     }
-                }, 2000);
+                }, 1000);
             }
         }
     };
@@ -4971,9 +4976,6 @@ function Game() {
                     <div className="enemy-card-with-meters">
                     {enemyCardMode === "create" ? (
                         <div className="game-enemy-card game-enemy-card--create">
-                            <div className="next-enemy-text">
-                                <span>Homunculus Lab</span>
-                            </div>
                             <div className="game-enemy-card-header">
                                 <div className="game-enemy-card-name">
                                     {isCreatingHomunculus
@@ -5047,17 +5049,9 @@ function Game() {
                                 )}
    
                             </div>
-                            <div className="game-enemy-card-footer">
-                                {isCreatingHomunculus
-                                    ? "Creating homunculus..."
-                                    : (matchedHomunculusRow ? "" : "Insert element(s) to Begin Creation")}
-                            </div>
                         </div>
                     ) : enemyCardMode === "consume" ? (
                         <div ref={consumeCardRef} className={`game-enemy-card game-enemy-card--consume${isConsuming ? " is-consuming" : ""}`}>
-                            <div className="next-enemy-text">
-                                <span>Consume</span>
-                            </div>
                             <div className="game-enemy-card-header">
                                 <div className="game-enemy-card-name">{nextEnemy?.name ?? "Unknown Enemy"}</div>
                             </div>
@@ -5090,13 +5084,9 @@ function Game() {
                                     souls={nextEnemy?.souls ?? 0}
                                 />
                             </div>
-                            <div className="game-enemy-card-footer">Absorb this enemy's essence</div>
                         </div>
                     ) : enemyCardMode === "boss" ? (
                         <div className="game-enemy-card game-enemy-card--boss">
-                            <div className="next-enemy-text">
-                                <span>Boss Battle</span>
-                            </div>
                             <div className="game-enemy-card-header">
                                 <div className="game-enemy-card-name">{bossEnemy?.name ?? "Unknown Boss"}</div>
                             </div>
@@ -5116,9 +5106,6 @@ function Game() {
                         </div>
                     ) : (
                         <div className="game-enemy-card">
-                            <div className="next-enemy-text">
-                                <span>Next Enemy</span>
-                            </div>
                             <div className="game-enemy-card-header">
                                 <div className="game-enemy-card-name">{nextEnemy?.name ?? "Unknown Enemy"}</div>
                             </div>

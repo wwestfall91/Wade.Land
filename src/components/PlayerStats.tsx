@@ -93,6 +93,11 @@ function PlayerStats({
                             <div key={element} className={`player-resistance-item player-resistance-item--${element}`}>
                                 <ElementIcon name={element} className="player-resistance-icon" />
                                 <span className={`player-resistance-value ${resistanceClass}`}>{`${prefix}${normalizedValue}%`}</span>
+                                <span className="player-resistance-tooltip">
+                                    {normalizedValue >= 0
+                                        ? `Reduce ${element.charAt(0).toUpperCase() + element.slice(1)} damage by ${normalizedValue}%`
+                                        : `Take ${Math.abs(normalizedValue)}% more ${element.charAt(0).toUpperCase() + element.slice(1)} damage`}
+                                </span>
                             </div>
                         );
                     })}

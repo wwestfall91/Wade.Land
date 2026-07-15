@@ -1060,7 +1060,7 @@
         .element-icon {
             width: 3.8rem;
             height: 3.8rem;
-            animation: forge-elem-glow 2000ms ease-in forwards;
+            animation: forge-elem-glow 1000ms ease-in forwards;
         }
     }
 
@@ -1069,7 +1069,7 @@
         inset: 0;
         opacity: 0;
         transform: scale(0.82);
-        animation: forge-sprite-reveal 2000ms ease-out forwards;
+        animation: forge-sprite-reveal 1000ms ease-out forwards;
         pointer-events: none;
     }
 
@@ -2522,6 +2522,7 @@
         display: flex;
         flex-direction: column;
         justify-content: center;
+        text-align: center;
         align-items: center;
         border-bottom: 2px solid rgba(228, 234, 255, 0.64);
         background: linear-gradient(180deg, rgba(85, 103, 230, 0.95) 0%, rgba(36, 50, 164, 0.95) 100%);
@@ -2532,11 +2533,13 @@
         min-height: 2rem;
 
         .game-enemy-card-name {
-            font-size: 1rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.25rem;
             font-weight: 700;
             color: #ffffff;
             text-transform: uppercase;
-            text-align: center;
             line-height: 1.1;
             flex: 1 1 auto;
         }
@@ -2735,7 +2738,7 @@
     }
 
     &.is-consuming .consume-mode-stage {
-        animation: consume-shake 0.09s linear infinite, consume-fade 2s ease-out forwards;
+        animation: consume-shake 0.09s linear infinite, consume-fade 1s ease-out forwards;
 
         .enemy-sprite-image {
             filter: grayscale(0) brightness(1.4) drop-shadow(0 0 10px var(--consume-glow-color, #ef4444)) !important;
@@ -2748,7 +2751,7 @@
         animation: consume-shake 0.09s linear infinite;
 
         .enemy-sprite-image {
-            animation: consume-finale-whiteburn 1s ease-in forwards !important;
+            animation: consume-finale-whiteburn 0.5s ease-in forwards !important;
         }
     }
 
@@ -2779,7 +2782,7 @@
             height: 2.3rem;
             object-fit: contain;
             transform-origin: center center;
-            animation: consume-finale-icon-shrink 1s ease-out forwards;
+            animation: consume-finale-icon-shrink 0.5s ease-out forwards;
         }
     }
 }
@@ -2907,8 +2910,8 @@
 }
 
 .create-fragment-slot {
-    width: 1.6rem;
-    height: 1.6rem;
+    width: 1.9rem;
+    height: 1.9rem;
     border: 1.5px solid #4ab9f5;
     border-radius: 245px;
     background:
@@ -2936,8 +2939,8 @@
 }
 
 .create-fragment-slot-empty {
-    width: 0.9rem;
-    height: 0.9rem;
+    width: 1.1rem;
+    height: 1.1rem;
     opacity: 0.55;
     user-select: none;
     pointer-events: none;

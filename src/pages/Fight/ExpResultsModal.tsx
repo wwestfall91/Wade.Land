@@ -232,9 +232,12 @@ export function ExpResultsModal({ entries, onContinue }: ExpResultsModalProps) {
                 )}
 
                 <button
-                    className={`exp-results-continue${allDone ? " is-ready" : ""}`}
-                    disabled={!allDone}
-                    onClick={onContinue}
+                    className="exp-results-continue"
+                    onClick={() => {
+                        timersRef.current.forEach(window.clearTimeout);
+                        timersRef.current = [];
+                        onContinue();
+                    }}
                 >
                     Continue
                 </button>
